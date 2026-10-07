@@ -1,0 +1,19 @@
+{
+  "name": "tasky-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.4.0",
+    "papaparse": "^5.7.0",
+    "read-excel-file": "^9.3.10"
+  }
+}
