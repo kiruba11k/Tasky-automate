@@ -1,4 +1,4 @@
-# Render Blueprint: one free web service serving the API and the built frontend.
+# Render Blueprint: one free web service (API + built frontend) backed by a Neon Postgres database.
 services:
   - type: web
     name: tasky-automate
@@ -12,7 +12,15 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-      - key: DATA_DIR
-        value: /tmp/tasky-data
-      - key: ANTHROPIC_API_KEY
-        sync: false   # optional: enables real AI task allocation
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL        # Neon connection string (see README)
+        sync: false
+      - key: ADMIN_EMAIL         # first admin, created on first start
+        sync: false
+      - key: ADMIN_PASSWORD      # min 8 chars; can be removed after first login
+        sync: false
+      - key: ANTHROPIC_API_KEY   # optional: enables real AI task allocation
+        sync: false

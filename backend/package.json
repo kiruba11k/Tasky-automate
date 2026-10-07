@@ -7,13 +7,17 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:schema": "node scripts/migrate.js --print"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "papaparse": "^5.7.0",
+    "pg": "^8.23.1",
     "read-excel-file": "^9.3.10"
   }
 }

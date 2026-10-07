@@ -1,17 +1,17 @@
-const USER_KEY = 'tasky_user_id';
+const TOKEN_KEY = 'tasky_token';
 
-export function getActingUserId() {
+export function getToken() {
   try {
-    return localStorage.getItem(USER_KEY);
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
 }
 
-export function setActingUserId(id) {
+export function setToken(token) {
   try {
-    if (id) localStorage.setItem(USER_KEY, id);
-    else localStorage.removeItem(USER_KEY);
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {
     /* storage unavailable */
   }
@@ -19,8 +19,8 @@ export function setActingUserId(id) {
 
 export async function request(method, url, body) {
   const headers = {};
-  const userId = getActingUserId();
-  if (userId) headers['x-user-id'] = userId;
+  const token = getToken();
+  if (token) headers.authorization = `Bearer ${token}`;
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   if (body !== undefined && !isForm) headers['content-type'] = 'application/json';
   const res = await fetch(url, { method, headers, body: body === undefined ? undefined : isForm ? body : JSON.stringify(body) });
@@ -32,6 +32,11 @@ export async function request(method, url, body) {
     } catch {
       data = text;
     }
+  }
+  if (res.status === 401 && token) {
+    // Session expired or revoked: drop it and let the app show the login page.
+    setToken(null);
+    window.dispatchEvent(new Event('auth:logout'));
   }
   if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
   return data;

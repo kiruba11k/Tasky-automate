@@ -10,7 +10,8 @@ for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
   schemas[s.name] = s;
 }
 
-// Built-in User entity: permissive, roles are admin | team_leader | team_member.
+// Built-in User entity. Roles are admin | team_leader | team_member. Login secrets live in
+// database-only columns (see ddl.js SECRET_COLUMNS) and are never part of this schema.
 schemas.User = {
   name: 'User',
   type: 'object',
@@ -21,6 +22,10 @@ schemas.User = {
     status: { type: 'string', enum: ['Active', 'Inactive'], default: 'Active' },
     project_ids: { type: 'array' },
     google_sheet_id: { type: 'string' },
+    designation: { type: 'string' },
+    contact: { type: 'string' },
+    hire_date: { type: 'string' },
+    skills: { type: 'string' },
   },
   required: ['full_name', 'email'],
 };

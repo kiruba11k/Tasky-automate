@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { User } from "@/entities/User";
+import InviteLinkDialog from "@/components/shared/InviteLinkDialog";
 import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -42,6 +43,8 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openDesignation, setOpenDesignation] = useState(false);
   const [currentSkill, setCurrentSkill] = useState('');
+  const [error, setError] = useState('');
+  const [invite, setInvite] = useState(null);
 
   useEffect(() => {
     setFormData(getInitialState(member));
@@ -50,20 +53,19 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError('');
     try {
       const dataToSave = { ...formData, skills: Array.isArray(formData.skills) ? formData.skills.join(',') : '' };
       if (member) {
         await User.update(member.id, dataToSave);
       } else {
-        // Assuming User.create is available for adding new users.
-        // This is a placeholder for actual user creation logic which might be more complex
-        // (e.g., sending an invite).
-        // For now, we simulate direct creation.
-        await User.create(dataToSave);
+        const created = await User.create(dataToSave);
+        setInvite({ name: created.full_name, token: created.invite_token });
       }
       onSaved();
     } catch (error) {
       console.error("Error saving member:", error);
+      setError(error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -81,9 +83,12 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-800 border-slate-600 text-white">
         <DialogHeader><DialogTitle>{member ? 'Edit Member' : 'Add New Member'}</DialogTitle></DialogHeader>
+        {!member && <p className="text-sm text-slate-400">An invitation link is generated on save. The member sets their own password.</p>}
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Full Name</Label><Input value={formData.full_name || ''} onChange={e => setFormData({...formData, full_name: e.target.value})} required className="bg-slate-700"/></div>
@@ -122,5 +127,7 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
         </form>
       </DialogContent>
     </Dialog>
+    <InviteLinkDialog open={!!invite} onOpenChange={(o) => !o && setInvite(null)} name={invite?.name} token={invite?.token} />
+    </>
   );
 }

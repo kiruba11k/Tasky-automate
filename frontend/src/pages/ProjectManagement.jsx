@@ -45,7 +45,6 @@ export default function ProjectManagement() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
     try {
       // Load data with individual try-catch to prevent one failure from breaking everything
       let user = null;

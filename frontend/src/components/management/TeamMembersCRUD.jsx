@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Filter, Plus, Edit, Trash2, User as UserIcon, Phone, Mail, Calendar } from "lucide-react";
+import InviteLinkDialog from '@/components/shared/InviteLinkDialog';
+import { Search, Filter, Plus, Edit, Trash2, Link2, User as UserIcon, Phone, Mail, Calendar } from "lucide-react";
 import { format } from 'date-fns';
 
 const marketingDesignations = [
@@ -24,6 +25,8 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [invite, setInvite] = useState(null); // { name, token } for the link dialog
   
   const [formData, setFormData] = useState({
     full_name: '',
@@ -72,6 +75,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
         hire_date: ''
       });
     }
+    setFormError('');
     setShowForm(true);
   };
 
@@ -90,14 +94,30 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
       } else {
         result = await User.create(formData);
         await onLogActivity('Create', 'Team Member', result.id, formData.full_name);
+        setInvite({ name: result.full_name, token: result.invite_token });
       }
       
       setShowForm(false);
       onDataChange();
     } catch (error) {
       console.error('Error saving user:', error);
+      setFormError(error.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleInvite = async (user) => {
+    const msg = user.invite_pending
+      ? `Generate a new invitation link for ${user.full_name}?`
+      : `Reset ${user.full_name}'s password? Their current password stops working until they accept a new invitation.`;
+    if (!window.confirm(msg)) return;
+    try {
+      const { invite_token } = await User.invite(user.id);
+      setInvite({ name: user.full_name, token: invite_token });
+      onDataChange();
+    } catch (error) {
+      window.alert(error.message);
     }
   };
 
@@ -109,6 +129,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
         onDataChange();
       } catch (error) {
         console.error('Error deleting user:', error);
+        window.alert(error.message);
       }
     }
   };
@@ -263,6 +284,12 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
                   </Button>
+                  {user.id !== currentUser?.id && (
+                    <Button variant="ghost" size="sm" onClick={() => handleInvite(user)}>
+                      <Link2 className="w-4 h-4 mr-1" />
+                      {user.invite_pending ? 'Invite link' : 'Reset password'}
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => handleDelete(user)} className="text-red-400 hover:text-red-300">
                     <Trash2 className="w-4 h-4 mr-1" />
                     Delete
@@ -280,6 +307,10 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Edit Team Member' : 'Add New Team Member'}</DialogTitle>
           </DialogHeader>
+          {!editingUser && (
+            <p className="text-sm text-slate-400">An invitation link is generated on save. The member sets their own password.</p>
+          )}
+          {formError && <p role="alert" className="text-sm text-red-400">{formError}</p>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -394,6 +425,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
           </form>
         </DialogContent>
       </Dialog>
+      <InviteLinkDialog open={!!invite} onOpenChange={(o) => !o && setInvite(null)} name={invite?.name} token={invite?.token} />
     </div>
   );
 }

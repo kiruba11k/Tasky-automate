@@ -1,11 +1,11 @@
 import Papa from 'papaparse';
 import readXlsx from 'read-excel-file/node';
 
-/** Parses an uploaded CSV/XLSX file into { columns, rows }. */
-export async function parseTable(filePath, filename) {
+/** Parses an uploaded CSV/XLSX buffer into { columns, rows }. */
+export async function parseTable(buffer, filename) {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.xlsx')) {
-    const rows = await readXlsx(filePath);
+    const rows = await readXlsx(buffer);
     const [header = [], ...body] = rows;
     const columns = header.map((h) => String(h ?? '').trim());
     return {
@@ -14,8 +14,7 @@ export async function parseTable(filePath, filename) {
     };
   }
   if (lower.endsWith('.csv') || lower.endsWith('.txt')) {
-    const fs = await import('node:fs/promises');
-    const parsed = Papa.parse((await fs.readFile(filePath, 'utf8')).replace(/^﻿/, ''), { header: true, skipEmptyLines: true });
+    const parsed = Papa.parse(buffer.toString('utf8').replace(/^﻿/, ''), { header: true, skipEmptyLines: true });
     return { columns: (parsed.meta.fields || []).map((c) => c.trim()), rows: parsed.data };
   }
   throw new Error('Unsupported file type. Please upload a .csv or .xlsx file.');

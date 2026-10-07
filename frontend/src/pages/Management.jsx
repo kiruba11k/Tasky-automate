@@ -35,7 +35,6 @@ export default function Management() {
   }, []);
 
   const loadData = async () => {
-    setIsLoading(true);
     try {
       const [
         currentUserData,

@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { User } from "@/entities/User";
-import { setActingUserId } from "@/api/client";
-import { LayoutDashboard, Users, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
+import { useAuth } from "@/auth/AuthContext";
+import { LayoutDashboard, LogOut, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
 
 const navigationItems = [
   {
@@ -40,22 +39,7 @@ const navigationItems = [
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
-  const [users, setUsers] = useState([]);
-  const [me, setMe] = useState(null);
-
-  useEffect(() => {
-    Promise.all([User.list(), User.me()])
-      .then(([all, current]) => {
-        setUsers(all);
-        setMe(current);
-      })
-      .catch((e) => console.error("Failed to load users:", e));
-  }, []);
-
-  const switchUser = (e) => {
-    setActingUserId(e.target.value);
-    window.location.reload();
-  };
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen animated-gradient-bg-enhanced">
@@ -285,19 +269,21 @@ export default function Layout({ children, currentPageName }) {
               })}
             </div>
 
-            {/* Acting-user switcher (no auth system: pick who you are) */}
-            <select
-              value={me?.id || ""}
-              onChange={switchUser}
-              aria-label="Acting user"
-              className="bg-slate-800/70 text-slate-200 text-sm rounded-lg border border-slate-700/60 px-2 py-2 max-w-[11rem]"
-            >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name} ({u.role})
-                </option>
-              ))}
-            </select>
+            {/* Signed-in user */}
+            <div className="flex items-center gap-3">
+              <div className="text-right leading-tight hidden sm:block">
+                <div className="text-sm font-medium text-white">{user?.full_name}</div>
+                <div className="text-xs text-slate-400">{user?.role?.replace("_", " ")}</div>
+              </div>
+              <button
+                onClick={logout}
+                aria-label="Sign out"
+                title="Sign out"
+                className="p-2 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300 hover:text-white"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </nav>
