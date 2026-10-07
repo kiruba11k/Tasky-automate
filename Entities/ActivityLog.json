@@ -1,0 +1,62 @@
+{
+  "name": "ActivityLog",
+  "type": "object",
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "Create",
+        "Update",
+        "Delete"
+      ],
+      "description": "Type of action performed"
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": [
+        "Project",
+        "Task",
+        "Team Member",
+        "Resource"
+      ],
+      "description": "Type of entity that was modified"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the entity that was modified"
+    },
+    "entity_name": {
+      "type": "string",
+      "description": "Name/title of the entity for display"
+    },
+    "performed_by": {
+      "type": "string",
+      "description": "ID of user who performed the action"
+    },
+    "performed_by_name": {
+      "type": "string",
+      "description": "Name of user who performed the action"
+    },
+    "performed_by_role": {
+      "type": "string",
+      "description": "Role of user who performed the action"
+    },
+    "changes": {
+      "type": "object",
+      "description": "Details of what changed (before/after values)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the action was performed"
+    }
+  },
+  "required": [
+    "action_type",
+    "entity_type",
+    "entity_id",
+    "performed_by",
+    "performed_by_name",
+    "timestamp"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "SheetSync",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "sheet_id": {
+      "type": "string"
+    },
+    "last_sync": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "error",
+        "pending",
+        "disabled"
+      ],
+      "default": "pending"
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_id",
+    "sheet_id"
+  ]
+}

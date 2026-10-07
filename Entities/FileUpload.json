@@ -1,0 +1,54 @@
+{
+  "name": "FileUpload",
+  "type": "object",
+  "properties": {
+    "filename": {
+      "type": "string"
+    },
+    "file_type": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "xlsx"
+      ]
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "uploaded_by": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "uploaded",
+        "processing",
+        "completed",
+        "error"
+      ],
+      "default": "uploaded"
+    },
+    "records_imported": {
+      "type": "number",
+      "default": 0
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "column_mapping": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "filename",
+    "file_type",
+    "file_url",
+    "uploaded_by"
+  ]
+}

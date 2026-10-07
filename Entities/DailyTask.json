@@ -1,0 +1,74 @@
+{
+  "name": "DailyTask",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "task": {
+      "type": "string"
+    },
+    "expected_outcome": {
+      "type": "string"
+    },
+    "expected_time": {
+      "type": "number",
+      "minimum": 0.1
+    },
+    "tasks_done": {
+      "type": "string"
+    },
+    "actual_time_taken": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0
+    },
+    "task_status": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "In Progress",
+        "Completed",
+        "Blocked"
+      ],
+      "default": "Pending"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High",
+        "Critical"
+      ],
+      "default": "Medium"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "file_source": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "google_sheets",
+        "csv_upload"
+      ],
+      "default": "manual"
+    }
+  },
+  "required": [
+    "date",
+    "project_id",
+    "user_id",
+    "task",
+    "expected_outcome",
+    "expected_time"
+  ]
+}

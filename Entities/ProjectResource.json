@@ -1,0 +1,54 @@
+{
+  "name": "ProjectResource",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the project this resource belongs to"
+    },
+    "title": {
+      "type": "string",
+      "description": "Resource title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Resource description"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Note",
+        "File",
+        "Link"
+      ],
+      "description": "Type of resource"
+    },
+    "content": {
+      "type": "string",
+      "description": "Resource content (note text, file URL, or link URL)"
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Original file name if type is File"
+    },
+    "file_size": {
+      "type": "number",
+      "description": "File size in bytes if type is File"
+    },
+    "uploaded_by": {
+      "type": "string",
+      "description": "ID of user who uploaded/created this resource"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the resource is active"
+    }
+  },
+  "required": [
+    "project_id",
+    "title",
+    "type",
+    "content"
+  ]
+}

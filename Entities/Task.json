@@ -1,0 +1,69 @@
+{
+  "name": "Task",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Task title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed task description"
+    },
+    "project_id": {
+      "type": "string",
+      "description": "ID of the project this task belongs to"
+    },
+    "assigned_to": {
+      "type": "string",
+      "description": "ID of the team member assigned to this task"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "In Progress",
+        "Completed"
+      ],
+      "default": "Pending",
+      "description": "Current task status"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High",
+        "Critical"
+      ],
+      "default": "Medium",
+      "description": "Task priority level"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Task deadline"
+    },
+    "estimated_hours": {
+      "type": "number",
+      "minimum": 0.5,
+      "description": "Estimated hours to complete"
+    },
+    "actual_hours": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Actual hours spent on the task"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the task"
+    }
+  },
+  "required": [
+    "title",
+    "description",
+    "project_id",
+    "assigned_to"
+  ]
+}

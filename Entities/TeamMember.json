@@ -1,0 +1,117 @@
+{
+  "name": "TeamMember",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Team member's full name"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Marketing Manager",
+        "Content Creator",
+        "Social Media Specialist",
+        "SEO Specialist",
+        "PPC Specialist",
+        "Designer",
+        "Copywriter",
+        "Data Analyst"
+      ],
+      "description": "Team member's primary role"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Team member's email"
+    },
+    "skills": {
+      "type": "object",
+      "description": "Skill levels from 1-10",
+      "properties": {
+        "content_creation": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "social_media": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "seo": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "ppc_advertising": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "design": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "copywriting": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "analytics": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        },
+        "strategy": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5
+        }
+      }
+    },
+    "availability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 100,
+      "description": "Current availability percentage"
+    },
+    "current_workload": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Current workload percentage"
+    }
+  },
+  "required": [
+    "name",
+    "role",
+    "email"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {},
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
