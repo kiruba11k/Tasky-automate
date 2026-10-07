@@ -21,76 +21,71 @@ for (const [name, makeStore] of backends) {
       const text = await res.text();
       return { status: res.status, body: text ? JSON.parse(text) : null };
     };
-    const login = async (email, password) => (await api('POST', '/api/auth/login', { body: { email, password } })).body.token;
+    const login = async (email) => (await api('POST', '/api/auth/login', { body: { email } })).body.token;
     let admin;
 
     before(async () => {
       store = makeStore();
       await store.init();
       if (name === 'postgres') for (const e of Object.keys(schemas)) await store.pool.query(`TRUNCATE "${tableName(e)}"`);
-      await bootstrapAdmin(store, { email: 'Boss@Example.com', password: 'supersecret1' });
+      await bootstrapAdmin(store, { email: 'Boss@Example.com' });
       server = createApp({ store, jwtSecret: 'test-secret' }).listen(0);
       base = `http://localhost:${server.address().port}`;
-      admin = await login('boss@example.com', 'supersecret1');
+      admin = await login(' BOSS@example.com ');
     });
     after(async () => {
       server.close();
       await store.close();
     });
 
-    test('everything except login/invite/health requires a session', async () => {
+    test('everything except login/health requires a session', async () => {
       assert.equal((await api('GET', '/api/health')).status, 200);
       assert.equal((await api('GET', '/api/entities/Project')).status, 401);
       assert.equal((await api('GET', '/api/auth/me')).status, 401);
       assert.equal((await api('GET', '/api/entities/Project', { token: 'garbage' })).status, 401);
-      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'boss@example.com', password: 'wrong' } })).status, 401);
-      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'nobody@example.com', password: 'x' } })).status, 401);
+      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'nobody@example.com' } })).status, 401);
+      assert.equal((await api('POST', '/api/auth/login', { body: {} })).status, 401);
       const me = await api('GET', '/api/auth/me', { token: admin });
       assert.equal(me.body.role, 'admin');
-      assert.equal(me.body.password_hash, undefined);
+      assert.equal(me.body.email, 'boss@example.com');
     });
 
-    test('invite-only onboarding', async () => {
-      const inv = await api('POST', '/api/entities/User', { token: admin, body: { full_name: 'Lena', email: 'lena@x.com', role: 'team_leader' } });
-      assert.equal(inv.status, 201);
-      assert.ok(inv.body.invite_token);
-      assert.equal(inv.body.invite_pending, true);
-      assert.equal(inv.body.password_hash, undefined);
-      // cannot log in before accepting
-      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'lena@x.com', password: 'anything12' } })).status, 401);
+    test('only emails added by an admin can sign in', async () => {
+      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'lena@x.com' } })).status, 401);
+      const add = await api('POST', '/api/entities/User', { token: admin, body: { full_name: 'Lena', email: 'Lena@X.com', role: 'team_leader' } });
+      assert.equal(add.status, 201);
+      assert.equal(add.body.email, 'lena@x.com');
       assert.equal((await api('POST', '/api/entities/User', { token: admin, body: { full_name: 'Dup', email: 'LENA@x.com' } })).status, 409);
-      assert.equal((await api('GET', '/api/auth/invite/bogus')).status, 404);
-      assert.equal((await api('GET', `/api/auth/invite/${inv.body.invite_token}`)).body.email, 'lena@x.com');
-      assert.equal((await api('POST', '/api/auth/accept-invite', { body: { token: inv.body.invite_token, password: 'short' } })).status, 400);
-      const ok = await api('POST', '/api/auth/accept-invite', { body: { token: inv.body.invite_token, password: 'lenapass123' } });
-      assert.equal(ok.status, 200);
-      assert.equal(ok.body.user.invite_pending, false);
-      // token is single-use
-      assert.equal((await api('POST', '/api/auth/accept-invite', { body: { token: inv.body.invite_token, password: 'otherpass123' } })).status, 404);
-      assert.ok(await login('lena@x.com', 'lenapass123'));
+      assert.ok(await login('lena@x.com'));
+      // deactivated users are locked out, including existing sessions
+      const t = await login('lena@x.com');
+      await api('PUT', `/api/entities/User/${add.body.id}`, { token: admin, body: { status: 'Inactive' } });
+      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'lena@x.com' } })).status, 401);
+      assert.equal((await api('GET', '/api/auth/me', { token: t })).status, 401);
+      await api('PUT', `/api/entities/User/${add.body.id}`, { token: admin, body: { status: 'Active' } });
+      // removing the user revokes access
+      const tmp = await api('POST', '/api/entities/User', { token: admin, body: { full_name: 'Tmp', email: 'tmp@x.com' } });
+      const tmpToken = await login('tmp@x.com');
+      await api('DELETE', `/api/entities/User/${tmp.body.id}`, { token: admin });
+      assert.equal((await api('GET', '/api/auth/me', { token: tmpToken })).status, 401);
+      assert.equal((await api('POST', '/api/auth/login', { body: { email: 'tmp@x.com' } })).status, 401);
     });
 
     test('role rules', async () => {
-      const lena = await login('lena@x.com', 'lenapass123');
+      const lena = await login('lena@x.com');
       const member = await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'Mo', email: 'mo@x.com' } });
       assert.equal(member.status, 201);
       assert.equal(member.body.role, 'team_member');
       assert.equal((await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'X', email: 'x@x.com', role: 'admin' } })).status, 403);
-      const accept = await api('POST', '/api/auth/accept-invite', { body: { token: member.body.invite_token, password: 'mopass12345' } });
-      const mo = accept.body.token;
+      const mo = await login('mo@x.com');
       assert.equal((await api('POST', '/api/entities/User', { token: mo, body: { full_name: 'Y', email: 'y@x.com' } })).status, 403);
       const adminRec = (await api('GET', '/api/entities/User', { token: mo })).body.find((u) => u.role === 'admin');
       assert.equal((await api('PUT', `/api/entities/User/${adminRec.id}`, { token: lena, body: { role: 'team_member' } })).status, 403);
       assert.equal((await api('PUT', `/api/entities/User/${adminRec.id}`, { token: admin, body: { role: 'team_member' } })).status, 400); // last admin
       assert.equal((await api('DELETE', `/api/entities/User/${adminRec.id}`, { token: admin })).status, 400);
-      // secrets can't be written through the API
-      const put = await api('PUT', `/api/entities/User/${member.body.id}`, { token: admin, body: { designation: 'Dev', password_hash: 'x', skills: 'a,b' } });
+      assert.equal((await api('DELETE', `/api/entities/User/${adminRec.id}`, { token: admin })).status, 400);
+      const put = await api('PUT', `/api/entities/User/${member.body.id}`, { token: admin, body: { designation: 'Dev', skills: 'a,b' } });
       assert.equal(put.body.designation, 'Dev');
-      assert.ok(await login('mo@x.com', 'mopass12345'));
-      // admin reset via re-invite locks the old password
-      const re = await api('POST', `/api/users/${member.body.id}/invite`, { token: admin });
-      assert.ok(re.body.invite_token);
-      assert.equal((await api('GET', '/api/auth/me', { token: mo })).status, 401);
     });
 
     test('entity CRUD, defaults, validation, filter, sort', async () => {

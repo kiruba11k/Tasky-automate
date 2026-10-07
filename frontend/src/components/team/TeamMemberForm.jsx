@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { User } from "@/entities/User";
-import InviteLinkDialog from "@/components/shared/InviteLinkDialog";
 import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -44,7 +43,6 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
   const [openDesignation, setOpenDesignation] = useState(false);
   const [currentSkill, setCurrentSkill] = useState('');
   const [error, setError] = useState('');
-  const [invite, setInvite] = useState(null);
 
   useEffect(() => {
     setFormData(getInitialState(member));
@@ -59,8 +57,7 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
       if (member) {
         await User.update(member.id, dataToSave);
       } else {
-        const created = await User.create(dataToSave);
-        setInvite({ name: created.full_name, token: created.invite_token });
+        await User.create(dataToSave);
       }
       onSaved();
     } catch (error) {
@@ -83,11 +80,10 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
   };
 
   return (
-    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-800 border-slate-600 text-white">
         <DialogHeader><DialogTitle>{member ? 'Edit Member' : 'Add New Member'}</DialogTitle></DialogHeader>
-        {!member && <p className="text-sm text-slate-400">An invitation link is generated on save. The member sets their own password.</p>}
+        {!member && <p className="text-sm text-slate-400">Adding someone lets them sign in with just this email.</p>}
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -127,7 +123,5 @@ export default function TeamMemberForm({ open, onOpenChange, member, projects, t
         </form>
       </DialogContent>
     </Dialog>
-    <InviteLinkDialog open={!!invite} onOpenChange={(o) => !o && setInvite(null)} name={invite?.name} token={invite?.token} />
-    </>
   );
 }

@@ -24,14 +24,13 @@ export function AuthProvider({ children }) {
     return u;
   }, []);
 
-  const login = useCallback(async (email, password) => startSession(await request('POST', '/api/auth/login', { email, password })), [startSession]);
-  const acceptInvite = useCallback(async (token, password) => startSession(await request('POST', '/api/auth/accept-invite', { token, password })), [startSession]);
+  const login = useCallback(async (email) => startSession(await request('POST', '/api/auth/login', { email })), [startSession]);
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, acceptInvite, logout }), [user, loading, login, acceptInvite, logout]);
+  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

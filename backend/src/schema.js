@@ -10,8 +10,8 @@ for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
   schemas[s.name] = s;
 }
 
-// Built-in User entity. Roles are admin | team_leader | team_member. Login secrets live in
-// database-only columns (see ddl.js SECRET_COLUMNS) and are never part of this schema.
+// Built-in User entity. Roles are admin | team_leader | team_member. A user row is the login allow-list:
+// only emails present here (and Active) can sign in.
 schemas.User = {
   name: 'User',
   type: 'object',

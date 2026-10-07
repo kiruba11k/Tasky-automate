@@ -2,7 +2,6 @@ import React from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Layout from './Layout';
 import { AuthProvider, useAuth } from './auth/AuthContext';
-import AcceptInvite from './pages/AcceptInvite';
 import AIAllocation from './pages/AIAllocation';
 import Analytics from './pages/Analytics';
 import DailyTasks from './pages/DailyTasks';
@@ -46,10 +45,7 @@ function Protected() {
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/accept-invite" element={<AcceptInvite />} />
-        <Route path="*" element={<Protected />} />
-      </Routes>
+      <Protected />
     </AuthProvider>
   );
 }

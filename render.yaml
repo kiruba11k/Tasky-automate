@@ -18,9 +18,7 @@ services:
         generateValue: true
       - key: DATABASE_URL        # Neon connection string (see README)
         sync: false
-      - key: ADMIN_EMAIL         # first admin, created on first start
-        sync: false
-      - key: ADMIN_PASSWORD      # min 8 chars; can be removed after first login
+      - key: ADMIN_EMAIL         # first admin's email, created on first start
         sync: false
       - key: ANTHROPIC_API_KEY   # optional: enables real AI task allocation
         sync: false

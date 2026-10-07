@@ -27,10 +27,9 @@ await store.init();
 
 const port = Number(process.env.PORT) || 4000;
 const baseUrl = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
-const inviteToken = await bootstrapAdmin(store, { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD, name: process.env.ADMIN_NAME || 'Admin' });
-if (inviteToken) console.log(`First admin invitation (valid 7 days): ${baseUrl}/accept-invite?token=${inviteToken}`);
-if (!process.env.ADMIN_EMAIL && (await store.list('User', { query: { role: 'admin' } })).length === 0) {
-  console.warn('No admin exists. Set ADMIN_EMAIL (and ADMIN_PASSWORD) to create the first admin.');
+await bootstrapAdmin(store, { email: process.env.ADMIN_EMAIL, name: process.env.ADMIN_NAME || 'Admin' });
+if ((await store.list('User', { query: { role: 'admin' } })).length === 0) {
+  console.warn('No admin exists, so nobody can sign in. Set ADMIN_EMAIL to create the first admin.');
 }
 
 const app = createApp({ store, jwtSecret, staticDir: path.join(root, '..', 'frontend', 'dist') });

@@ -2,16 +2,12 @@ import { schemas } from './schema.js';
 
 const SQL_TYPES = { string: 'text', number: 'double precision', boolean: 'boolean', array: 'jsonb', object: 'jsonb' };
 
-// Columns that exist only in the database and are never accepted from clients.
-export const SECRET_COLUMNS = { User: ['password_hash', 'invite_token_hash', 'invite_expires'] };
-
 export const snake = (s) => s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 export const tableName = (entity) => `${snake(entity)}s`;
 
 export function columnsFor(entity) {
   const schema = schemas[entity];
   const cols = Object.entries(schema.properties || {}).map(([name, def]) => ({ name, type: def.type || 'string', sql: SQL_TYPES[def.type] || 'text' }));
-  for (const name of SECRET_COLUMNS[entity] || []) cols.push({ name, type: 'string', sql: 'text', secret: true });
   return cols;
 }
 

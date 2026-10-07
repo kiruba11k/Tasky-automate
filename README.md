@@ -1,6 +1,6 @@
 # Tasky Automate (TaskFlow)
 
-Marketing team task, project and workload manager. Invitation-only login, Postgres (Neon) storage.
+Marketing team task, project and workload manager. Email-only login restricted to an allow-list in the database, Postgres (Neon) storage.
 
 - `frontend/` — React 18 + Vite + Tailwind (shadcn-style UI components in `src/components/ui`)
 - `backend/` — Express API, entity schemas in `backend/schemas/`, Postgres via `pg`
@@ -10,7 +10,7 @@ Marketing team task, project and workload manager. Invitation-only login, Postgr
 ```bash
 npm run install:all
 npm run build     # builds frontend/dist
-ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=change-me-123 npm start   # http://localhost:4000
+ADMIN_EMAIL=you@example.com npm start   # http://localhost:4000
 ```
 
 Development: `npm run dev:backend` (port 4000) and `npm run dev:frontend` (port 5173, proxies `/api`).
@@ -26,28 +26,29 @@ Tests: `npm test` (add `TEST_DATABASE_URL=postgres://...` to also run the suite 
 
 Without `DATABASE_URL` the server falls back to a local JSON file store (`backend/data`) for development only.
 
-## Login (invitation only)
+## Login (email only, allow-list)
 
-There is no sign-up. Accounts exist only if an admin (or a team leader, for team members) invites them.
+There is no sign-up and no password. Signing in needs only an email, and that email must already be in the `users` table.
 
-- **First admin:** set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (min. 8 chars) before the first start. If you set only `ADMIN_EMAIL`, an invitation link is printed in the server log instead. These are only used while no admin exists, so you can delete `ADMIN_PASSWORD` afterwards.
-- **Inviting:** Management → Team Members → Add Member. A one-time link (valid 7 days) is shown to share; the invitee opens it and sets their own password. "Reset password" on a member issues a new link and invalidates their current password.
-- Passwords are hashed with scrypt; sessions are 7-day JWTs signed with `JWT_SECRET` (required in production); login is rate-limited (10 attempts / 15 min per IP + email).
+- **First admin:** set `ADMIN_EMAIL`; it is created on first start if no admin exists.
+- **Adding people:** Management → Team Members → Add Member (admins can add anyone; team leaders can add team members). The email is stored in the database and that person can sign in immediately. Set a member's status to Inactive or delete them to revoke access (existing sessions stop working at once).
+- Sessions are 7-day JWTs signed with `JWT_SECRET` (required in production). Login is rate-limited (20 attempts / 15 min per IP + email).
 - Roles: `admin` (everything), `team_leader` (manages team members), `team_member`.
+- **Security note:** because no password or code is checked, anyone who knows or guesses an allowed email (including the admin's) can sign in as that person. Keep the admin email private and use this only for internal tools. If you later want real verification, add an emailed one-time code on top of the same allow-list.
 
 ## Deploy on Render (free)
 
 1. Push this repo to GitHub and create the Neon database (above).
 2. In Render: **New → Blueprint**, pick the repo. `render.yaml` configures the service; `JWT_SECRET` is generated for you.
-3. When prompted, set `DATABASE_URL`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` (optionally `ANTHROPIC_API_KEY`).
-4. Open `https://<name>.onrender.com`, sign in as the admin, and invite everyone else from Management.
+3. When prompted, set `DATABASE_URL` and `ADMIN_EMAIL` (optionally `ANTHROPIC_API_KEY`).
+4. Open `https://<name>.onrender.com`, sign in with the admin email, and add everyone else from Management.
 
 Free-tier note: the service sleeps after ~15 min idle (first request takes ~30–60 s). Data lives in Neon, so restarts and redeploys lose nothing.
 Manual setup without the Blueprint: Web Service · Node · Build `npm run render-build` · Start `npm start` · Health check `/api/health` · env as above plus `NODE_VERSION=22`, `NODE_ENV=production`.
 
 ## Environment variables
 
-`DATABASE_URL`, `JWT_SECRET` (required in production), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PUBLIC_URL` (base URL used in log links), `PORT` (default 4000), `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` (optional AI allocation; otherwise a round-robin fallback is used), `DATA_DIR` (JSON fallback only).
+`DATABASE_URL`, `JWT_SECRET` (required in production), `ADMIN_EMAIL`, `PORT` (default 4000), `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` (optional AI allocation; otherwise a round-robin fallback is used), `DATA_DIR` (JSON fallback only).
 
 ## Notes
 

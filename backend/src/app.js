@@ -6,16 +6,14 @@ import path from 'node:path';
 import { schemas, validate } from './schema.js';
 import { invokeLLM } from './llm.js';
 import { parseTable } from './extract.js';
-import {
-  MIN_PASSWORD, createLimiter, hashPassword, inviteHash, inviteValid, newInvite, publicUser, signToken, verifyPassword, verifyToken,
-} from './auth.js';
+import { createLimiter, signToken, verifyToken } from './auth.js';
 
 const RESERVED_QUERY = new Set(['sort', 'limit', 'skip']);
 const SERVED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(csv|plain))$/;
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 const isManager = (u) => u.role === 'admin' || u.role === 'team_leader';
 // Fields clients may never write on a user.
-const USER_PROTECTED = ['id', 'created_date', 'updated_date', 'created_by', 'password_hash', 'invite_token_hash', 'invite_expires', 'invite_pending', 'invite_token'];
+const USER_PROTECTED = ['id', 'created_date', 'updated_date', 'created_by'];
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -26,27 +24,19 @@ class HttpError extends Error {
 
 const strip = (body, keys) => Object.fromEntries(Object.entries(body || {}).filter(([k]) => !keys.includes(k)));
 
-/** Creates the first admin from env (ADMIN_EMAIL [+ ADMIN_PASSWORD]) when no admin exists. Returns an invite token if one was issued. */
-export async function bootstrapAdmin(store, { email, password, name = 'Admin' } = {}) {
-  if (!email) return null;
-  const admins = await store.list('User', { query: { role: 'admin' } });
-  if (admins.length) return null;
-  const fields = { full_name: name, email: normEmail(email), role: 'admin', status: 'Active', project_ids: [] };
-  if (password) {
-    if (password.length < MIN_PASSWORD) throw new Error(`ADMIN_PASSWORD must be at least ${MIN_PASSWORD} characters`);
-    await store.insert('User', { ...fields, password_hash: hashPassword(password) });
-    return null;
-  }
-  const invite = newInvite();
-  await store.insert('User', { ...fields, ...invite.fields });
-  return invite.token;
+/** Creates the first admin from ADMIN_EMAIL when no admin exists yet. */
+export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
+  if (!email) return false;
+  if ((await store.list('User', { query: { role: 'admin' } })).length) return false;
+  await store.insert('User', { full_name: name, email: normEmail(email), role: 'admin', status: 'Active', project_ids: [] });
+  return true;
 }
 
 /** Builds the Express app around an initialised store. */
 export function createApp({ store, jwtSecret, staticDir } = {}) {
   if (!store || !jwtSecret) throw new Error('createApp requires { store, jwtSecret }');
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-  const loginLimit = createLimiter({ max: 10 });
+  const loginLimit = createLimiter({ max: 20 });
 
   const app = express();
   app.set('trust proxy', 1);
@@ -54,45 +44,19 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
   app.use(express.json({ limit: '2mb' }));
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-  const sessionFor = (user) => ({ token: signToken(jwtSecret, user.id), user: publicUser(user) });
+  
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-  // ---- public auth endpoints (no self sign-up exists: accounts are created by invitation only) ----
+  // ---- login: email only. There is no sign-up; only emails an admin/team leader added to the users table can sign in. ----
   const findByEmail = async (email) => (await store.list('User')).find((u) => normEmail(u.email) === normEmail(email));
 
   app.post('/api/auth/login', wrap(async (req, res) => {
     const email = normEmail(req.body?.email);
-    const password = String(req.body?.password || '');
     if (!loginLimit(`${req.ip}|${email}`)) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
     const user = email ? await findByEmail(email) : null;
-    // Always run a hash comparison so response time doesn't reveal whether the email exists.
-    const ok = verifyPassword(password, user?.password_hash || 'scrypt$00$00');
-    if (!user || !ok || user.status === 'Inactive') return res.status(401).json({ error: 'Invalid email or password' });
-    res.json(sessionFor(user));
-  }));
-
-  const userByInvite = async (token) => {
-    const hash = inviteHash(String(token || ''));
-    const user = (await store.list('User', { query: {} })).find((u) => u.invite_token_hash === hash);
-    return inviteValid(user) ? user : null;
-  };
-
-  app.get('/api/auth/invite/:token', wrap(async (req, res) => {
-    const user = await userByInvite(req.params.token);
-    if (!user) return res.status(404).json({ error: 'This invitation is invalid or has expired' });
-    res.json({ email: user.email, full_name: user.full_name });
-  }));
-
-  app.post('/api/auth/accept-invite', wrap(async (req, res) => {
-    const { token, password } = req.body || {};
-    if (typeof password !== 'string' || password.length < MIN_PASSWORD) {
-      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` });
-    }
-    const user = await userByInvite(token);
-    if (!user) return res.status(404).json({ error: 'This invitation is invalid or has expired' });
-    const updated = await store.update('User', user.id, { password_hash: hashPassword(password), invite_token_hash: null, invite_expires: null, status: 'Active' });
-    res.json(sessionFor(updated));
+    if (!user || user.status === 'Inactive') return res.status(401).json({ error: 'This email has not been added. Ask an admin to add you.' });
+    res.json({ token: signToken(jwtSecret, user.id), user });
   }));
 
   // ---- uploaded files: ids are random UUIDs; served as attachments with a restricted content type ----
@@ -113,13 +77,13 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     const header = req.get('authorization') || '';
     const userId = header.startsWith('Bearer ') ? verifyToken(jwtSecret, header.slice(7)) : null;
     const user = userId ? await store.get('User', userId) : null;
-    if (!user || !user.password_hash || user.status === 'Inactive') return res.status(401).json({ error: 'Authentication required' });
+    if (!user || user.status === 'Inactive') return res.status(401).json({ error: 'Authentication required' });
     req.user = user;
     next();
   });
   app.use('/api', requireAuth);
 
-  app.get('/api/auth/me', (req, res) => res.json(publicUser(req.user)));
+  app.get('/api/auth/me', (req, res) => res.json(req.user));
 
   app.patch('/api/auth/me', wrap(async (req, res) => {
     // Self-service profile edits only: no role/email/status changes.
@@ -127,17 +91,7 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     const body = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
     const { data, errors } = validate(schemas.User, body, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-    res.json(publicUser(await store.update('User', req.user.id, data)));
-  }));
-
-  app.post('/api/auth/change-password', wrap(async (req, res) => {
-    const { current_password, new_password } = req.body || {};
-    if (!verifyPassword(String(current_password || ''), req.user.password_hash)) return res.status(400).json({ error: 'Current password is incorrect' });
-    if (typeof new_password !== 'string' || new_password.length < MIN_PASSWORD) {
-      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` });
-    }
-    await store.update('User', req.user.id, { password_hash: hashPassword(new_password) });
-    res.json({ success: true });
+    res.json(await store.update('User', req.user.id, data));
   }));
 
   // ---- users: managed by admins (any role) and team leaders (team members only) ----
@@ -149,13 +103,13 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
 
   app.get('/api/entities/User', wrap(async (req, res) => {
     const rows = await store.list('User', { sort: req.query.sort || '-created_date', limit: parseInt(req.query.limit, 10) || undefined, skip: parseInt(req.query.skip, 10) || 0 });
-    res.json(rows.map(publicUser));
+    res.json(rows);
   }));
 
   app.get('/api/entities/User/:id', wrap(async (req, res) => {
     const u = await store.get('User', req.params.id);
     if (!u) return res.status(404).json({ error: 'Not found' });
-    res.json(publicUser(u));
+    res.json(u);
   }));
 
   app.post('/api/entities/User', wrap(async (req, res) => {
@@ -163,22 +117,9 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     body.email = normEmail(body.email);
     const { data, errors } = validate(schemas.User, body);
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-    if (!isManager(req.user) || !canManageUser(req.user, null, data.role)) return res.status(403).json({ error: 'You cannot invite users with this role' });
+    if (!isManager(req.user) || !canManageUser(req.user, null, data.role)) return res.status(403).json({ error: 'You cannot add users with this role' });
     if (await findByEmail(data.email)) return res.status(409).json({ error: 'A user with this email already exists' });
-    const invite = newInvite();
-    const created = await store.insert('User', { ...data, ...invite.fields }, req.user.email);
-    res.status(201).json({ ...publicUser(created), invite_token: invite.token });
-  }));
-
-  app.post('/api/users/:id/invite', wrap(async (req, res) => {
-    const target = await store.get('User', req.params.id);
-    if (!target) return res.status(404).json({ error: 'Not found' });
-    if (target.id === req.user.id) return res.status(400).json({ error: 'You cannot re-invite yourself' });
-    if (!canManageUser(req.user, target)) return res.status(403).json({ error: 'Not allowed' });
-    const invite = newInvite();
-    // Re-inviting an active user also invalidates their password until they accept (admin-driven reset).
-    await store.update('User', target.id, { ...invite.fields, password_hash: null });
-    res.json({ invite_token: invite.token });
+    res.status(201).json(await store.insert('User', data, req.user.email));
   }));
 
   app.put('/api/entities/User/:id', wrap(async (req, res) => {
@@ -197,7 +138,7 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     if (losesAdmin && (await store.list('User', { query: { role: 'admin' } })).filter((a) => a.status !== 'Inactive').length <= 1) {
       return res.status(400).json({ error: 'Cannot demote or deactivate the last admin' });
     }
-    res.json(publicUser(await store.update('User', target.id, data)));
+    res.json(await store.update('User', target.id, data));
   }));
 
   app.delete('/api/entities/User/:id', wrap(async (req, res) => {
