@@ -9,6 +9,10 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "lint": "npm --prefix frontend run lint",
-    "test": "npm --prefix backend test"
+    "test": "npm --prefix backend test",
+    "render-build": "npm --prefix backend install --omit=dev && npm --prefix frontend install --include=dev && npm --prefix frontend run build"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

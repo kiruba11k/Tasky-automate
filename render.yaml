@@ -1,0 +1,18 @@
+# Render Blueprint: one free web service serving the API and the built frontend.
+services:
+  - type: web
+    name: tasky-automate
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm run render-build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DATA_DIR
+        value: /tmp/tasky-data
+      - key: ANTHROPIC_API_KEY
+        sync: false   # optional: enables real AI task allocation

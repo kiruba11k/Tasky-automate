@@ -23,3 +23,14 @@ Tests: `npm test` (backend) · Lint: `npm run lint`.
 - AI allocation uses the Anthropic API when `ANTHROPIC_API_KEY` is set (optional `ANTHROPIC_MODEL`); otherwise a balanced round-robin fallback is used.
 - Env: `PORT` (default 4000), `DATA_DIR` (default `backend/data`).
 - Google Sheets integration only stores the sheet ID/status; there is no live Google sync.
+
+## Deploy on Render (free)
+
+1. Push this repo to GitHub.
+2. In Render: **New → Blueprint**, pick the repo. `render.yaml` configures everything (free web service, build, start, health check).
+3. Optional: set `ANTHROPIC_API_KEY` in the service's Environment tab for AI allocation.
+4. Open the `https://<name>.onrender.com` URL.
+
+Free-tier caveats: the service sleeps after ~15 min idle (first request takes ~30–60 s to wake), and the filesystem is **ephemeral** — data in `DATA_DIR` resets on every deploy/restart. For durable data, upgrade to a paid plan and attach a persistent disk (set `DATA_DIR` to its mount path), or move the store to a managed database.
+
+Manual setup (without the Blueprint): Web Service · Runtime Node · Build `npm run render-build` · Start `npm start` · Health check `/api/health` · env `NODE_VERSION=22`.
