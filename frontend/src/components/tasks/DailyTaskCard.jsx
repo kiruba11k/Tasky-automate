@@ -94,7 +94,7 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
             </Badge>
             {canEdit && task.task_status !== 'Completed' && <FocusButton task={task} />}
             {canEdit && task.task_status !== 'Completed' && (
-              <Button size="sm" onClick={markDone} disabled={completing} title="Mark as done" className="h-7 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold rounded-full">
+              <Button size="sm" onClick={markDone} disabled={completing} title="Mark as done" className="h-7 px-2 bg-emerald-500 hover:bg-emerald-400 text-ink font-bold rounded-full">
                 <Check className="w-4 h-4 mr-1" />{completing ? '…' : 'Done!'}
               </Button>
             )}

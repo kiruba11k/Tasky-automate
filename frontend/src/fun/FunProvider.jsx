@@ -310,7 +310,7 @@ export function FunProvider({ children }) {
             <Mascot mood={mood} size={76} className={mood === 'cheer' ? 'tasky-jump' : mood === 'oops' ? 'tasky-shake' : mood === 'sleep' ? '' : 'tasky-bob'} />
           </button>
           {bubble && (
-            <div key={bubble.id} className="pointer-events-auto mb-8 max-w-[15rem] animate-bubble rounded-2xl rounded-bl-sm border-[3px] border-slate-900 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-[3px_3px_0_rgba(0,0,0,.45)]" role="status">
+            <div key={bubble.id} className="speech-bubble pointer-events-auto mb-8 max-w-[15rem] animate-bubble" role="status">
               <Rich text={bubble.text} />
             </div>
           )}

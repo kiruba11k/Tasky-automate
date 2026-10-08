@@ -8,6 +8,7 @@ import { invokeLLM } from './llm.js';
 import { parseTable } from './extract.js';
 import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
+import { validateThemePrefs } from './theme.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
 import { openDailyDrop, syncProgress, teamPulse, trophies } from './gamify.js';
@@ -97,8 +98,11 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   app.patch('/api/auth/me', wrap(async (req, res) => {
     // Self-service profile edits only: no role/email/status changes.
-    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills'];
+    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at'];
     const body = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+    const themeError = validateThemePrefs(body);
+    if (themeError) return res.status(400).json({ error: themeError });
+    if (body.theme_custom === '') body.theme_custom = null; // clearing a custom theme
     const { data, errors } = validate(schemas.User, body, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
     res.json(await store.update('User', req.user.id, data));

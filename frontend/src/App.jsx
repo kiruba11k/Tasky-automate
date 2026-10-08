@@ -15,6 +15,7 @@ import Team from './pages/Team';
 import WeeklyTasks from './pages/WeeklyTasks';
 import { NotificationProvider } from './notifications/NotificationProvider';
 import { FunProvider } from './fun/FunProvider';
+import { ThemeProvider } from './themes/ThemeProvider';
 import { FocusProvider } from './fun/FocusTimer';
 import FunLoader from './fun/FunLoader';
 
@@ -58,7 +59,9 @@ function Protected() {
 export default function App() {
   return (
     <AuthProvider>
-      <Protected />
+      <ThemeProvider>
+        <Protected />
+      </ThemeProvider>
     </AuthProvider>
   );
 }

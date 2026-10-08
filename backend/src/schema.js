@@ -26,6 +26,10 @@ schemas.User = {
     contact: { type: 'string' },
     hire_date: { type: 'string' },
     skills: { type: 'string' },
+    theme: { type: 'string' },
+    theme_auto: { type: 'boolean' },
+    theme_custom: { type: 'string' },
+    theme_at: { type: 'number' },
   },
   required: ['full_name', 'email'],
 };

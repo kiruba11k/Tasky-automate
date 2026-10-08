@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx",
-    "build:icons": "node scripts/build-emoji-icons.mjs"
+    "build:icons": "node scripts/build-emoji-icons.mjs",
+    "build:palette": "node scripts/build-palette.mjs",
+    "test": "node --test src/themes/themes.test.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.2.0",

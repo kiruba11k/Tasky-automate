@@ -52,7 +52,7 @@ export default function QuestBoard() {
             <div className="flex items-center gap-2">
               <Emoji e={q.emoji} size="1.6rem" />
               <span className={`font-semibold flex-1 ${q.done ? 'text-emerald-200 line-through decoration-2' : 'text-white'}`}>{q.title}</span>
-              {q.done ? <span className="grid place-items-center w-6 h-6 rounded-full bg-emerald-400 text-slate-900"><Check className="w-4 h-4" /></span> : <span className="text-xs font-bold text-yellow-300">+{q.xp} XP</span>}
+              {q.done ? <span className="grid place-items-center w-6 h-6 rounded-full bg-emerald-400 text-ink"><Check className="w-4 h-4" /></span> : <span className="text-xs font-bold text-yellow-300">+{q.xp} XP</span>}
             </div>
             <div className="mt-1.5 h-2 rounded-full bg-slate-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${Math.round((q.progress / q.target) * 100)}%` }} /></div>
             <div className="text-[11px] text-slate-500 mt-0.5">{q.progress}/{q.target}</div>
@@ -63,7 +63,7 @@ export default function QuestBoard() {
       {allDone && <p className="text-center text-sm font-bold text-yellow-300">All quests complete! You are on fire today <Emoji e="🔥" /></p>}
 
       {stats.drop_state === 'ready' && (
-        <Button onClick={() => setChest(true)} className="w-full bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-extrabold chest-pulse"><Emoji e="🎁" size="1.4rem" className="mr-1.5" />Open your treasure chest!</Button>
+        <Button onClick={() => setChest(true)} className="w-full bg-yellow-400 hover:bg-yellow-300 text-ink font-extrabold chest-pulse"><Emoji e="🎁" size="1.4rem" className="mr-1.5" />Open your treasure chest!</Button>
       )}
       {stats.drop_state === 'locked' && <p className="text-xs text-center text-slate-500"><Emoji e="🎁" /> Finish a task today to unlock your treasure chest.</p>}
       {stats.drop_state === 'opened' && <p className="text-xs text-center text-slate-500"><Emoji e="🎁" /> Today's chest is opened. A new one unlocks tomorrow!</p>}

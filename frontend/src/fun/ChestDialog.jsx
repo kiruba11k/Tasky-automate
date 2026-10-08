@@ -52,9 +52,9 @@ export default function ChestDialog({ open, onOpenChange, onOpened, today }) {
         </div>
         {phase === 'open' && <p className="text-sm text-slate-300">{prize.is_new ? 'New sticker added to your album!' : 'Already in your album — bonus XP instead.'} <span className="text-emerald-300 font-bold">+{prize.xp} XP</span></p>}
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-        {phase === 'closed' && <Button onClick={openChest} className="bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-extrabold">Open it!</Button>}
-        {phase === 'opening' && <Button disabled className="bg-yellow-400 text-slate-900 font-extrabold">Opening…</Button>}
-        {phase === 'open' && <Button onClick={() => reset(false)} className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold">Nice!</Button>}
+        {phase === 'closed' && <Button onClick={openChest} className="bg-yellow-400 hover:bg-yellow-300 text-ink font-extrabold">Open it!</Button>}
+        {phase === 'opening' && <Button disabled className="bg-yellow-400 text-ink font-extrabold">Opening…</Button>}
+        {phase === 'open' && <Button onClick={() => reset(false)} className="bg-emerald-500 hover:bg-emerald-400 text-ink font-bold">Nice!</Button>}
       </DialogContent>
     </Dialog>
   );

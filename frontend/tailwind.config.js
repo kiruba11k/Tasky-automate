@@ -1,4 +1,20 @@
 import animate from 'tailwindcss-animate';
+import plugin from 'tailwindcss/plugin';
+import colors from 'tailwindcss/colors';
+
+// Colour scales are driven by CSS variables so a theme can re-colour every existing bg-*/text-*/border-* class at runtime.
+// The defaults below are Tailwind's own values, which is the "Midnight" (original) look.
+const FAMILIES = ['slate', 'gray', 'red', 'orange', 'amber', 'yellow', 'green', 'emerald', 'cyan', 'sky', 'blue', 'indigo', 'purple', 'pink'];
+const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`; };
+const themed = Object.fromEntries(FAMILIES.map((f) => [f, Object.fromEntries(STEPS.map((s) => [s, `rgb(var(--${f}-${s}) / <alpha-value>)`]))]));
+const themeDefaults = plugin(({ addBase }) => addBase({
+  ':root': {
+    '--c-white': '255 255 255',
+    '--accent-green-rgb': '16 185 129', '--accent-blue-rgb': '59 130 246', '--accent-purple-rgb': '139 92 246', '--accent-pink-rgb': '236 72 153',
+    ...Object.fromEntries(FAMILIES.flatMap((f) => STEPS.map((s) => [`--${f}-${s}`, rgb(colors[f][s])]))),
+  },
+}));
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -19,10 +35,13 @@ export default {
         accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
         popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
         card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
-        'accent-blue': '#3b82f6',
-        'accent-green': '#10b981',
-        'accent-purple': '#8b5cf6',
-        'accent-pink': '#ec4899',
+        ...themed,
+        white: 'rgb(var(--c-white) / <alpha-value>)',
+        ink: '#0b1220',
+        'accent-blue': 'rgb(var(--accent-blue-rgb) / <alpha-value>)',
+        'accent-green': 'rgb(var(--accent-green-rgb) / <alpha-value>)',
+        'accent-purple': 'rgb(var(--accent-purple-rgb) / <alpha-value>)',
+        'accent-pink': 'rgb(var(--accent-pink-rgb) / <alpha-value>)',
       },
       keyframes: {
         pop: { '0%': { transform: 'scale(.6) translateY(12px)', opacity: '0' }, '60%': { transform: 'scale(1.05)', opacity: '1' }, '100%': { transform: 'scale(1)', opacity: '1' } },
@@ -47,5 +66,5 @@ export default {
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
     },
   },
-  plugins: [animate],
+  plugins: [animate, themeDefaults],
 };

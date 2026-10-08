@@ -27,7 +27,7 @@ export default function ProgressChip() {
     <Popover>
       <PopoverTrigger asChild>
         <button type="button" aria-label="Your level and fun settings" className="chip-sticker flex items-center gap-2 rounded-full border border-slate-700/60 bg-slate-800/70 pl-1.5 pr-3 py-1 text-xs text-white">
-          <span className="grid place-items-center w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-400 to-blue-500 font-extrabold text-[11px] text-slate-900">{stats ? stats.level : '…'}</span>
+          <span className="grid place-items-center w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-400 to-blue-500 font-extrabold text-[11px] text-ink">{stats ? stats.level : '…'}</span>
           <span className="hidden md:flex flex-col leading-tight text-left">
             <span className="font-semibold whitespace-nowrap">{stats ? stats.title : "Loading"}</span>
             <span className="h-1.5 w-20 rounded-full bg-slate-700 overflow-hidden"><span className="block h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${pct}%` }} /></span>

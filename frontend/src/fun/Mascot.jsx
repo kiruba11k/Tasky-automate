@@ -27,8 +27,8 @@ export default function Mascot({ mood = 'happy', size = 80, className = '', titl
     <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={title || `Tasky the mascot looks ${mood}`} className={`tasky ${className}`}>
       <defs>
         <linearGradient id="tasky-body" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#34d399" />
-          <stop offset="1" stopColor="#3b82f6" />
+          <stop offset="0" style={{ stopColor: 'var(--mascot-a, #34d399)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--mascot-b, #3b82f6)' }} />
         </linearGradient>
       </defs>
       <ellipse cx="50" cy="95" rx="26" ry="4" fill="#000" opacity=".25" />

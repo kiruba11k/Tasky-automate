@@ -15,7 +15,7 @@ export default function BadgeUnlock({ badge, onClose }) {
           <DialogTitle className="text-2xl font-extrabold">{badge?.name}</DialogTitle>
           <DialogDescription className="text-slate-300">{badge?.desc}</DialogDescription>
           <p className="text-xs text-emerald-300 font-semibold">+25 XP</p>
-          <Button onClick={onClose} className="mt-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold">Awesome!</Button>
+          <Button onClick={onClose} className="mt-2 bg-emerald-500 hover:bg-emerald-400 text-ink font-bold">Awesome!</Button>
         </div>
       </DialogContent>
     </Dialog>

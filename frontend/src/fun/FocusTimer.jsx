@@ -78,7 +78,7 @@ export function FocusProvider({ children }) {
           <DialogTitle className="text-xl font-extrabold">Focus session complete!</DialogTitle>
           <DialogDescription className="text-slate-300">{finished?.minutes} minutes on “{finished?.title}”. Take a quick stretch <Emoji e="🧘" /></DialogDescription>
           <div className="flex gap-2 justify-center">
-            <Button onClick={logTime} disabled={busy} className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold">{busy ? 'Logging…' : `Log ${finished?.minutes} min on the task`}</Button>
+            <Button onClick={logTime} disabled={busy} className="bg-emerald-500 hover:bg-emerald-400 text-ink font-bold">{busy ? 'Logging…' : `Log ${finished?.minutes} min on the task`}</Button>
             <Button variant="outline" onClick={() => setFinished(null)} className="bg-transparent border-slate-600 text-slate-200">Skip</Button>
           </div>
         </DialogContent>
@@ -102,7 +102,7 @@ export function FocusButton({ task }) {
       </Button>
       {open && (
         <span className="absolute z-20 left-0 mt-1 flex gap-1 rounded-xl border-2 border-slate-900 bg-slate-800 p-1.5 shadow-[3px_3px_0_rgba(0,0,0,.5)]">
-          {[15, 25, 50].map((m) => <button key={m} type="button" onClick={() => { setOpen(false); focus.start(task, m); }} className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-slate-700 hover:bg-emerald-500 hover:text-slate-900">{m}m</button>)}
+          {[15, 25, 50].map((m) => <button key={m} type="button" onClick={() => { setOpen(false); focus.start(task, m); }} className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-slate-700 hover:bg-emerald-500 hover:text-ink">{m}m</button>)}
         </span>
       )}
     </span>

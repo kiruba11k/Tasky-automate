@@ -85,6 +85,16 @@ Designed from what research says works (streaks are the best-evidenced hook; rew
 
 API: `POST /api/me/sync` (evaluates and records quests/badges once), `GET /api/me/trophies`, `POST /api/me/daily-drop`, `GET /api/team/pulse`, `POST /api/kudos`. Achievements and kudos are written only by the server.
 
+## Themes
+
+Eight built-in themes — **light:** Sunny Day, Bubblegum Pop, Mint Fresh, Sky Pop; **dark:** Midnight (the original), Neon Arcade, Forest Night, Cherry Cola — each with its own background pattern and a mascot tinted to match. Switch from the header: ☀/🌙 quick toggle, or the palette button for the gallery (live mini-previews). Also: **Match my device** (follows the system light/dark setting live), a **Cartoon style** switch (outlined stickers, bouncy buttons, hard shadows), and **Make your own theme** (pick a mode, two colours and a background tint; export/import as JSON to share with teammates).
+
+- The choice applies instantly, is applied before the first paint (no flash) and is saved on the user's account, so it follows them across devices (the newer of "this browser" and "the account" wins at sign-in).
+- **How it works:** Tailwind's colour scales (slate, blue, red, green …) are CSS variables, so a theme re-colours every existing `bg-*`/`text-*`/`border-*` class without touching components. In light themes the neutral scale keeps each class's *role* (page, card, muted text…) and pale text shades are swapped for dark ones. `text-white` means "main text colour" and stays white only on solid colour fills.
+- **Accessibility:** shades of 600+ are darkened automatically until white text on them reaches WCAG AA, whatever colours a theme or a user picks. `npm --prefix frontend test` checks text, muted text, buttons, links and status chips against AA for every theme.
+- **Adding a theme (an extension, not a code change):** drop a file in `frontend/src/themes/packs/` that exports a definition — `{ id, mode: 'light'|'dark', name, tagline, icon, neutral: {hue, sat}, primary, secondary, accent, pattern, patternSize, mascot }` — see any existing pack. It appears in the gallery automatically; run `npm --prefix frontend test` to verify contrast. Use `text-ink` (not `text-slate-900`) for dark text on bright fills.
+- API: `theme`, `theme_auto`, `theme_custom` (strictly validated JSON: name, mode, two `#rrggbb` colours, tint) and `theme_at` on `PATCH /api/auth/me`.
+
 ## Icons
 
 The UI uses illustrated cartoon icons instead of OS emoji, so it looks identical on every device and works offline. Emoji characters stay as the stable keys in the data (kudos, badges, stickers); `src/icons/Emoji.jsx` swaps them for artwork at render time (`<Emoji e="🔥" />`, or `<Rich text="Nice 🎉" />` for strings), and the confetti/burst effects use the same art. The artwork is bundled in `frontend/src/icons/emojiIcons.generated.js`. When you introduce a new emoji anywhere in `frontend/src` or `backend/src`, run `npm --prefix frontend run build:icons` to add its artwork.

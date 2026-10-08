@@ -591,3 +591,52 @@ describe('engagement endpoints', () => {
     assert.equal(empty.week.pct, 0);
   });
 });
+
+describe('theme preferences', () => {
+  let server, base, token;
+  const api = async (method, url, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const good = { name: 'Grape Soda', mode: 'dark', neutral: { hue: 280, sat: 40 }, primary: '#8b5cf6', secondary: '#f59e0b' };
+
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    server = createApp({ store, jwtSecret: 's' }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    token = (await api('POST', '/api/auth/login', { email: 'boss@example.com' })).body.token;
+  });
+  after(() => server.close());
+
+  test('a built-in theme choice is saved on the account and comes back with /me', async () => {
+    const r = await api('PATCH', '/api/auth/me', { theme: 'bubblegum-pop', theme_auto: false, theme_at: 1700000000000 });
+    assert.equal(r.status, 200);
+    const me = (await api('GET', '/api/auth/me')).body;
+    assert.equal(me.theme, 'bubblegum-pop');
+    assert.equal(me.theme_auto, false);
+    assert.equal(me.theme_at, 1700000000000);
+    assert.equal((await api('PATCH', '/api/auth/me', { theme_at: 'now' })).status, 400);
+  });
+
+  test('custom themes are validated strictly', async () => {
+    assert.equal((await api('PATCH', '/api/auth/me', { theme: 'custom', theme_custom: JSON.stringify(good) })).status, 200);
+    assert.equal(JSON.parse((await api('GET', '/api/auth/me')).body.theme_custom).name, 'Grape Soda');
+    for (const bad of [
+      { ...good, primary: 'red' }, { ...good, primary: 'url(javascript:alert(1))' }, { ...good, mode: 'neon' }, { ...good, name: '' },
+      { ...good, name: 'x'.repeat(31) }, { ...good, neutral: { hue: 999, sat: 10 } }, { ...good, neutral: undefined },
+    ]) assert.equal((await api('PATCH', '/api/auth/me', { theme_custom: JSON.stringify(bad) })).status, 400, JSON.stringify(bad));
+    assert.equal((await api('PATCH', '/api/auth/me', { theme_custom: 'not json' })).status, 400);
+    assert.equal((await api('PATCH', '/api/auth/me', { theme_custom: JSON.stringify({ ...good, evil: '<script>' }).padEnd(700, ' ') })).status, 400);
+    assert.equal((await api('PATCH', '/api/auth/me', { theme: '../../etc' })).status, 400);
+    assert.equal((await api('PATCH', '/api/auth/me', { theme: 'x'.repeat(41) })).status, 400);
+    assert.equal((await api('PATCH', '/api/auth/me', { theme_auto: 'yes' })).status, 400);
+  });
+
+  test('clearing a custom theme', async () => {
+    assert.equal((await api('PATCH', '/api/auth/me', { theme_custom: '' })).status, 200);
+    assert.equal((await api('GET', '/api/auth/me')).body.theme_custom, undefined);
+  });
+});

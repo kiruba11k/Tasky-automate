@@ -34,12 +34,12 @@ body.fun { font-family: 'Fredoka', ui-rounded, 'Nunito', system-ui, sans-serif; 
 
 /* Sticker-style cards: thick outline, hard offset shadow, lift on hover */
 body.fun .glass-effect-enhanced {
-  border: 2px solid rgba(15, 23, 42, 0.9) !important;
+  border: 2px solid var(--outline, rgba(15, 23, 42, 0.9)) !important;
   border-radius: 1.1rem !important;
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 4px 4px 0 var(--hard-shadow, rgba(0, 0, 0, 0.45)) !important;
   transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease;
 }
-body.fun .glass-effect-enhanced:hover { transform: translate(-2px, -2px) rotate(-.3deg); box-shadow: 7px 7px 0 rgba(0, 0, 0, 0.5) !important; }
+body.fun .glass-effect-enhanced:hover { transform: translate(-2px, -2px) rotate(-.3deg); box-shadow: 7px 7px 0 var(--hard-shadow, rgba(0, 0, 0, 0.5)) !important; }
 body.calm .glass-effect-enhanced:hover { transform: none; }
 
 /* Squishy buttons */
@@ -49,9 +49,9 @@ body.fun button:not(:disabled):active { transform: translateY(1px) scale(.93); }
 body.fun [role="tab"]:hover { transform: translateY(-1px); }
 body.fun .nav-pill:hover svg { animation: wiggle .6s ease-in-out; }
 body.fun input, body.fun textarea, body.fun select { border-radius: .8rem; }
-body.fun [data-radix-popper-content-wrapper] > div, body.fun [role="dialog"] { border-width: 2px; border-color: rgba(15, 23, 42, .95); box-shadow: 5px 5px 0 rgba(0, 0, 0, .5); }
+body.fun [data-radix-popper-content-wrapper] > div, body.fun [role="dialog"] { border-width: 2px; border-color: var(--outline, rgba(15, 23, 42, .95)); box-shadow: 5px 5px 0 var(--hard-shadow, rgba(0, 0, 0, .5)); }
 body.fun [role="dialog"] { border-radius: 1.4rem; }
-body.fun .chip-sticker { box-shadow: 2px 2px 0 rgba(0,0,0,.45); }
+body.fun .chip-sticker { box-shadow: 2px 2px 0 var(--hard-shadow, rgba(0,0,0,.45)); }
 
 /* Bouncy page entrance */
 .page-enter { animation: page .45s cubic-bezier(.34,1.56,.64,1) both; }
@@ -136,3 +136,25 @@ body.calm .win-item, body.calm .flame, body.calm .chest-pulse, body.calm .rocket
 body.party { animation: party-hue 1.2s linear infinite; }
 @keyframes party-hue { to { filter: hue-rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { body.party { animation: none; } .flame, .chest-pulse, .rocket-fly { animation: none !important; } }
+
+
+/* ======================= Themes ======================= */
+html { color-scheme: dark; }
+html[data-mode='light'] { color-scheme: light; }
+
+/* Decorative page pattern from the active theme (dots, stripes, grid, clouds...) */
+.theme-pattern { position: fixed; inset: 0; pointer-events: none; z-index: 0; background-image: var(--page-pattern, none); background-size: var(--page-pattern-size, auto); opacity: .9; }
+body.calm .theme-pattern { opacity: .55; }
+
+/* The speech bubble keeps classic comic colours in every theme */
+.speech-bubble { background: #fff; color: #0b1220; border: 3px solid #0b1220; box-shadow: 3px 3px 0 rgba(0,0,0,.45); border-radius: 1rem 1rem 1rem .25rem; padding: .5rem .75rem; font-size: .875rem; font-weight: 700; }
+
+/* Light themes: "text-white" means "main text colour" (which the theme makes dark), except where it sits on a solid colour fill. */
+html[data-mode='light'] :is(
+  [class*='bg-blue-'], [class*='bg-purple-'], [class*='bg-green-'], [class*='bg-emerald-'], [class*='bg-red-'], [class*='bg-orange-'], [class*='bg-pink-'], [class*='bg-indigo-'],
+  [class*='bg-accent-'], [class*='from-blue-'], [class*='from-accent-'], [class*='from-emerald-'], [class*='from-green-'], [class*='to-purple-'], .nav-pill.active, .approved-stamp
+):not([class*='/10']):not([class*='/20']):not([class*='/30']) :is(.text-white, svg),
+html[data-mode='light'] :is(
+  [class*='bg-blue-'], [class*='bg-purple-'], [class*='bg-green-'], [class*='bg-emerald-'], [class*='bg-red-'], [class*='bg-orange-'], [class*='bg-pink-'], [class*='bg-indigo-'],
+  [class*='bg-accent-'], [class*='from-blue-'], [class*='from-accent-'], [class*='from-emerald-'], [class*='from-green-'], [class*='to-purple-'], .nav-pill.active
+):not([class*='/10']):not([class*='/20']):not([class*='/30']).text-white { color: #fff; }
