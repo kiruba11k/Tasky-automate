@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import Mascot from './Mascot';
+import BadgeUnlock from './BadgeUnlock';
 import { effects } from './effects';
 import { play } from './sounds';
 
@@ -36,11 +37,19 @@ const COPY = {
   busy: ['Working on it… 🧠', 'Hold on, doing the thing… ⚙️'],
   incomingSubmitted: ['Ooh, someone finished something! 👀', 'A submission is waiting for you! 📥'],
   incomingDone: ['A teammate completed a task! 👏'],
+  quest: ['Quest complete: {x}! +15 XP 🗺️', 'Quest done: {x}! Treasure unlocked 💰'],
+  badge: ['New badge: {x}! 🏅', 'You earned {x}! Check the trophy shelf 🏆'],
+  kudos: ['{x} sent you a high-five! 🙌', 'Shout-out from {x}! 💛'],
+  kudosSent: ['High-five delivered! 🙌', 'Spreading the love! 💛'],
+  chest: ['Your treasure chest is ready! 🎁', 'Ooh, a chest is waiting for you! 🎁'],
+  focusStart: ['Focus time! I will guard the fort 🏰', 'Deep work mode on. Ignoring the world 🎧'],
+  focusDone: ['Focus session complete! 🍅 Stretch time!', 'Ding! You focused like a champion 🧘'],
+  party: ['PARTY MODE! 🎉🎉🎉'],
 };
-const BURST = { created: 'POW!', completed: 'BAM!', approved: 'YES!', submitted: 'ZOOM!', rejected: 'OOPS!', allocated: 'WHOOSH!', assignedToMe: 'PING!', statusProgress: 'VROOM!', deleted: 'POOF!', voice: 'DROP!', levelUp: 'LEVEL UP!', streak: 'HOT!', error: 'UH-OH!' };
-const MOOD = { created: 'cheer', completed: 'cheer', approved: 'cheer', submitted: 'happy', rejected: 'oops', allocated: 'happy', assignedToMe: 'wave', statusProgress: 'happy', updated: 'wink', deleted: 'oops', voice: 'cheer', levelUp: 'cheer', streak: 'cheer', error: 'oops', busy: 'think', incomingSubmitted: 'wave', incomingDone: 'happy' };
-const PRIORITY = { levelUp: 9, streak: 8, approved: 7, completed: 6, voice: 5, allocated: 5, submitted: 4, rejected: 4, assignedToMe: 4, created: 3, deleted: 2, statusProgress: 2, error: 2, incomingSubmitted: 2, incomingDone: 1, updated: 1 };
-const BIG = new Set(['levelUp', 'streak', 'approved', 'completed', 'allocated']);
+const BURST = { quest: 'QUEST!', badge: 'BADGE!', kudos: '🙌', focusDone: 'FOCUS!', party: 'PARTY!', created: 'POW!', completed: 'BAM!', approved: 'YES!', submitted: 'ZOOM!', rejected: 'OOPS!', allocated: 'WHOOSH!', assignedToMe: 'PING!', statusProgress: 'VROOM!', deleted: 'POOF!', voice: 'DROP!', levelUp: 'LEVEL UP!', streak: 'HOT!', error: 'UH-OH!' };
+const MOOD = { quest: 'cheer', badge: 'cheer', kudos: 'wave', kudosSent: 'wink', chest: 'wave', focusStart: 'think', focusDone: 'cheer', party: 'cheer', created: 'cheer', completed: 'cheer', approved: 'cheer', submitted: 'happy', rejected: 'oops', allocated: 'happy', assignedToMe: 'wave', statusProgress: 'happy', updated: 'wink', deleted: 'oops', voice: 'cheer', levelUp: 'cheer', streak: 'cheer', error: 'oops', busy: 'think', incomingSubmitted: 'wave', incomingDone: 'happy' };
+const PRIORITY = { party: 10, badge: 8, quest: 6, kudos: 5, focusDone: 6, kudosSent: 2, chest: 3, focusStart: 2, levelUp: 9, streak: 8, approved: 7, completed: 6, voice: 5, allocated: 5, submitted: 4, rejected: 4, assignedToMe: 4, created: 3, deleted: 2, statusProgress: 2, error: 2, incomingSubmitted: 2, incomingDone: 1, updated: 1 };
+const BIG = new Set(['levelUp', 'streak', 'approved', 'completed', 'allocated', 'badge', 'party', 'focusDone']);
 const STREAK_MILESTONES = [3, 5, 7, 10, 14, 21, 30, 50, 100];
 const IGNORED_ENTITIES = new Set(['ActivityLog', 'SheetSync', 'FileUpload', 'Notification']);
 const NOUN = { Task: 'task', DailyTask: 'daily task', Project: 'project', Team: 'team', TeamMember: 'teammate', User: 'teammate', ProjectResource: 'resource' };
@@ -62,7 +71,10 @@ export function FunProvider({ children }) {
   const [bursts, setBursts] = useState([]); // comic words
   const [stamp, setStamp] = useState(null);
   const [stats, setStats] = useState(null);
-  const refs = useRef({ settings, pending: 0, queue: [], flush: null, lastBig: 0, bubbleTimer: null, bubbleActive: false, idle: null, busyTimer: null, statsTimer: null });
+  const [badgeQueue, setBadgeQueue] = useState([]);
+  const [floaters, setFloaters] = useState([]);
+  const [partyOn, setPartyOn] = useState(false);
+  const refs = useRef({ pointer: { x: 0, y: 0 }, lastActive: Date.now(), lastNudge: 0, stats: null, settings, pending: 0, queue: [], flush: null, lastBig: 0, bubbleTimer: null, bubbleActive: false, idle: null, busyTimer: null, statsTimer: null });
   refs.current.settings = settings;
 
   const setSettings = useCallback((patch) => {
@@ -83,6 +95,15 @@ export function FunProvider({ children }) {
     setMood(nextMood);
     setBubble({ text, id: Date.now() });
     r.bubbleTimer = setTimeout(() => { r.bubbleActive = false; setBubble(null); setMood('happy'); }, ms);
+  }, []);
+
+  /** "+10 XP" that floats up from where the user last clicked. */
+  const floatXp = useCallback((text) => {
+    if (refs.current.settings.anim !== 'full') return;
+    const id = `${Date.now()}-${Math.random()}`;
+    const { x, y } = refs.current.pointer;
+    setFloaters((f) => [...f.slice(-4), { id, text, x: x || window.innerWidth / 2, y: y || 120 }]);
+    setTimeout(() => setFloaters((f) => f.filter((i) => i.id !== id)), 1400);
   }, []);
 
   const sleepSoon = useCallback(() => {
@@ -124,9 +145,14 @@ export function FunProvider({ children }) {
       else if (kind === 'created' && !soft) effects.small();
       else if (kind === 'statusProgress') effects.emoji('🏎️');
       else if (kind === 'rejected') effects.emoji('🛠️');
+      else if (kind === 'kudos') effects.rain('🙌');
+      else if (kind === 'kudosSent') effects.emoji('💛');
+      else if (kind === 'quest') effects.emoji('🗺️');
+      else if (kind === 'chest') effects.emoji('🎁');
+      else if (kind === 'focusDone') effects.emoji('🍅');
     }
     if (full || kind === 'levelUp') {
-      play({ levelUp: 'levelUp', streak: 'fanfare', approved: 'fanfare', completed: 'ding', created: 'pop', allocated: 'whoosh', submitted: 'whoosh', rejected: 'womp', error: 'womp', deleted: 'poof', assignedToMe: 'blip', incomingSubmitted: 'blip', incomingDone: 'blip', voice: 'boing', statusProgress: 'boing', updated: 'pop' }[kind] || 'pop', sound);
+      play({ badge: 'fanfare', quest: 'ding', kudos: 'ding', kudosSent: 'pop', chest: 'blip', focusDone: 'fanfare', focusStart: 'blip', party: 'fanfare', levelUp: 'levelUp', streak: 'fanfare', approved: 'fanfare', completed: 'ding', created: 'pop', allocated: 'whoosh', submitted: 'whoosh', rejected: 'womp', error: 'womp', deleted: 'poof', assignedToMe: 'blip', incomingSubmitted: 'blip', incomingDone: 'blip', voice: 'boing', statusProgress: 'boing', updated: 'pop' }[kind] || 'pop', sound);
     }
   }, [say, sleepSoon]);
 
@@ -144,22 +170,27 @@ export function FunProvider({ children }) {
     }, 450);
   }, [fire]);
 
-  // ---- progress (XP / level / streak) ----
+  // ---- progress (XP / level / streak / quests / badges) ----
   const loadStats = useCallback(async () => {
     if (!user) return;
     try {
-      const s = await request('GET', `/api/me/stats?today=${format(new Date(), 'yyyy-MM-dd')}`);
+      const s = await request('POST', '/api/me/sync', { today: format(new Date(), 'yyyy-MM-dd') });
+      const before = refs.current.stats;
+      refs.current.stats = s;
       setStats(s);
       const lvKey = `tasky_level_${user.id}`;
       const stKey = `tasky_streak_${user.id}`;
       let prevLevel = null;
       let prevStreak = 0;
       try { prevLevel = Number(localStorage.getItem(lvKey)) || null; prevStreak = Number(localStorage.getItem(stKey)) || 0; } catch { /* ignore */ }
+      s.new_quests.forEach((id) => { const q = s.quests.find((x) => x.id === id); if (q) { celebrate('quest', { x: q.title }); floatXp(`+${q.xp} XP`); } });
+      if (s.new_badges.length) { setBadgeQueue((q) => [...q, ...s.new_badges]); celebrate('badge', { x: s.new_badges[0].name }); }
       if (prevLevel !== null && s.level > prevLevel) celebrate('levelUp', { x: s.title });
       else if (s.streak > prevStreak && STREAK_MILESTONES.includes(s.streak)) celebrate('streak', { x: s.streak });
+      if (s.drop_state === 'ready' && before?.drop_state !== 'ready') setTimeout(() => celebrate('chest'), 1800);
       try { localStorage.setItem(lvKey, String(s.level)); localStorage.setItem(stKey, String(s.streak)); } catch { /* ignore */ }
     } catch { /* progress is a bonus */ }
-  }, [user, celebrate]);
+  }, [user, celebrate, floatXp]);
 
   const refreshStatsSoon = useCallback(() => {
     clearTimeout(refs.current.statsTimer);
@@ -181,6 +212,9 @@ export function FunProvider({ children }) {
       }
       if (d.type === 'error') { celebrate('error'); return; }
       if (d.type === 'voice') { celebrate('voice'); return; }
+      if (d.type === 'kudosSent') { celebrate('kudosSent'); refreshStatsSoon(); return; }
+      if (d.type === 'focus') { celebrate(d.on ? 'focusStart' : 'focusDone'); return; }
+      if (d.type === 'say') { say(d.text, d.mood || 'happy'); return; }
       if (d.type === 'weekly') {
         if (d.action === 'save') { if (d.count) celebrate('allocated'); } else celebrate({ submit: 'submitted', approve: 'approved', reject: 'rejected' }[d.action]);
         refreshStatsSoon();
@@ -193,7 +227,7 @@ export function FunProvider({ children }) {
         else if (d.action === 'delete') celebrate('deleted', { x: noun });
         else {
           const status = d.patch?.task_status || d.patch?.status;
-          if (status === 'Completed') celebrate('completed');
+          if (status === 'Completed') { celebrate('completed'); if (d.entity === 'DailyTask') floatXp('+10 XP'); }
           else if (status === 'In Progress') celebrate('statusProgress');
           else celebrate('updated');
         }
@@ -207,14 +241,56 @@ export function FunProvider({ children }) {
         else if (t === 'task_assigned' || t === 'weekly_allocation') celebrate('assignedToMe');
         else if (t === 'weekly_submitted') celebrate('incomingSubmitted');
         else if (t === 'task_status') celebrate('incomingDone');
-        if (t === 'weekly_approved') refreshStatsSoon();
+        else if (t === 'kudos') celebrate('kudos', { x: d.notification.actor_name || 'A teammate' });
+        if (t === 'weekly_approved' || t === 'kudos') refreshStatsSoon();
       }
     };
     window.addEventListener('tasky:fun', onEvent);
     return () => window.removeEventListener('tasky:fun', onEvent);
-  }, [celebrate, say, refreshStatsSoon]);
+  }, [celebrate, say, refreshStatsSoon, floatXp]);
 
   useEffect(() => { sleepSoon(); return () => { const r = refs.current; clearTimeout(r.idle); clearTimeout(r.bubbleTimer); clearTimeout(r.flush); clearTimeout(r.statsTimer); clearTimeout(r.busyTimer); }; }, [sleepSoon]);
+
+  // Track the pointer (for floating XP), idle time (for gentle nudges) and a secret code.
+  useEffect(() => {
+    const r = refs.current;
+    const touch = () => { r.lastActive = Date.now(); };
+    const onDown = (e) => { r.pointer = { x: e.clientX, y: e.clientY }; touch(); };
+    const code = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    let pos = 0;
+    const onKey = (e) => {
+      touch();
+      pos = e.key === code[pos] ? pos + 1 : e.key === code[0] ? 1 : 0;
+      if (pos === code.length) {
+        pos = 0;
+        setPartyOn(true);
+        celebrate('party');
+        effects.fireworks();
+        setTimeout(() => setPartyOn(false), 6000);
+      }
+    };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', touch, { passive: true });
+    window.addEventListener('keydown', onKey);
+    const nudge = setInterval(() => {
+      const st = r.stats;
+      const idleMs = Date.now() - r.lastActive;
+      if (document.hidden || idleMs < 120000 || Date.now() - r.lastNudge < 20 * 60000 || !st) return;
+      r.lastNudge = Date.now();
+      const left = st.planned_today - st.completed_today;
+      if (st.drop_state === 'ready') say('Psst! Your treasure chest is waiting 🎁', 'wave', 7000);
+      else if (st.at_risk) say(`Your ${st.streak}-day streak needs one finished task today 🔥`, 'think', 7000);
+      else if (left > 0) say(`${left} task${left === 1 ? '' : 's'} left today. You can do it! 💪`, 'wave', 7000);
+    }, 30000);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', touch);
+      window.removeEventListener('keydown', onKey);
+      clearInterval(nudge);
+    };
+  }, [celebrate, say]);
+
+  useEffect(() => { document.body.classList.toggle('party', partyOn); }, [partyOn]);
 
   const poke = () => {
     play('boing', settings.sound);
@@ -222,7 +298,7 @@ export function FunProvider({ children }) {
     sleepSoon();
   };
 
-  const value = useMemo(() => ({ settings, setSettings, stats, celebrate, say, mood }), [settings, setSettings, stats, celebrate, say, mood]);
+  const value = useMemo(() => ({ settings, setSettings, stats, celebrate, say, mood, refreshStats: loadStats }), [settings, setSettings, stats, celebrate, say, mood, loadStats]);
 
   return (
     <FunContext.Provider value={value}>
@@ -245,6 +321,10 @@ export function FunProvider({ children }) {
         ))}
         {stamp && <div key={stamp} className="approved-stamp animate-stamp">APPROVED!</div>}
       </div>
+      <div className="pointer-events-none fixed inset-0 z-[160] overflow-hidden" aria-hidden="true">
+        {floaters.map((f) => <div key={f.id} className="xp-float" style={{ left: f.x, top: f.y }}>{f.text}</div>)}
+      </div>
+      <BadgeUnlock badge={badgeQueue[0]} onClose={() => setBadgeQueue((q) => q.slice(1))} />
     </FunContext.Provider>
   );
 }

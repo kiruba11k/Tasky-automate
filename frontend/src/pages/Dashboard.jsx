@@ -1,5 +1,9 @@
 
 import Greeting from '../fun/Greeting';
+import QuestBoard from '../fun/QuestBoard';
+import TeamRocket from '../fun/TeamRocket';
+import WinsFeed from '../fun/WinsFeed';
+import CountUp from '../fun/CountUp';
 import React, { useState, useEffect } from "react";
 import { TeamMember } from "@/entities/TeamMember";
 import { Task } from "@/entities/Task";
@@ -184,6 +188,11 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-8">
         <Greeting />
 
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <QuestBoard />
+          <div className="space-y-6"><TeamRocket /><WinsFeed /></div>
+        </div>
+
         {/* Header */}
         <div>
           <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Marketing Dashboard</h1>
@@ -199,7 +208,7 @@ export default function Dashboard() {
                 <Users className="h-5 w-5 text-blue-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white">{teamMembers.length}</div>
+                <div className="text-3xl font-bold text-white"><CountUp value={teamMembers.length} /></div>
                 <p className="text-xs text-slate-400 mt-1">Active members</p>
               </CardContent>
             </Card>
@@ -212,7 +221,7 @@ export default function Dashboard() {
                 <Activity className="h-5 w-5 text-green-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white">{getTasksByStatus("In Progress")}</div>
+                <div className="text-3xl font-bold text-white"><CountUp value={getTasksByStatus("In Progress")} /></div>
                 <p className="text-xs text-slate-400 mt-1">Currently in progress</p>
               </CardContent>
             </Card>
@@ -225,7 +234,7 @@ export default function Dashboard() {
                 <TrendingUp className="h-5 w-5 text-yellow-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white">{getAverageWorkload()}%</div>
+                <div className="text-3xl font-bold text-white"><CountUp value={getAverageWorkload()} suffix="%" /></div>
                 <p className="text-xs text-slate-400 mt-1">Team capacity utilization</p>
               </CardContent>
             </Card>
@@ -238,7 +247,7 @@ export default function Dashboard() {
                 <AlertCircle className="h-5 w-5 text-red-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white">{getHighPriorityTasks()}</div>
+                <div className="text-3xl font-bold text-white"><CountUp value={getHighPriorityTasks()} /></div>
                 <p className="text-xs text-slate-400 mt-1">Critical & High priority tasks</p>
               </CardContent>
             </Card>

@@ -1,0 +1,55 @@
+import React, { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { request } from '@/api/client';
+import { format } from 'date-fns';
+
+/** Badges (with progress toward the locked ones) and the sticker album. */
+export default function TrophyShelf({ open, onOpenChange }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    if (open) request('GET', `/api/me/trophies?today=${format(new Date(), 'yyyy-MM-dd')}`).then(setData).catch(() => setData(null));
+  }, [open]);
+  const earned = data ? data.badges.filter((b) => b.earned).length : 0;
+  const owned = data ? data.stickers.filter((s) => s.owned).length : 0;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl bg-slate-900 border-slate-700 text-white">
+        <DialogTitle className="text-2xl font-extrabold">Trophy shelf</DialogTitle>
+        <DialogDescription className="text-slate-400">Everything here comes from real finished work.</DialogDescription>
+        {!data ? <p className="text-slate-400 py-8 text-center">Polishing the trophies…</p> : (
+          <Tabs defaultValue="badges">
+            <TabsList className="bg-slate-800">
+              <TabsTrigger value="badges">Badges {earned}/{data.badges.length}</TabsTrigger>
+              <TabsTrigger value="stickers">Sticker album {owned}/{data.stickers.length}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="badges" className="mt-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
+                {data.badges.map((b) => (
+                  <div key={b.id} className={`rounded-2xl border-2 border-slate-900 p-3 text-center shadow-[3px_3px_0_rgba(0,0,0,.45)] ${b.earned ? 'bg-gradient-to-b from-yellow-400/20 to-slate-800' : 'bg-slate-800/60'}`}>
+                    <div className={`text-4xl ${b.earned ? 'badge-pop' : 'grayscale opacity-40'}`}>{b.emoji}</div>
+                    <div className="font-bold mt-1">{b.name}</div>
+                    <div className="text-xs text-slate-400">{b.desc}</div>
+                    {b.earned
+                      ? <div className="text-[11px] text-emerald-300 mt-1">Earned{b.earned_on ? ` ${b.earned_on}` : ''}</div>
+                      : <div className="mt-2"><div className="h-1.5 rounded-full bg-slate-700 overflow-hidden"><div className="h-full bg-sky-400" style={{ width: `${Math.round((b.progress / b.target) * 100)}%` }} /></div><div className="text-[11px] text-slate-500 mt-0.5">{b.progress}/{b.target}</div></div>}
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="stickers" className="mt-3">
+              <p className="text-xs text-slate-400 mb-2">Finish a task each day to unlock a chest with a random sticker. Rare and epic ones are harder to find.</p>
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                {data.stickers.map((s) => (
+                  <div key={s.id} title={s.owned ? `${s.rarity} sticker` : 'Not found yet'} className={`aspect-square grid place-items-center rounded-xl text-3xl border-2 ${s.owned ? `bg-slate-800 ${s.rarity === 'epic' ? 'border-yellow-400' : s.rarity === 'rare' ? 'border-sky-400' : 'border-slate-600'}` : 'bg-slate-800/40 border-dashed border-slate-700 text-slate-600'}`}>
+                    {s.owned ? s.emoji : '?'}
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

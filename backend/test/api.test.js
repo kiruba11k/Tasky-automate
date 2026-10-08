@@ -420,9 +420,9 @@ for (const [name, makeStore] of backends.slice(0, 1)) {
   });
 }
 
-import { computeStats, levelForXp, xpForLevel, streakDays } from '../src/stats.js';
+import { computeStats, levelForXp, xpForLevel, streakInfo, questsFor, badgeStatus, pickSticker, STICKERS } from '../src/stats.js';
 
-describe('stats (XP, levels, streaks)', () => {
+describe('progress maths', () => {
   test('levels line up with their XP thresholds', () => {
     for (let l = 1; l <= 12; l += 1) {
       assert.equal(levelForXp(xpForLevel(l)), l);
@@ -431,44 +431,163 @@ describe('stats (XP, levels, streaks)', () => {
     assert.equal(levelForXp(0), 1);
   });
 
-  test('streaks', () => {
-    assert.equal(streakDays([], '2026-10-14'), 0);
-    assert.equal(streakDays(['2026-10-14', '2026-10-13', '2026-10-12', '2026-10-10'], '2026-10-14'), 3);
-    assert.equal(streakDays(['2026-10-13', '2026-10-12'], '2026-10-14'), 2); // today not done yet: the streak is still alive
-    assert.equal(streakDays(['2026-10-11'], '2026-10-14'), 0);
-    assert.equal(streakDays(['2026-10-14', '2026-10-14'], '2026-10-14'), 1);
+  test('streaks count working days, ignore weekends and forgive a miss once a shield is earned', () => {
+    // 2026-10-12 is a Monday
+    assert.deepEqual(streakInfo([], '2026-10-14'), { streak: 0, shields: 0, shield_used: false, at_risk: false });
+    const s1 = streakInfo(['2026-10-12', '2026-10-13'], '2026-10-14');
+    assert.equal(s1.streak, 2);
+    assert.equal(s1.at_risk, true); // today still open: finish a task to keep it
+    assert.equal(streakInfo(['2026-10-12', '2026-10-13', '2026-10-14'], '2026-10-14').at_risk, false);
+    // Friday + Monday: the weekend neither counts nor breaks
+    assert.equal(streakInfo(['2026-10-09', '2026-10-12'], '2026-10-12').streak, 2);
+    // a missed workday with no shield resets the streak
+    assert.equal(streakInfo(['2026-10-12', '2026-10-14'], '2026-10-14').streak, 1);
+    // 5 days earn a shield, which silently covers one missed day
+    const week = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09']; // Mon-Fri
+    const covered = streakInfo([...week, '2026-10-12', '2026-10-14'], '2026-10-14'); // Tue 13 missed
+    assert.equal(covered.streak, 7);
+    assert.equal(covered.shield_used, true);
+    assert.equal(covered.shields, 0);
+    // a long gap eventually resets it, with no punishment beyond that
+    assert.equal(streakInfo(week, '2026-10-30').streak, 0);
+    // weekend-only completions are not needed and do not crash
+    assert.equal(streakInfo(['2026-10-10'], '2026-10-12').streak, 0);
   });
 
-  test('computeStats', () => {
-    const s = computeStats({ done: Array.from({ length: 6 }, () => ({ date: '2026-10-14' })), approved: [{}], planned: [{ task_status: 'Completed' }, { task_status: 'Pending' }], today: '2026-10-14' });
-    assert.equal(s.xp, 100); // 6*10 + 40
-    assert.equal(s.level, 2); // 50 <= 100 < 150
-    assert.equal(s.title, 'Checklist Cadet');
-    assert.equal(s.next_level_xp, 150);
+  test('quests are derived from real work and members/leaders differ', () => {
+    const done = [{ date: '2026-10-14', actual_time_taken: 1 }, { date: '2026-10-14' }];
+    const m = questsFor({ role: 'member', today: '2026-10-14', done, plannedToday: 5, kudosGivenToday: 0, approvalsToday: 0 });
+    assert.deepEqual(m.map((q) => [q.id, q.progress, q.target, q.done]), [['finish', 2, 3, false], ['track', 1, 1, true], ['kudos', 0, 1, false]]);
+    const l = questsFor({ role: 'leader', today: '2026-10-14', done: [], plannedToday: 0, kudosGivenToday: 1, approvalsToday: 0 });
+    assert.deepEqual(l.map((q) => q.id), ['finish', 'review', 'kudos']);
+    assert.equal(l[0].target, 1); // nothing planned yet: one finished task is enough
+  });
+
+  test('badges need real work', () => {
+    const base = { done: [], plannedToday: 0, doneToday: 0, streak: 0, approved: 0, kudosGiven: 0, kudosReceived: 0, questsClaimed: 0, stickers: 0, reviews: 0, plans: 0, voiceUsed: false };
+    assert.equal(badgeStatus(base).filter((b) => b.earned).length, 0);
+    const three = { ...base, done: [1, 2, 3].map(() => ({ date: '2026-10-14', expected_time: 2, actual_time_taken: 1 })), plannedToday: 3, doneToday: 3 };
+    const earned = badgeStatus(three).filter((b) => b.earned).map((b) => b.id).sort();
+    assert.deepEqual(earned, ['first_win', 'hat_trick', 'perfect_day']);
+  });
+
+  test('sticker odds and computeStats', () => {
+    assert.equal(pickSticker(() => 0.1).rarity, 'common');
+    assert.equal(pickSticker(() => 0.8).rarity, 'rare');
+    assert.equal(pickSticker(() => 0.99).rarity, 'epic');
+    assert.equal(new Set(STICKERS.map((s) => s.id)).size, STICKERS.length);
+    const s = computeStats({ done: Array.from({ length: 6 }, () => ({ date: '2026-10-14' })), approved: [{}], planned: [{ task_status: 'Completed' }, { task_status: 'Pending' }], today: '2026-10-14', claims: ['quest:a', 'badge:b'], dropNew: 1, dropDupes: 2 });
+    assert.equal(s.xp, 60 + 40 + 15 + 25 + 10 + 10);
     assert.equal(s.completed_today, 1);
     assert.equal(s.planned_today, 2);
   });
 });
 
-describe('stats endpoint', () => {
-  test('derived from real completed work', async () => {
-    const store = new MemoryStore();
+describe('engagement endpoints', () => {
+  let store, server, base, boss, lena, alok;
+  const api = async (method, url, { body, token } = {}) => {
+    const res = await fetch(base + url, { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await api('POST', '/api/auth/login', { body: { email } })).body.token;
+  const T = '2026-10-14';
+  const task = (uid, extra = {}) => ({ date: T, user_id: uid, task: 'Write post', expected_outcome: 'o', expected_time: 2, task_status: 'Pending', ...extra });
+
+  before(async () => {
+    store = new MemoryStore();
     await store.init();
     await bootstrapAdmin(store, { email: 'boss@example.com' });
-    const server = createApp({ store, jwtSecret: 's' }).listen(0);
-    const base = `http://localhost:${server.address().port}`;
-    const token = (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'boss@example.com' }) })).json()).token;
-    const h = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
-    const me = await (await fetch(`${base}/api/auth/me`, { headers: h })).json();
-    assert.equal((await fetch(`${base}/api/me/stats`)).status, 401);
-    for (const [date, status] of [['2026-10-14', 'Completed'], ['2026-10-13', 'Completed'], ['2026-10-14', 'Pending']]) {
-      await fetch(`${base}/api/entities/DailyTask`, { method: 'POST', headers: h, body: JSON.stringify({ date, user_id: me.id, task: 't', expected_outcome: 'o', expected_time: 1, task_status: status }) });
-    }
-    const stats = await (await fetch(`${base}/api/me/stats?today=2026-10-14`, { headers: h })).json();
-    assert.equal(stats.xp, 20);
-    assert.equal(stats.streak, 2);
-    assert.equal(stats.completed_today, 1);
-    assert.equal(stats.planned_today, 2);
-    server.close();
+    server = createApp({ store, jwtSecret: 's', random: () => 0.1 }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    boss = await login('boss@example.com');
+    await api('POST', '/api/entities/User', { token: boss, body: { full_name: 'Lena Lead', email: 'lena@x.com', role: 'team_leader' } });
+    await api('POST', '/api/entities/User', { token: boss, body: { full_name: 'Alok Kumar', email: 'alok@x.com' } });
+    lena = await login('lena@x.com');
+    alok = await login('alok@x.com');
+  });
+  after(() => server.close());
+
+  const me = async (t) => (await api('GET', '/api/auth/me', { token: t })).body;
+
+  test('sync needs auth; quests and badges are claimed exactly once', async () => {
+    assert.equal((await api('POST', '/api/me/sync', { body: { today: T } })).status, 401);
+    const a = await me(alok);
+    let s = (await api('POST', '/api/me/sync', { token: alok, body: { today: T } })).body;
+    assert.equal(s.xp, 0);
+    assert.equal(s.new_badges.length, 0);
+    assert.equal(s.drop_available, false);
+    assert.deepEqual(s.quests.map((q) => q.id), ['finish', 'track', 'kudos']);
+    const made = [];
+    for (let i = 0; i < 3; i += 1) made.push((await api('POST', '/api/entities/DailyTask', { token: alok, body: task(a.id) })).body);
+    for (const t of made) await api('PUT', `/api/entities/DailyTask/${t.id}`, { token: alok, body: { task_status: 'Completed', actual_time_taken: 1 } });
+    s = (await api('POST', '/api/me/sync', { token: alok, body: { today: T } })).body;
+    assert.deepEqual(s.new_quests.sort(), ['finish', 'track']);
+    assert.deepEqual(s.new_badges.map((b) => b.id).sort(), ['first_win', 'hat_trick', 'perfect_day']);
+    assert.equal(s.xp, 3 * 10 + 2 * 15 + 3 * 25);
+    assert.equal(s.drop_available, true);
+    assert.equal(s.quests_done, 2);
+    const again = (await api('POST', '/api/me/sync', { token: alok, body: { today: T } })).body;
+    assert.equal(again.new_quests.length, 0); // nothing is celebrated twice
+    assert.equal(again.new_badges.length, 0);
+    assert.equal(again.xp, s.xp);
+  });
+
+  test('daily chest: only after finishing work, once a day, stickers are collected', async () => {
+    assert.equal((await api('POST', '/api/me/daily-drop', { token: lena, body: { today: T } })).status, 409); // lena has done nothing
+    const open = await api('POST', '/api/me/daily-drop', { token: alok, body: { today: T } });
+    assert.equal(open.status, 200);
+    assert.equal(open.body.is_new, true);
+    assert.equal(open.body.sticker.rarity, 'common');
+    assert.equal((await api('POST', '/api/me/daily-drop', { token: alok, body: { today: T } })).status, 409);
+    const tr = (await api('GET', `/api/me/trophies?today=${T}`, { token: alok })).body;
+    assert.equal(tr.stickers.filter((x) => x.owned).length, 1);
+    assert.equal(tr.badges.find((b) => b.id === 'first_win').earned, true);
+    assert.equal(tr.badges.find((b) => b.id === 'century').progress, 3);
+    assert.equal(tr.drop_available, false);
+    // the next day's chest unlocks after the next finished task; the same sticker is a duplicate (+5 XP)
+    const a = await me(alok);
+    const t2 = (await api('POST', '/api/entities/DailyTask', { token: alok, body: task(a.id, { date: '2026-10-15', task_status: 'Completed' }) })).body;
+    assert.ok(t2.id);
+    const dupe = await api('POST', '/api/me/daily-drop', { token: alok, body: { today: '2026-10-15' } });
+    assert.equal(dupe.body.is_new, false);
+    assert.equal(dupe.body.xp, 5);
+    assert.equal((await api('POST', '/api/me/daily-drop', { token: alok, body: { today: '2026-10-15', rng: 0.99 } })).status, 409); // clients cannot steer the roll
+  });
+
+  test('achievements and kudos cannot be written directly', async () => {
+    assert.equal((await api('POST', '/api/entities/Achievement', { token: alok, body: { user_id: 'x', key: 'badge:century' } })).status, 403);
+    assert.equal((await api('POST', '/api/entities/Kudos', { token: alok, body: { from_user_id: 'a', to_user_id: 'b', emoji: '🙌' } })).status, 403);
+  });
+
+  test('high-fives: validated, notify the receiver, finish the kudos quest, show in the feed', async () => {
+    const l = await me(lena);
+    const a = await me(alok);
+    assert.equal((await api('POST', '/api/kudos', { body: { to_user_id: l.id, emoji: '🙌' } })).status, 401);
+    assert.equal((await api('POST', '/api/kudos', { token: alok, body: { to_user_id: a.id, emoji: '🙌' } })).status, 400); // self
+    assert.equal((await api('POST', '/api/kudos', { token: alok, body: { to_user_id: l.id, emoji: '💩' } })).status, 400);
+    assert.equal((await api('POST', '/api/kudos', { token: alok, body: { to_user_id: 'nope', emoji: '🙌' } })).status, 404);
+    const ok = await api('POST', '/api/kudos', { token: alok, body: { to_user_id: l.id, emoji: '🙌', message: 'Great plan!' } });
+    assert.equal(ok.status, 201);
+    const notes = (await api('GET', '/api/notifications', { token: lena })).body;
+    assert.ok(notes.some((n) => n.type === 'kudos' && /🙌/.test(n.title) && /Great plan/.test(n.message)));
+    const s = (await api('POST', '/api/me/sync', { token: alok, body: { today: new Date().toISOString().slice(0, 10) } })).body;
+    assert.equal(s.quests.find((q) => q.id === 'kudos').done, true);
+    const pulse = (await api('GET', `/api/team/pulse?today=${T}&week_start=2026-10-12`, { token: alok })).body;
+    assert.ok(pulse.wins.some((w) => w.type === 'kudos' && /Great plan/.test(w.text)));
+    assert.ok(pulse.wins.some((w) => w.type === 'done'));
+    assert.ok(pulse.wins.some((w) => w.type === 'badge'));
+  });
+
+  test('team pulse: weekly goal progress', async () => {
+    assert.equal((await api('GET', `/api/team/pulse?today=${T}`, { token: alok })).status, 400);
+    const p = (await api('GET', `/api/team/pulse?today=${T}&week_start=2026-10-12`, { token: alok })).body;
+    assert.equal(p.week.planned, 4); // 3 on the 14th + 1 on the 15th
+    assert.equal(p.week.done, 4);
+    assert.equal(p.week.pct, 100);
+    assert.equal(p.today.active_members, 1);
+    assert.equal(p.today.members, 3);
+    const empty = (await api('GET', `/api/team/pulse?today=${T}&week_start=2026-11-02`, { token: alok })).body;
+    assert.equal(empty.week.pct, 0);
   });
 });

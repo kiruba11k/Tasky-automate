@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, Edit3, Clock, Target, User, Calendar } from "lucide-react";
 import { DailyTask } from "@/entities/DailyTask";
+import { FocusButton } from "@/fun/FocusTimer";
 import { format } from 'date-fns';
 
 const priorityColors = {
@@ -90,6 +91,7 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
             <Badge className={`${statusColors[task.task_status]} border px-2 py-1 text-xs`}>
               {statusEmoji[task.task_status]} {task.task_status}
             </Badge>
+            {canEdit && task.task_status !== 'Completed' && <FocusButton task={task} />}
             {canEdit && task.task_status !== 'Completed' && (
               <Button size="sm" onClick={markDone} disabled={completing} title="Mark as done" className="h-7 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold rounded-full">
                 <Check className="w-4 h-4 mr-1" />{completing ? '…' : 'Done!'}

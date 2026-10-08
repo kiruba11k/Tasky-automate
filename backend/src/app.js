@@ -10,7 +10,7 @@ import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
-import { computeStats } from './stats.js';
+import { openDailyDrop, syncProgress, teamPulse, trophies } from './gamify.js';
 
 const RESERVED_QUERY = new Set(['sort', 'limit', 'skip']);
 const SERVED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(csv|plain))$/;
@@ -37,7 +37,7 @@ export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
 }
 
 /** Builds the Express app around an initialised store. */
-export function createApp({ store, jwtSecret, staticDir, llm } = {}) {
+export function createApp({ store, jwtSecret, staticDir, llm, random = Math.random } = {}) {
   // AI parsing needs ANTHROPIC_API_KEY (or an injected function in tests); otherwise voice falls back to simple rules.
   const voiceLlm = llm || (process.env.ANTHROPIC_API_KEY ? invokeLLM : null);
   const voiceLimit = createLimiter({ max: 60, windowMs: 60 * 60 * 1000 });
@@ -133,7 +133,7 @@ export function createApp({ store, jwtSecret, staticDir, llm } = {}) {
   registerWeekly(app, { store, notifier, wrap });
 
   // Weekly plans and notifications are written only through the endpoints above.
-  const READ_ONLY_ENTITIES = new Set(['WeeklyTask', 'WeeklyAssignment']);
+  const READ_ONLY_ENTITIES = new Set(['WeeklyTask', 'WeeklyAssignment', 'Achievement', 'Kudos']);
   app.use('/api/entities/:entity', (req, res, next) => {
     const { entity: name } = req.params;
     if (name === 'Notification' || (READ_ONLY_ENTITIES.has(name) && req.method !== 'GET')) {
@@ -151,19 +151,45 @@ export function createApp({ store, jwtSecret, staticDir, llm } = {}) {
     if (mode === 'weekly' && !/^\d{4}-\d{2}-\d{2}$/.test(weekStart || '')) return res.status(400).json({ error: 'week_start is required' });
     if (!voiceLimit(req.user.id)) return res.status(429).json({ error: 'Too many voice requests. Try again later.' });
     const [users, projects] = await Promise.all([store.list('User'), store.list('Project')]);
+    await store.list('Achievement', { query: { user_id: req.user.id, key: 'flag:voice' } }).then((r) => (r.length ? null : store.insert('Achievement', { user_id: req.user.id, key: 'flag:voice' }))).catch(() => {});
     const today = new Date().toISOString().slice(0, 10);
     res.json(await parseVoice({ transcript, mode, users, projects, me: req.user, today: req.body.today && /^\d{4}-\d{2}-\d{2}$/.test(req.body.today) ? req.body.today : today, weekStart: mode === 'weekly' ? weekStart : null, llm: voiceLlm }));
   }));
 
-  // ---- playful progress: XP, level and streak, derived from real work (nothing extra is stored) ----
-  app.get('/api/me/stats', wrap(async (req, res) => {
-    const today = /^\d{4}-\d{2}-\d{2}$/.test(req.query.today || '') ? req.query.today : new Date().toISOString().slice(0, 10);
-    const [done, approved, planned] = await Promise.all([
-      store.list('DailyTask', { query: { user_id: req.user.id, task_status: 'Completed' } }),
-      store.list('WeeklyAssignment', { query: { user_id: req.user.id, status: 'Approved' } }),
-      store.list('DailyTask', { query: { user_id: req.user.id, date: today } }),
-    ]);
-    res.json(computeStats({ done, approved, planned, today }));
+  // ---- playful progress: derived from real work. Rewards come from finished tasks, never from merely opening the app. ----
+  const todayParam = (req) => (/^\d{4}-\d{2}-\d{2}$/.test(req.query.today || req.body?.today || '') ? (req.query.today || req.body.today) : new Date().toISOString().slice(0, 10));
+  const EMOJIS = ['🙌', '🔥', '🌟', '💪', '🎯', '❤️', '👏', '🚀'];
+
+  // Evaluates quests/badges for the signed-in user, records anything newly earned (once) and returns the progress.
+  app.post('/api/me/sync', wrap(async (req, res) => res.json(await syncProgress(store, req.user, todayParam(req)))));
+  app.get('/api/me/trophies', wrap(async (req, res) => res.json(await trophies(store, req.user, todayParam(req)))));
+
+  app.post('/api/me/daily-drop', wrap(async (req, res) => {
+    const r = await openDailyDrop(store, req.user, todayParam(req), random);
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    res.json(r);
+  }));
+
+  app.get('/api/team/pulse', wrap(async (req, res) => {
+    const today = todayParam(req);
+    const ws = /^\d{4}-\d{2}-\d{2}$/.test(req.query.week_start || '') ? req.query.week_start : null;
+    if (!ws) return res.status(400).json({ error: 'week_start is required' });
+    res.json(await teamPulse(store, today, ws, await store.list('User')));
+  }));
+
+  app.post('/api/kudos', wrap(async (req, res) => {
+    const { to_user_id: toId, emoji, message } = req.body || {};
+    const target = toId && (await store.get('User', toId));
+    if (!target || target.status === 'Inactive') return res.status(404).json({ error: 'Teammate not found' });
+    if (target.id === req.user.id) return res.status(400).json({ error: 'Save the high-fives for your teammates 😄' });
+    if (!EMOJIS.includes(emoji)) return res.status(400).json({ error: 'Pick one of the high-five emojis' });
+    const today = new Date().toISOString().slice(0, 10);
+    const sentToday = (await store.list('Kudos', { query: { from_user_id: req.user.id } })).filter((k) => String(k.created_date).slice(0, 10) === today).length;
+    if (sentToday >= 20) return res.status(429).json({ error: 'That is plenty of high-fives for today!' });
+    const rec = await store.insert('Kudos', { from_user_id: req.user.id, to_user_id: target.id, emoji, message: String(message || '').trim().slice(0, 140) || undefined }, req.user.email);
+    const by = req.user.full_name || req.user.email;
+    await notifier.notify(target.id, { type: 'kudos', title: `${by} sent you a ${emoji}`, message: rec.message || 'Keep up the great work!', actor_name: by, link: '/' }).catch((e) => console.error('kudos notify failed:', e));
+    res.status(201).json(rec);
   }));
 
   // ---- users: managed by admins (any role) and team leaders (team members only) ----

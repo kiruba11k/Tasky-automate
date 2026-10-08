@@ -1,0 +1,11 @@
+{
+  "name": "Kudos",
+  "type": "object",
+  "properties": {
+    "from_user_id": { "type": "string" },
+    "to_user_id": { "type": "string" },
+    "emoji": { "type": "string" },
+    "message": { "type": "string" }
+  },
+  "required": ["from_user_id", "to_user_id", "emoji"]
+}

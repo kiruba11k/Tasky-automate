@@ -69,6 +69,22 @@ Everything you do gets a playful reaction, driven by one event bus (`frontend/sr
 - **Look and feel:** rounded Fredoka font, sticker-style cards, bouncy dialogs and page transitions, squishy buttons, bouncing loaders, sleepy empty states, a greeting banner on the dashboard.
 - **Control:** the level chip in the header opens a panel to turn off the cartoon look, celebrations (calm mode), sound, or the mascot. `prefers-reduced-motion` starts in calm mode automatically.
 
+## Engagement layer: reasons to come back to the dashboard
+
+Designed from what research says works (streaks are the best-evidenced hook; rewards should track finished work, not logins; progress should be visible at several levels; team goals and peer recognition help while leaderboards often backfire; broken streaks demotivate, so be forgiving). Everything is derived from real work, and nothing ranks people against each other.
+
+- **Daily quests** (3 a day, +15 XP each): finish tasks, log the time on one (leaders: approve a submission), send a high-five. Progress bars plus a "today" ring.
+- **Forgiving streak:** counts working days with a finished task. Weekends never count against you, and every 5 days earns a shield (max 2) that quietly covers one missed day. A missed streak just says "start a new one"; an evening nudge says "finish a task to keep it".
+- **Daily treasure chest:** unlocked by *finishing a task* (not by opening the app). Holds one of 24 collectible stickers (common / rare / epic, rolled on the server); duplicates give bonus XP. Sticker album in the trophy shelf.
+- **19 badges** with progress bars for the locked ones (First Win, Hat-trick, Perfect Day, streaks, Timekeeper, Sharpshooter, Hype Person, Mentor, Voice Wizard…), each with an unlock celebration.
+- **Team rocket:** the team's weekly goal (finish everything planned). Every finished task moves the rocket; the whole team celebrates when it reaches the moon.
+- **Team wins feed + high-fives:** positive-only activity with one-tap 🙌🔥🌟💪 that notifies the receiver live. Max 20 a day.
+- **Focus timer:** 15/25/50-minute sessions on a task, a countdown pill, and on completion an offer to log the time on the task.
+- **Micro-delights:** floating "+10 XP" from where you clicked, count-up numbers, Tasky nudges when you've been idle ("2 tasks left today"), and a secret code (↑↑↓↓←→←→BA).
+- Controls live in the header level chip (celebrations, sound, mascot, cartoon look). Rewards are cosmetic and small, to avoid crowding out intrinsic motivation.
+
+API: `POST /api/me/sync` (evaluates and records quests/badges once), `GET /api/me/trophies`, `POST /api/me/daily-drop`, `GET /api/team/pulse`, `POST /api/kudos`. Achievements and kudos are written only by the server.
+
 ## Deploy on Render (free)
 
 1. Push this repo to GitHub and create the Neon database (above).

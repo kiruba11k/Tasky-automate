@@ -15,6 +15,7 @@ import Team from './pages/Team';
 import WeeklyTasks from './pages/WeeklyTasks';
 import { NotificationProvider } from './notifications/NotificationProvider';
 import { FunProvider } from './fun/FunProvider';
+import { FocusProvider } from './fun/FocusTimer';
 import FunLoader from './fun/FunLoader';
 
 const pages = { AIAllocation, Analytics, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
@@ -36,6 +37,7 @@ function Protected() {
   return (
     <NotificationProvider>
     <FunProvider>
+    <FocusProvider>
     <Layout currentPageName={currentPageName}>
       <div key={location.pathname} className="page-enter">
       <Routes>
@@ -47,6 +49,7 @@ function Protected() {
       </Routes>
       </div>
     </Layout>
+    </FocusProvider>
     </FunProvider>
     </NotificationProvider>
   );

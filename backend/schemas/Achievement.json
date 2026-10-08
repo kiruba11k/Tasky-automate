@@ -1,0 +1,11 @@
+{
+  "name": "Achievement",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string" },
+    "key": { "type": "string", "description": "badge:<id> | quest:<date>:<id> | sticker:<id> | drop:<date>" },
+    "date": { "type": "string" },
+    "meta": { "type": "object" }
+  },
+  "required": ["user_id", "key"]
+}

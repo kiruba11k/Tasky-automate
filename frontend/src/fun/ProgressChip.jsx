@@ -1,4 +1,6 @@
 import React from 'react';
+import { useState } from 'react';
+import TrophyShelf from './TrophyShelf';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFun } from './FunProvider';
 
@@ -14,10 +16,13 @@ const Toggle = ({ label, on, onChange, hint }) => (
 /** Header chip: level + XP bar + streak. Opens a panel with progress details and the fun settings. */
 export default function ProgressChip() {
   const { stats, settings, setSettings } = useFun();
+  const [shelf, setShelf] = useState(false);
   const span = stats ? Math.max(1, stats.next_level_xp - stats.level_start_xp) : 1;
   const pct = stats ? Math.min(100, Math.round(((stats.xp - stats.level_start_xp) / span) * 100)) : 0;
 
   return (
+    <>
+    <TrophyShelf open={shelf} onOpenChange={setShelf} />
     <Popover>
       <PopoverTrigger asChild>
         <button type="button" aria-label="Your level and fun settings" className="chip-sticker flex items-center gap-2 rounded-full border border-slate-700/60 bg-slate-800/70 pl-1.5 pr-3 py-1 text-xs text-white">
@@ -40,7 +45,8 @@ export default function ProgressChip() {
               <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">{stats.approved_total}</div>approved</div>
               <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">🔥 {stats.streak}</div>day streak</div>
             </div>
-            <p className="text-[11px] text-slate-500">+10 XP per finished daily task, +40 XP per approved weekly task.</p>
+            <p className="text-[11px] text-slate-500">+10 XP per finished daily task, +40 per approved weekly task, +15 per daily quest, +25 per badge.</p>
+            <button type="button" onClick={() => setShelf(true)} className="w-full rounded-lg bg-slate-800 hover:bg-slate-700 py-1.5 text-sm font-bold">🏆 Open trophy shelf</button>
           </div>
         )}
         <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Fun settings</div>
@@ -50,5 +56,6 @@ export default function ProgressChip() {
         <Toggle label="Tasky the mascot" on={settings.mascot} onChange={(v) => setSettings({ mascot: v })} />
       </PopoverContent>
     </Popover>
+    </>
   );
 }
