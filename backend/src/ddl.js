@@ -28,6 +28,9 @@ export function buildDDL() {
   out.push('CREATE UNIQUE INDEX IF NOT EXISTS "users_email_lower_idx" ON "users" (lower(email));');
   out.push('CREATE INDEX IF NOT EXISTS "daily_tasks_date_idx" ON "daily_tasks" ("date");');
   out.push('CREATE INDEX IF NOT EXISTS "tasks_status_idx" ON "tasks" ("status");');
+  out.push('CREATE INDEX IF NOT EXISTS "weekly_tasks_week_idx" ON "weekly_tasks" ("week_start");');
+  out.push('CREATE INDEX IF NOT EXISTS "weekly_assignments_week_idx" ON "weekly_assignments" ("week_start");');
+  out.push('CREATE INDEX IF NOT EXISTS "notifications_user_read_idx" ON "notifications" ("user_id", "read");');
   out.push(
     'CREATE TABLE IF NOT EXISTS "uploaded_files" (\n  id uuid PRIMARY KEY,\n  created_date timestamptz NOT NULL DEFAULT now(),\n  name text NOT NULL,\n  mime text,\n  data bytea NOT NULL\n);'
   );

@@ -65,6 +65,10 @@
     },
     "assigned_by": {
       "type": "string"
+    },
+    "weekly_assignment_id": {
+      "type": "string",
+      "description": "Set when generated from a weekly allocation"
     }
   },
   "required": [

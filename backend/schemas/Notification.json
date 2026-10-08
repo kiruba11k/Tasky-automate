@@ -1,0 +1,14 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string" },
+    "type": { "type": "string" },
+    "title": { "type": "string" },
+    "message": { "type": "string" },
+    "link": { "type": "string" },
+    "read": { "type": "boolean", "default": false },
+    "actor_name": { "type": "string" }
+  },
+  "required": ["user_id", "title"]
+}

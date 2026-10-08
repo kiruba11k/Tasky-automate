@@ -36,6 +36,14 @@ There is no sign-up and no password. Signing in needs only an email, and that em
 - Roles: `admin` (everything), `team_leader` (manages team members), `team_member`.
 - **Security note:** because no password or code is checked, anyone who knows or guesses an allowed email (including the admin's) can sign in as that person. Keep the admin email private and use this only for internal tools. If you later want real verification, add an emailed one-time code on top of the same allow-list.
 
+## Weekly tasks and notifications
+
+- **Weekly Tasks** tab (everyone). Leaders get *Allocate*, *Approvals* and *My week*; members get *My week*.
+- **Allocate:** a grid with tasks as rows and people as columns. Type a number in a person's cell to give them that target; several people can share one task. "Copy from last week" repeats last week's tasks so you only change the numbers. The calendar icon sets a custom daily split; otherwise targets are spread evenly over the selected working days.
+- **Save & notify** creates the daily tasks (leaders and project managers included) and notifies everyone affected at once. Unchanged allocations are not re-notified.
+- **Approval:** a member's *Submit for approval* (with how many they finished and a note) goes to the leaders; they *Approve* or *Request changes* (a reason is required). Changing the number on a submitted/approved task reopens it.
+- **Notifications:** pushed live to the screen (bell with unread count, pop-up toasts, optional desktop alerts) when work is allocated, changed, removed, submitted, approved or sent back, and when a leader assigns/edits a daily task or a project. Delivery uses Server-Sent Events with automatic reconnect and catch-up.
+
 ## Deploy on Render (free)
 
 1. Push this repo to GitHub and create the Neon database (above).

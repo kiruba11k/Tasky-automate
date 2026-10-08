@@ -1,0 +1,20 @@
+{
+  "name": "WeeklyAssignment",
+  "type": "object",
+  "properties": {
+    "weekly_task_id": { "type": "string" },
+    "week_start": { "type": "string" },
+    "user_id": { "type": "string" },
+    "target": { "type": "number", "minimum": 0 },
+    "done": { "type": "number", "minimum": 0 },
+    "daily_plan": { "type": "object", "description": "{ 'yyyy-MM-dd': quantity }" },
+    "status": { "type": "string", "enum": ["Assigned", "Submitted", "Approved", "Changes Requested"], "default": "Assigned" },
+    "note": { "type": "string", "description": "Member's note when submitting" },
+    "review_note": { "type": "string", "description": "Leader's note when requesting changes" },
+    "allocated_by": { "type": "string" },
+    "submitted_at": { "type": "string" },
+    "approved_by": { "type": "string" },
+    "approved_at": { "type": "string" }
+  },
+  "required": ["weekly_task_id", "week_start", "user_id", "target"]
+}

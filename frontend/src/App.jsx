@@ -12,8 +12,10 @@ import ProjectManagement from './pages/ProjectManagement';
 import SheetsSetup from './pages/SheetsSetup';
 import Tasks from './pages/Tasks';
 import Team from './pages/Team';
+import WeeklyTasks from './pages/WeeklyTasks';
+import { NotificationProvider } from './notifications/NotificationProvider';
 
-const pages = { AIAllocation, Analytics, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team };
+const pages = { AIAllocation, Analytics, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
 
 function Protected() {
   const { user, loading } = useAuth();
@@ -30,6 +32,7 @@ function Protected() {
   if (!user) return <Login />;
 
   return (
+    <NotificationProvider>
     <Layout currentPageName={currentPageName}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
@@ -39,6 +42,7 @@ function Protected() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </NotificationProvider>
   );
 }
 

@@ -2,7 +2,8 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/auth/AuthContext";
-import { LayoutDashboard, LogOut, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
+import NotificationBell from "@/notifications/NotificationBell";
+import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
 
 const navigationItems = [
   {
@@ -24,6 +25,11 @@ const navigationItems = [
     name: "Daily Tasks",
     url: createPageUrl("DailyTasks"),
     icon: Calendar,
+  },
+  {
+    name: "Weekly Tasks",
+    url: createPageUrl("WeeklyTasks"),
+    icon: CalendarRange,
   },
   {
     name: "Analytics",
@@ -275,6 +281,7 @@ export default function Layout({ children, currentPageName }) {
                 <div className="text-sm font-medium text-white">{user?.full_name}</div>
                 <div className="text-xs text-slate-400">{user?.role?.replace("_", " ")}</div>
               </div>
+              <NotificationBell />
               <button
                 onClick={logout}
                 aria-label="Sign out"

@@ -7,6 +7,8 @@ import { schemas, validate } from './schema.js';
 import { invokeLLM } from './llm.js';
 import { parseTable } from './extract.js';
 import { createLimiter, signToken, verifyToken } from './auth.js';
+import { createNotifier } from './notify.js';
+import { registerWeekly } from './weekly.js';
 
 const RESERVED_QUERY = new Set(['sort', 'limit', 'skip']);
 const SERVED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(csv|plain))$/;
@@ -34,6 +36,9 @@ export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
 
 /** Builds the Express app around an initialised store. */
 export function createApp({ store, jwtSecret, staticDir } = {}) {
+  const notifier = createNotifier(store);
+  // Notification side-effects must never fail the request that caused them.
+  const afterWrite = (args) => notifier.afterWrite(args).catch((e) => console.error('notify failed:', e));
   if (!store || !jwtSecret) throw new Error('createApp requires { store, jwtSecret }');
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
   const loginLimit = createLimiter({ max: 20 });
@@ -93,6 +98,44 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
     res.json(await store.update('User', req.user.id, data));
   }));
+
+  // ---- notifications (own only) ----
+  app.get('/api/notifications', wrap(async (req, res) => {
+    const query = { user_id: req.user.id };
+    if (req.query.unread === 'true') query.read = false;
+    res.json(await store.list('Notification', { query, sort: '-created_date', limit: Math.min(parseInt(req.query.limit, 10) || 50, 200) }));
+  }));
+
+  app.post('/api/notifications/read', wrap(async (req, res) => {
+    const mine = await store.list('Notification', { query: { user_id: req.user.id, read: false } });
+    const ids = req.body?.all ? null : new Set(Array.isArray(req.body?.ids) ? req.body.ids : []);
+    for (const n of mine) if (!ids || ids.has(n.id)) await store.update('Notification', n.id, { read: true });
+    res.json({ success: true });
+  }));
+
+  app.get('/api/notifications/stream', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    res.flushHeaders();
+    res.write(': connected\n\n');
+    const unsubscribe = notifier.subscribe(req.user.id, res);
+    const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
+  });
+
+  registerWeekly(app, { store, notifier, wrap });
+
+  // Weekly plans and notifications are written only through the endpoints above.
+  const READ_ONLY_ENTITIES = new Set(['WeeklyTask', 'WeeklyAssignment']);
+  app.use('/api/entities/:entity', (req, res, next) => {
+    const { entity: name } = req.params;
+    if (name === 'Notification' || (READ_ONLY_ENTITIES.has(name) && req.method !== 'GET')) {
+      return res.status(403).json({ error: `${name} cannot be changed directly` });
+    }
+    next();
+  });
 
   // ---- users: managed by admins (any role) and team leaders (team members only) ----
   const canManageUser = (actor, target, newRole) => {
@@ -188,19 +231,25 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     if (req.schema.properties?.timestamp && !body.timestamp) body.timestamp = new Date().toISOString();
     const { data, errors } = validate(req.schema, body);
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-    res.status(201).json(await store.insert(req.params.entity, data, req.user.email));
+    const created = await store.insert(req.params.entity, data, req.user.email);
+    await afterWrite({ entity: req.params.entity, action: 'create', rec: created, actor: req.user });
+    res.status(201).json(created);
   }));
 
   app.put('/api/entities/:entity/:id', entity, wrap(async (req, res) => {
     const { data, errors } = validate(req.schema, req.body || {}, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-    const rec = await store.update(req.params.entity, req.params.id, data);
+    const prev = await store.get(req.params.entity, req.params.id);
+    const rec = prev && (await store.update(req.params.entity, req.params.id, data));
     if (!rec) return res.status(404).json({ error: 'Not found' });
+    await afterWrite({ entity: req.params.entity, action: 'update', rec, prev, actor: req.user });
     res.json(rec);
   }));
 
   app.delete('/api/entities/:entity/:id', entity, wrap(async (req, res) => {
-    if (!(await store.remove(req.params.entity, req.params.id))) return res.status(404).json({ error: 'Not found' });
+    const prev = await store.get(req.params.entity, req.params.id);
+    if (!prev || !(await store.remove(req.params.entity, req.params.id))) return res.status(404).json({ error: 'Not found' });
+    await afterWrite({ entity: req.params.entity, action: 'delete', rec: null, prev, actor: req.user });
     res.json({ success: true });
   }));
 
