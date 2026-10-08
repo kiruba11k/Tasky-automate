@@ -3,6 +3,7 @@ import { useState } from 'react';
 import TrophyShelf from './TrophyShelf';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFun } from './FunProvider';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const Toggle = ({ label, on, onChange, hint }) => (
   <label className="flex items-center justify-between gap-3 py-1.5 cursor-pointer">
@@ -31,7 +32,7 @@ export default function ProgressChip() {
             <span className="font-semibold whitespace-nowrap">{stats ? stats.title : "Loading"}</span>
             <span className="h-1.5 w-20 rounded-full bg-slate-700 overflow-hidden"><span className="block h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${pct}%` }} /></span>
           </span>
-          {stats?.streak > 0 && <span title={`${stats.streak}-day streak`} className="font-bold text-orange-300">🔥{stats.streak}</span>}
+          {stats?.streak > 0 && <span title={`${stats.streak}-day streak`} className="font-bold text-orange-300 inline-flex items-center"><Emoji e="🔥" />{stats.streak}</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 bg-slate-900 border-slate-700 text-white">
@@ -43,10 +44,10 @@ export default function ProgressChip() {
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
               <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">{stats.completed_total}</div>tasks done</div>
               <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">{stats.approved_total}</div>approved</div>
-              <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">🔥 {stats.streak}</div>day streak</div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold flex items-center justify-center gap-1"><Emoji e="🔥" /> {stats.streak}</div>day streak</div>
             </div>
             <p className="text-[11px] text-slate-500">+10 XP per finished daily task, +40 per approved weekly task, +15 per daily quest, +25 per badge.</p>
-            <button type="button" onClick={() => setShelf(true)} className="w-full rounded-lg bg-slate-800 hover:bg-slate-700 py-1.5 text-sm font-bold">🏆 Open trophy shelf</button>
+            <button type="button" onClick={() => setShelf(true)} className="w-full rounded-lg bg-slate-800 hover:bg-slate-700 py-1.5 text-sm font-bold"><Emoji e="🏆" /> Open trophy shelf</button>
           </div>
         )}
         <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Fun settings</div>

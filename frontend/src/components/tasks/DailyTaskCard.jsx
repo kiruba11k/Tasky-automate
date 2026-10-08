@@ -6,6 +6,7 @@ import { Check, Edit3, Clock, Target, User, Calendar } from "lucide-react";
 import { DailyTask } from "@/entities/DailyTask";
 import { FocusButton } from "@/fun/FocusTimer";
 import { format } from 'date-fns';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const priorityColors = {
   "Low": "bg-blue-500/20 text-blue-300 border-blue-500/40",
@@ -21,7 +22,7 @@ const statusColors = {
   "Blocked": "bg-red-500/20 text-red-300 border-red-500/40"
 };
 
-const statusEmoji = { Pending: '🕒', 'In Progress': '🚀', Completed: '✅', Blocked: '🙈' };
+const statusEmoji = { Pending: '⏳', 'In Progress': '🚀', Completed: '✅', Blocked: '🙈' };
 const priorityEmoji = { Low: '🌱', Medium: '⚡', High: '🔥', Critical: '🚨' };
 
 export default function DailyTaskCard({ task, onEdit, userName, canEdit = false, onCompleted }) {
@@ -69,7 +70,7 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
           </div>
           <div className="flex items-start gap-2 ml-4">
             <Badge className={`${priorityColors[task.priority]} border px-2 py-1 text-xs`}>
-              {priorityEmoji[task.priority]} {task.priority}
+              <Emoji e={priorityEmoji[task.priority]} className="mr-1" />{task.priority}
             </Badge>
             {canEdit && (
               <Button
@@ -89,7 +90,7 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Badge className={`${statusColors[task.task_status]} border px-2 py-1 text-xs`}>
-              {statusEmoji[task.task_status]} {task.task_status}
+              <Emoji e={statusEmoji[task.task_status]} className="mr-1" />{task.task_status}
             </Badge>
             {canEdit && task.task_status !== 'Completed' && <FocusButton task={task} />}
             {canEdit && task.task_status !== 'Completed' && (

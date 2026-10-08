@@ -6,6 +6,7 @@ import { DailyTask } from '@/entities/DailyTask';
 import { emitFun } from './bus';
 import { play } from './sounds';
 import { useFun } from './FunProvider';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const KEY = 'tasky_focus';
 const FocusContext = createContext(null);
@@ -65,17 +66,17 @@ export function FocusProvider({ children }) {
     <FocusContext.Provider value={value}>
       {children}
       {session && (
-        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[95] flex items-center gap-3 rounded-full border-[3px] border-slate-900 bg-slate-800 px-4 py-2 shadow-[4px_4px_0_rgba(0,0,0,.5)] animate-pop" role="timer" aria-label="Focus timer">
-          <span className="text-xl" aria-hidden="true">🍅</span>
+        <div className="fixed bottom-3 left-1/2 z-[95] flex items-center gap-3 rounded-full border-[3px] border-slate-900 bg-slate-800 px-4 py-2 shadow-[4px_4px_0_rgba(0,0,0,.5)] animate-pop-x" role="timer" aria-label="Focus timer">
+          <Emoji e="🍅" size="1.6rem" />
           <div className="leading-tight"><div className="font-mono text-lg font-extrabold text-white">{fmt(session.endsAt - now)}</div><div className="text-[11px] text-slate-400 max-w-[11rem] truncate">{session.title}</div></div>
           <button type="button" onClick={stop} aria-label="Stop focus session" className="p-1.5 rounded-full bg-slate-700 text-slate-200 hover:text-white"><Pause className="w-4 h-4" /></button>
         </div>
       )}
       <Dialog open={!!finished} onOpenChange={(o) => !o && setFinished(null)}>
         <DialogContent className="max-w-sm bg-slate-900 border-slate-700 text-white text-center">
-          <div className="text-6xl" aria-hidden="true">🍅</div>
+          <div className="flex justify-center"><Emoji e="🍅" size="4.5rem" /></div>
           <DialogTitle className="text-xl font-extrabold">Focus session complete!</DialogTitle>
-          <DialogDescription className="text-slate-300">{finished?.minutes} minutes on “{finished?.title}”. Take a quick stretch 🧘</DialogDescription>
+          <DialogDescription className="text-slate-300">{finished?.minutes} minutes on “{finished?.title}”. Take a quick stretch <Emoji e="🧘" /></DialogDescription>
           <div className="flex gap-2 justify-center">
             <Button onClick={logTime} disabled={busy} className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold">{busy ? 'Logging…' : `Log ${finished?.minutes} min on the task`}</Button>
             <Button variant="outline" onClick={() => setFinished(null)} className="bg-transparent border-slate-600 text-slate-200">Skip</Button>

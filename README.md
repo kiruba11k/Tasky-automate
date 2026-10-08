@@ -85,6 +85,12 @@ Designed from what research says works (streaks are the best-evidenced hook; rew
 
 API: `POST /api/me/sync` (evaluates and records quests/badges once), `GET /api/me/trophies`, `POST /api/me/daily-drop`, `GET /api/team/pulse`, `POST /api/kudos`. Achievements and kudos are written only by the server.
 
+## Icons
+
+The UI uses illustrated cartoon icons instead of OS emoji, so it looks identical on every device and works offline. Emoji characters stay as the stable keys in the data (kudos, badges, stickers); `src/icons/Emoji.jsx` swaps them for artwork at render time (`<Emoji e="🔥" />`, or `<Rich text="Nice 🎉" />` for strings), and the confetti/burst effects use the same art. The artwork is bundled in `frontend/src/icons/emojiIcons.generated.js`. When you introduce a new emoji anywhere in `frontend/src` or `backend/src`, run `npm --prefix frontend run build:icons` to add its artwork.
+
+Artwork: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (Flat), MIT License, Copyright (c) Microsoft Corporation.
+
 ## Deploy on Render (free)
 
 1. Push this repo to GitHub and create the Neon database (above).

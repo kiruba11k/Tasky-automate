@@ -26,6 +26,8 @@ export default {
       },
       keyframes: {
         pop: { '0%': { transform: 'scale(.6) translateY(12px)', opacity: '0' }, '60%': { transform: 'scale(1.05)', opacity: '1' }, '100%': { transform: 'scale(1)', opacity: '1' } },
+        popCenter: { '0%': { transform: 'translate(-50%, -50%) scale(.6)', opacity: '0' }, '60%': { transform: 'translate(-50%, -50%) scale(1.05)', opacity: '1' }, '100%': { transform: 'translate(-50%, -50%) scale(1)', opacity: '1' } },
+        popX: { '0%': { transform: 'translateX(-50%) scale(.6)', opacity: '0' }, '60%': { transform: 'translateX(-50%) scale(1.05)', opacity: '1' }, '100%': { transform: 'translateX(-50%) scale(1)', opacity: '1' } },
         wiggle: { '0%,100%': { transform: 'rotate(0)' }, '20%': { transform: 'rotate(-14deg)' }, '40%': { transform: 'rotate(12deg)' }, '60%': { transform: 'rotate(-8deg)' }, '80%': { transform: 'rotate(6deg)' } },
         page: { '0%': { opacity: '0', transform: 'translateY(16px) scale(.985)' }, '100%': { opacity: '1', transform: 'translateY(0) scale(1)' } },
         bubble: { '0%': { transform: 'scale(.4)', opacity: '0', transformOrigin: 'bottom left' }, '70%': { transform: 'scale(1.06)', opacity: '1' }, '100%': { transform: 'scale(1)' } },
@@ -34,6 +36,8 @@ export default {
       },
       animation: {
         pop: 'pop .35s cubic-bezier(.34,1.56,.64,1) both',
+        'pop-center': 'popCenter .35s cubic-bezier(.34,1.56,.64,1) both',
+        'pop-x': 'popX .35s cubic-bezier(.34,1.56,.64,1) both',
         wiggle: 'wiggle .7s ease-in-out',
         page: 'page .45s cubic-bezier(.34,1.56,.64,1) both',
         bubble: 'bubble .4s cubic-bezier(.34,1.56,.64,1) both',

@@ -14,6 +14,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { useSpeech } from '@/lib/useSpeech';
 import { emitFun } from '@/fun/bus';
 import { dayLabel, weekDates } from '@/lib/week';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const LANGS = [['en-IN', 'English (India)'], ['en-US', 'English (US)'], ['en-GB', 'English (UK)'], ['hi-IN', 'Hindi']];
 const field = 'bg-slate-800 border-slate-700 text-white text-sm';
@@ -162,7 +163,7 @@ export default function VoiceTaskDialog({ open, onOpenChange, mode, week, onAppl
 
         {step === 'review' && (
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
-            {warnings.map((w) => <p key={w} className="text-xs text-amber-300">⚠ {w}</p>)}
+            {warnings.map((w) => <p key={w} className="text-xs text-amber-300"><Emoji e="⚠️" /> {w}</p>)}
             {items.length === 0 && <p className="text-sm text-slate-400">No tasks found. Go back and try again.</p>}
             {items.map((t) => (
               <div key={t.key} className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-2">
@@ -196,7 +197,7 @@ export default function VoiceTaskDialog({ open, onOpenChange, mode, week, onAppl
                       </PopoverContent>
                     </Popover>
                   )}
-                  {t.unresolved.map((u) => <span key={u} className="text-xs text-amber-300">⚠ {u}</span>)}
+                  {t.unresolved.map((u) => <span key={u} className="text-xs text-amber-300"><Emoji e="⚠️" /> {u}</span>)}
                   {mode === 'daily' && (
                     <div className="ml-auto flex items-center gap-2">
                       <Input type="date" className={`${field} w-40`} value={t.date} onChange={(e) => patch(t.key, { date: e.target.value })} aria-label="Date" />

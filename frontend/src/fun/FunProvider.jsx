@@ -6,6 +6,7 @@ import Mascot from './Mascot';
 import BadgeUnlock from './BadgeUnlock';
 import { effects } from './effects';
 import { play } from './sounds';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const FunContext = createContext(null);
 
@@ -310,14 +311,14 @@ export function FunProvider({ children }) {
           </button>
           {bubble && (
             <div key={bubble.id} className="pointer-events-auto mb-8 max-w-[15rem] animate-bubble rounded-2xl rounded-bl-sm border-[3px] border-slate-900 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-[3px_3px_0_rgba(0,0,0,.45)]" role="status">
-              {bubble.text}
+              <Rich text={bubble.text} />
             </div>
           )}
         </div>
       )}
       <div className="pointer-events-none fixed inset-0 z-[150] flex items-center justify-center overflow-hidden" aria-hidden="true">
         {bursts.map((b) => (
-          <div key={b.id} className="comic-burst absolute animate-burst"><span>{b.word}</span></div>
+          <div key={b.id} className="comic-burst absolute animate-burst"><span><Rich text={b.word} size="1.1em" /></span></div>
         ))}
         {stamp && <div key={stamp} className="approved-stamp animate-stamp">APPROVED!</div>}
       </div>

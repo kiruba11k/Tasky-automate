@@ -3,6 +3,7 @@ import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNotifications } from './NotificationProvider';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 export default function NotificationBell() {
   const { items, unread, latest, markAllRead, open } = useNotifications();
@@ -51,8 +52,8 @@ export default function NotificationBell() {
               <div className="flex items-start gap-2">
                 {!n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0" />}
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{n.title}</div>
-                  {n.message && <div className="text-xs text-slate-300 mt-0.5 whitespace-pre-line line-clamp-3">{n.message}</div>}
+                  <div className="text-sm font-medium"><Rich text={n.title} /></div>
+                  {n.message && <div className="text-xs text-slate-300 mt-0.5 whitespace-pre-line line-clamp-3"><Rich text={n.message} /></div>}
                   <div className="text-[11px] text-slate-500 mt-1">{formatDistanceToNow(new Date(n.created_date), { addSuffix: true })}</div>
                 </div>
               </div>

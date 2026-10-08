@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { request } from '@/api/client';
 import { format } from 'date-fns';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 /** Badges (with progress toward the locked ones) and the sticker album. */
 export default function TrophyShelf({ open, onOpenChange }) {
@@ -27,7 +28,7 @@ export default function TrophyShelf({ open, onOpenChange }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
                 {data.badges.map((b) => (
                   <div key={b.id} className={`rounded-2xl border-2 border-slate-900 p-3 text-center shadow-[3px_3px_0_rgba(0,0,0,.45)] ${b.earned ? 'bg-gradient-to-b from-yellow-400/20 to-slate-800' : 'bg-slate-800/60'}`}>
-                    <div className={`text-4xl ${b.earned ? 'badge-pop' : 'grayscale opacity-40'}`}>{b.emoji}</div>
+                    <div className={b.earned ? 'badge-pop' : 'grayscale opacity-40'}><Emoji e={b.emoji} size="2.8rem" /></div>
                     <div className="font-bold mt-1">{b.name}</div>
                     <div className="text-xs text-slate-400">{b.desc}</div>
                     {b.earned
@@ -41,8 +42,8 @@ export default function TrophyShelf({ open, onOpenChange }) {
               <p className="text-xs text-slate-400 mb-2">Finish a task each day to unlock a chest with a random sticker. Rare and epic ones are harder to find.</p>
               <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
                 {data.stickers.map((s) => (
-                  <div key={s.id} title={s.owned ? `${s.rarity} sticker` : 'Not found yet'} className={`aspect-square grid place-items-center rounded-xl text-3xl border-2 ${s.owned ? `bg-slate-800 ${s.rarity === 'epic' ? 'border-yellow-400' : s.rarity === 'rare' ? 'border-sky-400' : 'border-slate-600'}` : 'bg-slate-800/40 border-dashed border-slate-700 text-slate-600'}`}>
-                    {s.owned ? s.emoji : '?'}
+                  <div key={s.id} title={s.owned ? `${s.rarity} sticker` : 'Not found yet'} className={`aspect-square grid place-items-center rounded-xl border-2 ${s.owned ? `bg-slate-800 ${s.rarity === 'epic' ? 'border-yellow-400' : s.rarity === 'rare' ? 'border-sky-400' : 'border-slate-600'}` : 'bg-slate-800/40 border-dashed border-slate-700 text-slate-600'}`}>
+                    {s.owned ? <Emoji e={s.emoji} size="2.2rem" /> : <span className="text-2xl">?</span>}
                   </div>
                 ))}
               </div>

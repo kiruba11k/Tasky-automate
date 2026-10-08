@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { getToken, request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import { emitFun } from '@/fun/bus';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const NotificationContext = createContext(null);
 const TOAST_MS = 8000;
@@ -127,8 +128,8 @@ export function NotificationProvider({ children }) {
             <button aria-label="Dismiss" className="absolute top-2 right-2 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); dismissToast(t.id); }}>
               <X className="w-4 h-4" />
             </button>
-            <div className="text-sm font-bold text-white"><span className="mr-1.5" aria-hidden="true">{TOAST_EMOJI[t.type] || '🔔'}</span>{t.title}</div>
-            {t.message && <div className="text-xs text-slate-300 mt-1 whitespace-pre-line line-clamp-4">{t.message}</div>}
+            <div className="text-sm font-bold text-white"><Emoji e={TOAST_EMOJI[t.type] || '🔔'} className="mr-1.5" /><Rich text={t.title} /></div>
+            {t.message && <div className="text-xs text-slate-300 mt-1 whitespace-pre-line line-clamp-4"><Rich text={t.message} /></div>}
           </div>
         ))}
       </div>

@@ -5,6 +5,7 @@ import { request } from '@/api/client';
 import { effects } from './effects';
 import { play } from './sounds';
 import { useFun } from './FunProvider';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 const RARITY = { common: ['Common', 'text-slate-300', 'shadow-[0_0_0_4px_rgba(148,163,184,.4)]'], rare: ['Rare!', 'text-sky-300', 'shadow-[0_0_28px_6px_rgba(56,189,248,.7)]'], epic: ['EPIC!!', 'text-yellow-300', 'shadow-[0_0_36px_10px_rgba(250,204,21,.85)]'] };
 
@@ -41,10 +42,10 @@ export default function ChestDialog({ open, onOpenChange, onOpened, today }) {
         <DialogTitle className="text-xl font-extrabold">Treasure chest</DialogTitle>
         <DialogDescription className="text-slate-400">Earned by finishing tasks today. Collect all the stickers!</DialogDescription>
         <div className="h-40 grid place-items-center">
-          {phase !== 'open' && <div className={`text-8xl ${phase === 'opening' ? 'chest-shake' : 'tasky-bob'}`} aria-hidden="true">{phase === 'opening' ? '🎁' : '🎁'}</div>}
+          {phase !== 'open' && <div className={phase === 'opening' ? 'chest-shake' : 'tasky-bob'} aria-hidden="true"><Emoji e="🎁" size="7rem" /></div>}
           {phase === 'open' && (
             <div className="flex flex-col items-center gap-1">
-              <div className={`sticker-pop grid place-items-center w-24 h-24 rounded-3xl bg-slate-800 text-6xl ${r[2]}`} aria-label={`Sticker ${prize.sticker.emoji}`}>{prize.sticker.emoji}</div>
+              <div className={`sticker-pop grid place-items-center w-24 h-24 rounded-3xl bg-slate-800 ${r[2]}`}><Emoji e={prize.sticker.emoji} size="4.2rem" label="New sticker" /></div>
               <div className={`font-extrabold ${r[1]}`}>{r[0]}</div>
             </div>
           )}

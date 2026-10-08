@@ -6,6 +6,7 @@ import { useFun } from './FunProvider';
 import StreakFlame from './StreakFlame';
 import ChestDialog from './ChestDialog';
 import TrophyShelf from './TrophyShelf';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 function Ring({ value, max, size = 92 }) {
   const r = 38;
@@ -34,7 +35,7 @@ export default function QuestBoard() {
     <div className="glass-effect-enhanced rounded-2xl p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-xl font-extrabold text-white">Today's quests 🗺️</h3>
+          <h3 className="text-xl font-extrabold text-white">Today's quests <Emoji e="🗺️" size="1.3em" /></h3>
           <p className="text-xs text-slate-400">Finish them for bonus XP. Resets every day.</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShelf(true)} className="bg-transparent border-slate-600 text-slate-200 shrink-0"><Trophy className="w-4 h-4 mr-1" />Trophies</Button>
@@ -49,7 +50,7 @@ export default function QuestBoard() {
         {stats.quests.map((q) => (
           <li key={q.id} className={`rounded-xl border-2 border-slate-900 px-3 py-2 ${q.done ? 'bg-emerald-500/15' : 'bg-slate-800/60'}`}>
             <div className="flex items-center gap-2">
-              <span className="text-xl" aria-hidden="true">{q.emoji}</span>
+              <Emoji e={q.emoji} size="1.6rem" />
               <span className={`font-semibold flex-1 ${q.done ? 'text-emerald-200 line-through decoration-2' : 'text-white'}`}>{q.title}</span>
               {q.done ? <span className="grid place-items-center w-6 h-6 rounded-full bg-emerald-400 text-slate-900"><Check className="w-4 h-4" /></span> : <span className="text-xs font-bold text-yellow-300">+{q.xp} XP</span>}
             </div>
@@ -59,13 +60,13 @@ export default function QuestBoard() {
         ))}
       </ul>
 
-      {allDone && <p className="text-center text-sm font-bold text-yellow-300">All quests complete! You are on fire today 🔥</p>}
+      {allDone && <p className="text-center text-sm font-bold text-yellow-300">All quests complete! You are on fire today <Emoji e="🔥" /></p>}
 
       {stats.drop_state === 'ready' && (
-        <Button onClick={() => setChest(true)} className="w-full bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-extrabold chest-pulse">🎁 Open your treasure chest!</Button>
+        <Button onClick={() => setChest(true)} className="w-full bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-extrabold chest-pulse"><Emoji e="🎁" size="1.4rem" className="mr-1.5" />Open your treasure chest!</Button>
       )}
-      {stats.drop_state === 'locked' && <p className="text-xs text-center text-slate-500">🎁 Finish a task today to unlock your treasure chest.</p>}
-      {stats.drop_state === 'opened' && <p className="text-xs text-center text-slate-500">🎁 Today's chest is opened. A new one unlocks tomorrow!</p>}
+      {stats.drop_state === 'locked' && <p className="text-xs text-center text-slate-500"><Emoji e="🎁" /> Finish a task today to unlock your treasure chest.</p>}
+      {stats.drop_state === 'opened' && <p className="text-xs text-center text-slate-500"><Emoji e="🎁" /> Today's chest is opened. A new one unlocks tomorrow!</p>}
 
       <ChestDialog open={chest} onOpenChange={setChest} today={format(new Date(), 'yyyy-MM-dd')} onOpened={refreshStats} />
       <TrophyShelf open={shelf} onOpenChange={setShelf} />

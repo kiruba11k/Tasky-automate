@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Emoji, Rich } from '@/icons/Emoji';
 
 /** Shown one at a time when a new badge is earned. */
 export default function BadgeUnlock({ badge, onClose }) {
@@ -10,7 +11,7 @@ export default function BadgeUnlock({ badge, onClose }) {
         <div className="badge-rays" aria-hidden="true" />
         <div className="relative z-10 flex flex-col items-center gap-2 py-2">
           <div className="text-sm font-bold uppercase tracking-widest text-yellow-300">New badge!</div>
-          <div className="badge-pop text-7xl drop-shadow-[0_6px_0_rgba(0,0,0,.35)]" aria-hidden="true">{badge?.emoji}</div>
+          <div className="badge-pop drop-shadow-[0_6px_0_rgba(0,0,0,.35)]" aria-hidden="true">{badge && <Emoji e={badge.emoji} size="6rem" />}</div>
           <DialogTitle className="text-2xl font-extrabold">{badge?.name}</DialogTitle>
           <DialogDescription className="text-slate-300">{badge?.desc}</DialogDescription>
           <p className="text-xs text-emerald-300 font-semibold">+25 XP</p>
