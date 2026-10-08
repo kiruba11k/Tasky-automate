@@ -39,9 +39,11 @@ There is no sign-up and no password. Signing in needs only an email, and that em
 ## Weekly tasks and notifications
 
 - **Weekly Tasks** tab (everyone). Leaders get *Allocate*, *Approvals* and *My week*; members get *My week*.
-- **Allocate:** a grid with tasks as rows and people as columns. Type a number in a person's cell to give them that target; several people can share one task. "Copy from last week" repeats last week's tasks so you only change the numbers. The calendar icon sets a custom daily split; otherwise targets are spread evenly over the selected working days.
+- **Allocate** is laid out like the team's weekly sheet: Project · Task · Target / Expected Result (free text) · Assigned To · Estimated hrs · Result · Status. Assign one or more people to a task (shared tasks); the estimated hours are shared between them and spread over their days (Mon–Fri by default, adjustable per person with the calendar icon). Leave hours empty for N/A. Project names can be existing projects or free text such as "Others".
+- **Import from sheet:** copy the rows (with the header) from Google Sheets/Excel and paste them, or load a CSV. The Project cell applies to the rows below it until a blank row, "Alok/Jutraban" is matched to users, and the week is detected from "Project Dates" (dd/mm/yy). Names with no matching user are listed as warnings. Result and Status columns are ignored. **Export CSV** produces the same columns.
+- **Copy from last week** repeats last week's tasks and people so you only change what differs.
 - **Save & notify** creates the daily tasks (leaders and project managers included) and notifies everyone affected at once. Unchanged allocations are not re-notified.
-- **Approval:** a member's *Submit for approval* (with how many they finished and a note) goes to the leaders; they *Approve* or *Request changes* (a reason is required). Changing the number on a submitted/approved task reopens it.
+- **Approval:** a member's *Submit for approval* (with a written result) goes to the leaders; they *Approve* or *Request changes* (a reason is required). Status shows TRUE once every assignee is approved. Changing a submitted/approved allocation reopens it.
 - **Notifications:** pushed live to the screen (bell with unread count, pop-up toasts, optional desktop alerts) when work is allocated, changed, removed, submitted, approved or sent back, and when a leader assigns/edits a daily task or a project. Delivery uses Server-Sent Events with automatic reconnect and catch-up.
 
 ## Deploy on Render (free)

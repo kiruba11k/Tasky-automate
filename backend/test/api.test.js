@@ -167,86 +167,101 @@ for (const [name, makeStore] of backends) {
       await store.close();
     });
 
-    test('only leaders allocate; plan is validated', async () => {
-      const task = { title: 'Blog posts', unit: 'posts', hours_per_unit: 2, assignments: [{ user_id: ids.mo, target: 5 }] };
+    test('only leaders allocate; input is validated', async () => {
+      const task = { title: 'Review prospects', expected_result: '35% connection rate', estimated_hours: 10, assignments: [{ user_id: ids.mo }] };
       assert.equal((await api('POST', '/api/weekly/save', { token: mo, body: { week_start: W, tasks: [task] } })).status, 403);
       assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: '2026-10-13', tasks: [task] } })).status, 400); // not a Monday
-      assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: [{ ...task, assignments: [{ user_id: 'nope', target: 1 }] }] } })).status, 400);
-      assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: [{ ...task, assignments: [{ user_id: ids.mo, target: 5, plan: { '2026-10-12': 1 } }] }] } })).status, 400); // split != target
+      assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: [{ ...task, title: ' ' }] } })).status, 400);
+      assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: [{ ...task, assignments: [{ user_id: 'nope' }] }] } })).status, 400);
+      assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: [{ ...task, assignments: [{ user_id: ids.mo, days: ['2026-10-30'] }] }] } })).status, 400); // outside week
+      assert.equal((await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: [{ ...task, estimated_hours: -1 }] } })).status, 400);
       assert.equal((await api('POST', '/api/entities/WeeklyTask', { token: lena, body: { week_start: W, title: 'x' } })).status, 403);
     });
 
-    test('allocation creates daily tasks for members and leaders and notifies them', async () => {
+    const grid = async (token, mutate) => {
+      const tasks = (await api('GET', `/api/entities/WeeklyTask?week_start=${W}&sort=sort_order`, { token })).body;
+      const asg = (await api('GET', `/api/entities/WeeklyAssignment?week_start=${W}`, { token })).body;
+      const rows = tasks.map((t) => ({ ...t, assignments: asg.filter((a) => a.weekly_task_id === t.id).map((a) => ({ user_id: a.user_id, days: a.days })) }));
+      return api('POST', '/api/weekly/save', { token, body: { week_start: W, tasks: mutate(rows) } });
+    };
+
+    test('allocation: shared tasks, free-text targets, daily tasks for members and leaders, notifications', async () => {
       const save = await api('POST', '/api/weekly/save', {
         token: lena,
         body: {
           week_start: W,
           tasks: [
-            { title: 'Blog posts', unit: 'posts', hours_per_unit: 2, expected_outcome: 'Published', assignments: [{ user_id: ids.mo, target: 7 }, { user_id: ids.zed, target: 3 }, { user_id: ids.lena, target: 5 }] },
-            { title: 'Newsletter', assignments: [{ user_id: ids.mo, target: 1, plan: { '2026-10-14': 1 } }] },
+            { title: 'Review 100 prospects, send messages', project_name: 'BlueDove Hospitality', expected_result: '35% connection rate', estimated_hours: 10, assignments: [{ user_id: ids.mo }, { user_id: ids.zed }, { user_id: ids.lena, days: ['2026-10-12', '2026-10-14'] }] },
+            { title: 'Daily Internal Meetings', project_name: 'Others', expected_result: 'TBD', assignments: [{ user_id: ids.mo, days: ['2026-10-12'] }] },
           ],
         },
       });
       assert.equal(save.status, 200, JSON.stringify(save.body));
       assert.equal(save.body.assignments.length, 4);
+      assert.equal(save.body.tasks[0].project_name, 'BlueDove Hospitality');
+      assert.equal(save.body.tasks[0].expected_result, '35% connection rate');
       const moDaily = (await api('GET', `/api/entities/DailyTask?user_id=${ids.mo}`, { token: mo })).body;
-      const blog = moDaily.filter((d) => d.task.startsWith('Blog posts'));
-      assert.equal(blog.length, 5); // 7 over Mon-Fri => 2,2,1,1,1
-      assert.deepEqual(blog.map((d) => d.date).sort(), ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16']);
-      assert.equal(blog.find((d) => d.date === '2026-10-12').expected_time, 4);
-      assert.equal(moDaily.filter((d) => d.task.startsWith('Newsletter')).length, 1);
-      assert.equal((await api('GET', `/api/entities/DailyTask?user_id=${ids.lena}`, { token: lena })).body.length, 5); // leaders get daily tasks too
+      const review = moDaily.filter((d) => d.task.startsWith('Review'));
+      assert.equal(review.length, 5); // default Mon-Fri
+      assert.equal(review[0].expected_time, 0.67); // 10h / 3 people / 5 days
+      assert.equal(review[0].expected_outcome, '35% connection rate');
+      assert.equal(moDaily.filter((d) => d.task === 'Daily Internal Meetings').length, 1);
+      assert.equal(moDaily.find((d) => d.task === 'Daily Internal Meetings').expected_time, 1); // N/A hours default
+      const leadDaily = (await api('GET', `/api/entities/DailyTask?user_id=${ids.lena}`, { token: lena })).body;
+      assert.deepEqual(leadDaily.map((d) => d.date).sort(), ['2026-10-12', '2026-10-14']); // leaders get tasks too, custom days
       const moNotes = await notes(mo, '?unread=true');
       assert.equal(moNotes.length, 1);
-      assert.match(moNotes[0].message, /New: Blog posts — 7 posts/);
+      assert.match(moNotes[0].message, /New: Review 100 prospects/);
+      assert.match(moNotes[0].message, /New: Daily Internal Meetings/);
       assert.equal((await notes(lena)).length, 0); // no self-notification
       assert.ok((await notes(admin)).some((n) => n.type === 'weekly_plan_saved')); // other leaders hear about it
-      // unchanged re-save is silent
-      const again = await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: save.body.tasks.map((t) => ({ ...t, assignments: save.body.assignments.filter((a) => a.weekly_task_id === t.id).map((a) => ({ id: a.id, user_id: a.user_id, target: a.target, plan: a.daily_plan })) })) } });
-      assert.equal(again.body.changes, 0);
+      const again = await grid(lena, (rows) => rows);
+      assert.equal(again.body.changes, 0); // unchanged re-save is silent
       assert.equal((await notes(mo)).length, 1);
     });
 
-    test('changing the number updates daily tasks and notifies; removing a cell removes work', async () => {
-      const cur = await api('GET', `/api/entities/WeeklyAssignment?week_start=${W}`, { token: lena });
-      const tasks = (await api('GET', `/api/entities/WeeklyTask?week_start=${W}&sort=sort_order`, { token: lena })).body;
-      const grid = tasks.map((t) => ({
-        ...t,
-        assignments: cur.body.filter((a) => a.weekly_task_id === t.id && a.user_id !== ids.zed).map((a) => ({ user_id: a.user_id, target: a.user_id === ids.mo && t.title === 'Blog posts' ? 10 : a.target, plan: a.user_id === ids.mo && t.title === 'Blog posts' ? undefined : a.daily_plan })),
-      }));
-      const r = await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: grid } });
+    test('matching a project by name; editing hours/people updates daily tasks; removing work notifies', async () => {
+      const proj = await api('POST', '/api/entities/Project', { token: admin, body: { name: 'SSDI', team_id: 't', project_manager_id: 'm' } });
+      const r = await grid(lena, (rows) => [
+        ...rows.map((t) => (t.title.startsWith('Review')
+          ? { ...t, estimated_hours: 20, assignments: t.assignments.filter((a) => a.user_id !== ids.zed) } // zed removed, hours change
+          : t)),
+        { title: 'Tele for 15 VIPs', project_name: 'ssdi', assignments: [{ user_id: ids.zed, days: ['2026-10-15'] }] },
+      ]);
       assert.equal(r.status, 200, JSON.stringify(r.body));
-      assert.equal(r.body.changes, 2); // mo updated, zed removed
-      const moBlog = (await api('GET', `/api/entities/DailyTask?user_id=${ids.mo}`, { token: mo })).body.filter((d) => d.task.startsWith('Blog posts'));
-      assert.equal(moBlog.reduce((s, d) => s + Number(d.task.match(/— ([\d.]+)/)[1]), 0), 10);
-      assert.equal((await api('GET', `/api/entities/DailyTask?user_id=${ids.zed}`, { token: lena })).body.length, 0);
+      assert.equal(r.body.tasks.find((t) => t.title.startsWith('Tele')).project_id, proj.body.id); // matched case-insensitively
+      const moReview = (await api('GET', `/api/entities/DailyTask?user_id=${ids.mo}`, { token: mo })).body.filter((d) => d.task.startsWith('Review'));
+      assert.equal(moReview.length, 5);
+      assert.equal(moReview[0].expected_time, 2); // 20h / 2 people / 5 days
+      const zedDaily = (await api('GET', `/api/entities/DailyTask?user_id=${ids.zed}`, { token: lena })).body;
+      assert.deepEqual(zedDaily.map((d) => d.task), ['Tele for 15 VIPs']);
       const zedNotes = await notes(await login('zed@x.com'));
-      assert.ok(zedNotes.some((n) => /Removed: Blog posts/.test(n.message)));
+      assert.ok(zedNotes.some((n) => /Removed: Review 100 prospects/.test(n.message)));
+      assert.ok(zedNotes.some((n) => /New: Tele for 15 VIPs/.test(n.message)));
     });
 
     test('submit -> approval workflow with notifications', async () => {
-      const mine = (await api('GET', `/api/entities/WeeklyAssignment?user_id=${ids.mo}`, { token: mo })).body;
-      const a = mine.find((x) => x.target === 10);
-      assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: lena })).status, 403); // not theirs
+      const a = (await api('GET', `/api/entities/WeeklyAssignment?user_id=${ids.mo}`, { token: mo })).body.find((x) => x.hours === 10);
+      assert.ok(a);
+      assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: lena, body: { result: 'x' } })).status, 403); // not theirs
       assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/approve`, { token: lena })).status, 409); // not submitted yet
-      const sub = await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: mo, body: { done: 9, note: 'one left' } });
+      assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: mo, body: {} })).status, 400); // result required
+      const sub = await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: mo, body: { result: '44% connection rate\nSent 104 first level messages' } });
       assert.equal(sub.body.status, 'Submitted');
       const dailies = (await api('GET', `/api/entities/DailyTask?weekly_assignment_id=${a.id}`, { token: mo })).body;
       assert.ok(dailies.length && dailies.every((d) => d.task_status === 'Completed'));
-      assert.ok((await notes(lena)).some((n) => n.type === 'weekly_submitted' && /9\/10/.test(n.message)));
+      assert.ok((await notes(lena)).some((n) => n.type === 'weekly_submitted' && /44% connection rate/.test(n.message)));
       assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/approve`, { token: mo })).status, 403); // members can't approve
       assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/reject`, { token: lena, body: {} })).status, 400); // needs a reason
-      const rej = await api('POST', `/api/weekly/assignments/${a.id}/reject`, { token: lena, body: { note: 'finish the last post' } });
+      const rej = await api('POST', `/api/weekly/assignments/${a.id}/reject`, { token: lena, body: { note: 'send the remaining messages' } });
       assert.equal(rej.body.status, 'Changes Requested');
-      assert.ok((await notes(mo)).some((n) => n.type === 'weekly_rejected' && /finish the last post/.test(n.message)));
-      assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: mo, body: { done: 10 } })).body.status, 'Submitted');
+      assert.ok((await notes(mo)).some((n) => n.type === 'weekly_rejected' && /send the remaining messages/.test(n.message)));
+      assert.equal((await api('POST', `/api/weekly/assignments/${a.id}/submit`, { token: mo, body: { result: 'all sent' } })).body.status, 'Submitted');
       const ok = await api('POST', `/api/weekly/assignments/${a.id}/approve`, { token: lena });
       assert.equal(ok.body.status, 'Approved');
       assert.ok((await notes(mo)).some((n) => n.type === 'weekly_approved'));
       // changing an approved assignment reopens it
-      const tasks = (await api('GET', `/api/entities/WeeklyTask?week_start=${W}`, { token: lena })).body;
-      const all = (await api('GET', `/api/entities/WeeklyAssignment?week_start=${W}`, { token: lena })).body;
-      const re = await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W, tasks: tasks.map((t) => ({ ...t, assignments: all.filter((x) => x.weekly_task_id === t.id).map((x) => ({ user_id: x.user_id, target: x.id === a.id ? 12 : x.target, plan: x.id === a.id ? undefined : x.daily_plan })) })) } });
+      const re = await grid(lena, (rows) => rows.map((t) => (t.title.startsWith('Review') ? { ...t, estimated_hours: 30 } : t)));
       assert.equal(re.body.assignments.find((x) => x.id === a.id).status, 'Assigned');
     });
 

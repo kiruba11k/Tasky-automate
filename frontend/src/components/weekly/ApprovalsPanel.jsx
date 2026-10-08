@@ -45,13 +45,10 @@ export default function ApprovalsPanel({ submitted, taskById, userById, projectB
                 <div>
                   <div className="text-white font-semibold">{t?.title || 'Task'}</div>
                   <div className="text-sm text-slate-400">
-                    {u?.full_name || 'Someone'} · {projectById[t?.project_id]?.name || 'No project'} · week of {format(parseISO(a.week_start), 'MMM d')}
+                    {u?.full_name || 'Someone'} · {t?.project_name || projectById[t?.project_id]?.name || 'No project'} · week of {format(parseISO(a.week_start), 'MMM d')}
                   </div>
-                  <div className="text-sm text-slate-200 mt-1">
-                    Done <span className="font-semibold">{a.done ?? a.target}</span> of {a.target}{t?.unit ? ` ${t.unit}` : ''}
-                    {t?.expected_outcome && <span className="text-slate-400"> · outcome: {t.expected_outcome}</span>}
-                  </div>
-                  {a.note && <div className="text-sm text-slate-300 italic mt-1">"{a.note}"</div>}
+                  {t?.expected_result && <div className="text-sm text-slate-300 mt-1">Target: {t.expected_result}</div>}
+                  {a.result && <div className="text-sm text-slate-100 whitespace-pre-line mt-1 bg-slate-800/60 rounded-md p-2"><span className="text-slate-400">Result: </span>{a.result}</div>}
                 </div>
                 <div className="flex gap-2">
                   <Button disabled={own || busy === a.id} onClick={() => act(a.id, () => approveAssignment(a.id))} className="bg-green-600 hover:bg-green-700"><Check className="w-4 h-4 mr-1" />Approve</Button>

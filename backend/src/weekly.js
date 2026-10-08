@@ -11,22 +11,9 @@ export const addDays = (s, n) => {
 const isMonday = (s) => parse(s).getUTCDay() === 1;
 const round = (n) => Math.round(n * 100) / 100;
 
-/** Splits `target` across `dates`: whole numbers stay whole (earlier days take the remainder). */
-export function evenSplit(target, dates) {
-  const plan = {};
-  const n = dates.length;
-  if (Number.isInteger(target)) {
-    dates.forEach((d, i) => { plan[d] = Math.floor(target / n) + (i < target % n ? 1 : 0); });
-  } else {
-    dates.forEach((d) => { plan[d] = round(target / n); });
-    plan[dates[n - 1]] = round(target - round(target / n) * (n - 1));
-  }
-  return plan;
-}
-
-const taskSig = (t) => JSON.stringify([t.project_id || '', t.title, t.expected_outcome || '', t.unit || '', t.hours_per_unit ?? 1, t.priority]);
-const planSig = (p) => JSON.stringify(Object.entries(p || {}).filter(([, v]) => v > 0).sort());
-const label = (t, a) => `${t.title} — ${a.target}${t.unit ? ` ${t.unit}` : ''}`;
+const taskSig = (t) => JSON.stringify([t.project_id || '', t.project_name || '', t.title, t.expected_result || '', t.estimated_hours ?? null, t.priority]);
+const daysSig = (days) => JSON.stringify([...(days || [])].sort());
+const label = (t) => t.title;
 const fmtWeek = (w) => new Date(`${w}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 class Bad extends Error {
@@ -40,25 +27,27 @@ export function registerWeekly(app, { store, notifier, wrap }) {
   const isLeader = (u) => u.role === 'admin' || u.role === 'team_leader';
   const leaderOnly = (req, res, next) => (isLeader(req.user) ? next() : res.status(403).json({ error: 'Only team leaders can do this' }));
 
-  /** Recreates the daily tasks of an assignment from its plan, keeping days already completed. */
+  /** Recreates the daily tasks of an assignment from its days, keeping days already completed. */
   async function regenDaily(asg, task, actor) {
     const existing = await store.list('DailyTask', { query: { weekly_assignment_id: asg.id } });
     const doneDates = new Set(existing.filter((d) => d.task_status === 'Completed').map((d) => d.date));
     for (const d of existing.filter((x) => x.task_status !== 'Completed')) await store.remove('DailyTask', d.id);
-    for (const [date, qty] of Object.entries(asg.daily_plan || {})) {
-      if (!(qty > 0) || doneDates.has(date)) continue;
+    const days = asg.days || [];
+    for (const date of days) {
+      if (doneDates.has(date)) continue;
       await store.insert('DailyTask', {
         date,
         project_id: task.project_id || undefined,
         user_id: asg.user_id,
-        task: `${task.title} — ${qty}${task.unit ? ` ${task.unit}` : ''}`,
-        expected_outcome: task.expected_outcome || task.title,
-        expected_time: Math.max(0.25, round(qty * (task.hours_per_unit ?? 1))),
+        task: task.title,
+        expected_outcome: task.expected_result || task.title,
+        expected_time: asg.hours > 0 ? Math.max(0.25, round(asg.hours / days.length)) : 1,
         task_status: 'Pending',
         priority: task.priority || 'Medium',
         file_source: 'manual',
         weekly_assignment_id: asg.id,
         assigned_by: actor.id,
+        notes: task.project_name || undefined,
       }, actor.email);
     }
   }
@@ -69,51 +58,49 @@ export function registerWeekly(app, { store, notifier, wrap }) {
     }
   }
 
-  function normalise(body, users) {
+  function normalise(body, users, projects) {
     const { week_start, tasks } = body || {};
     if (!validDate(week_start) || !isMonday(week_start)) throw new Bad('week_start must be a Monday (yyyy-MM-dd)');
-    if (!Array.isArray(tasks) || tasks.length > 200) throw new Bad('tasks must be an array (max 200)');
+    if (!Array.isArray(tasks) || tasks.length > 300) throw new Bad('tasks must be an array (max 300)');
     const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week_start, i));
     const out = tasks.map((t, i) => {
       const title = String(t?.title || '').trim();
-      if (!title) throw new Bad(`Task ${i + 1} needs a title`);
+      if (!title) throw new Bad(`Row ${i + 1} needs a task`);
       const priority = t.priority || 'Medium';
-      if (!schemas.WeeklyTask.properties.priority.enum.includes(priority)) throw new Bad(`Task "${title}": invalid priority`);
-      const hours = t.hours_per_unit === undefined || t.hours_per_unit === '' ? 1 : Number(t.hours_per_unit);
-      if (!Number.isFinite(hours) || hours < 0) throw new Bad(`Task "${title}": hours per unit must be 0 or more`);
+      if (!schemas.WeeklyTask.properties.priority.enum.includes(priority)) throw new Bad(`"${title}": invalid priority`);
+      let hours = null;
+      if (t.estimated_hours !== undefined && t.estimated_hours !== null && t.estimated_hours !== '') {
+        hours = Number(t.estimated_hours);
+        if (!Number.isFinite(hours) || hours < 0) throw new Bad(`"${title}": estimated hours must be 0 or more`);
+      }
+      const typedName = String(t.project_name || '').trim();
+      let project_id = t.project_id || undefined;
+      let project_name = typedName || undefined;
+      if (!project_id && typedName) project_id = projects.find((p) => p.name.trim().toLowerCase() === typedName.toLowerCase())?.id;
+      if (project_id) {
+        const p = projects.find((x) => x.id === project_id);
+        if (!p) throw new Bad(`"${title}": unknown project`);
+        project_name = p.name;
+      }
       const seen = new Set();
+      const share = hours === null ? null : round(hours / Math.max(1, (t.assignments || []).length));
       const assignments = (t.assignments || []).map((a) => {
         const user = users.get(a?.user_id);
-        if (!user || user.status === 'Inactive') throw new Bad(`Task "${title}": unknown or inactive user`);
-        if (seen.has(user.id)) throw new Bad(`Task "${title}": ${user.full_name} is listed twice`);
+        if (!user || user.status === 'Inactive') throw new Bad(`"${title}": unknown or inactive user`);
+        if (seen.has(user.id)) throw new Bad(`"${title}": ${user.full_name} is listed twice`);
         seen.add(user.id);
-        const target = Number(a.target);
-        if (!Number.isFinite(target) || target <= 0 || target > 100000) throw new Bad(`Task "${title}": target for ${user.full_name} must be greater than 0`);
-        let plan = a.plan;
-        if (plan && typeof plan === 'object') {
-          let sum = 0;
-          for (const [d, v] of Object.entries(plan)) {
-            if (!weekDates.includes(d)) throw new Bad(`Task "${title}": ${d} is outside the week`);
-            if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Bad(`Task "${title}": invalid daily quantity`);
-            sum += Number(v);
-          }
-          if (Math.abs(sum - target) > 0.01) throw new Bad(`Task "${title}": ${user.full_name}'s daily split (${round(sum)}) must add up to the target (${target})`);
-          plan = Object.fromEntries(Object.entries(plan).map(([d, v]) => [d, Number(v)]));
-        } else plan = evenSplit(target, weekDates.slice(0, 5));
-        return { user_id: user.id, target, plan };
+        const days = a.days === undefined ? weekDates.slice(0, 5) : a.days;
+        if (!Array.isArray(days) || !days.length) throw new Bad(`"${title}": pick at least one day for ${user.full_name}`);
+        for (const d of days) if (!weekDates.includes(d)) throw new Bad(`"${title}": ${d} is outside the week`);
+        return { user_id: user.id, days: [...new Set(days)].sort(), hours: share };
       });
       return {
         id: t.id,
         fields: {
-          week_start,
-          project_id: t.project_id || undefined,
-          title,
-          description: t.description || undefined,
-          expected_outcome: t.expected_outcome || undefined,
-          unit: String(t.unit || '').trim() || undefined,
-          hours_per_unit: hours,
+          week_start, project_id, project_name, title,
+          expected_result: String(t.expected_result || '').trim() || undefined,
+          estimated_hours: hours === null ? undefined : hours,
           priority,
-          category: t.category || undefined,
           notes: t.notes || undefined,
           sort_order: i,
         },
@@ -127,7 +114,8 @@ export function registerWeekly(app, { store, notifier, wrap }) {
   app.post('/api/weekly/save', leaderOnly, wrap(async (req, res) => {
     const actor = req.user;
     const users = new Map((await store.list('User')).map((u) => [u.id, u]));
-    const { week_start, tasks } = normalise(req.body, users);
+    const projects = await store.list('Project');
+    const { week_start, tasks } = normalise(req.body, users, projects);
     const exTasks = await store.list('WeeklyTask', { query: { week_start } });
     const exAsg = await store.list('WeeklyAssignment', { query: { week_start } });
     for (const t of tasks) if (t.id && !exTasks.some((e) => e.id === t.id)) throw new Bad('A task no longer exists. Reload the week and try again.', 409);
@@ -150,19 +138,19 @@ export function registerWeekly(app, { store, notifier, wrap }) {
         const prev = exAsg.find((e) => e.weekly_task_id === rec.id && e.user_id === a.user_id);
         if (prev) {
           keptAsg.add(prev.id);
-          if (metaChanged || prev.target !== a.target || planSig(prev.daily_plan) !== planSig(a.plan)) {
+          if (metaChanged || (prev.hours ?? null) !== a.hours || daysSig(prev.days) !== daysSig(a.days)) {
             const upd = await store.update('WeeklyAssignment', prev.id, {
-              target: a.target, daily_plan: a.plan, status: 'Assigned', done: null, note: null, review_note: null, submitted_at: null, approved_by: null, approved_at: null, allocated_by: actor.id,
+              days: a.days, hours: a.hours, status: 'Assigned', result: null, review_note: null, submitted_at: null, approved_by: null, approved_at: null, allocated_by: actor.id,
             });
             await regenDaily(upd, rec, actor);
-            note(a.user_id, 'updated', label(rec, upd));
+            note(a.user_id, 'updated', label(rec));
           }
         } else {
           const created = await store.insert('WeeklyAssignment', {
-            weekly_task_id: rec.id, week_start, user_id: a.user_id, target: a.target, daily_plan: a.plan, status: 'Assigned', allocated_by: actor.id,
+            weekly_task_id: rec.id, week_start, user_id: a.user_id, days: a.days, hours: a.hours ?? undefined, status: 'Assigned', allocated_by: actor.id,
           }, actor.email);
           await regenDaily(created, rec, actor);
-          note(a.user_id, 'added', label(rec, created));
+          note(a.user_id, 'added', label(rec));
         }
       }
     }
@@ -170,7 +158,7 @@ export function registerWeekly(app, { store, notifier, wrap }) {
       const task = exTasks.find((t) => t.id === prev.weekly_task_id);
       await dropDaily(prev.id);
       await store.remove('WeeklyAssignment', prev.id);
-      if (task) note(prev.user_id, 'removed', label(task, prev));
+      if (task) note(prev.user_id, 'removed', label(task));
     }
     for (const t of exTasks.filter((e) => !keptTasks.has(e.id))) await store.remove('WeeklyTask', t.id);
 
@@ -220,16 +208,14 @@ export function registerWeekly(app, { store, notifier, wrap }) {
     const { asg, task } = await loadAssignment(req.params.id);
     if (asg.user_id !== req.user.id) throw new Bad('You can only submit your own tasks', 403);
     if (!['Assigned', 'Changes Requested'].includes(asg.status)) throw new Bad(`This task is already ${asg.status.toLowerCase()}`, 409);
-    const done = req.body?.done === undefined || req.body.done === '' ? asg.target : Number(req.body.done);
-    if (!Number.isFinite(done) || done < 0) throw new Bad('Completed quantity must be 0 or more');
-    const upd = await store.update('WeeklyAssignment', asg.id, {
-      status: 'Submitted', done, note: String(req.body?.note || '').slice(0, 1000) || null, review_note: null, submitted_at: new Date().toISOString(),
-    });
+    const result = String(req.body?.result || '').trim().slice(0, 4000);
+    if (!result) throw new Bad('Describe what you completed');
+    const upd = await store.update('WeeklyAssignment', asg.id, { status: 'Submitted', result, review_note: null, submitted_at: new Date().toISOString() });
     await setDailyStatus(asg.id, 'Completed');
     const by = req.user.full_name || req.user.email;
     const recipients = [asg.allocated_by, ...(await notifier.managers())].filter((id) => id && id !== req.user.id);
     await notifier.notifyMany(recipients, {
-      type: 'weekly_submitted', title: `${by} submitted a task for approval`, message: `${task?.title}: ${done}/${asg.target}${task?.unit ? ` ${task.unit}` : ''}${upd.note ? `\n"${upd.note}"` : ''}`,
+      type: 'weekly_submitted', title: `${by} submitted a task for approval`, message: `${task?.title}\n${result.slice(0, 300)}`,
       actor_name: by, link: `/WeeklyTasks?week=${asg.week_start}&tab=approvals`,
     });
     res.json(upd);

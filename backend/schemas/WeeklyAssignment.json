@@ -5,16 +5,15 @@
     "weekly_task_id": { "type": "string" },
     "week_start": { "type": "string" },
     "user_id": { "type": "string" },
-    "target": { "type": "number", "minimum": 0 },
-    "done": { "type": "number", "minimum": 0 },
-    "daily_plan": { "type": "object", "description": "{ 'yyyy-MM-dd': quantity }" },
+    "days": { "type": "array", "description": "Dates (yyyy-MM-dd) this person works on the task; a daily task is created for each" },
+    "hours": { "type": "number", "minimum": 0, "description": "This person's share of the estimated hours" },
     "status": { "type": "string", "enum": ["Assigned", "Submitted", "Approved", "Changes Requested"], "default": "Assigned" },
-    "note": { "type": "string", "description": "Member's note when submitting" },
+    "result": { "type": "string", "description": "What the member reports as done" },
     "review_note": { "type": "string", "description": "Leader's note when requesting changes" },
     "allocated_by": { "type": "string" },
     "submitted_at": { "type": "string" },
     "approved_by": { "type": "string" },
     "approved_at": { "type": "string" }
   },
-  "required": ["weekly_task_id", "week_start", "user_id", "target"]
+  "required": ["weekly_task_id", "week_start", "user_id"]
 }

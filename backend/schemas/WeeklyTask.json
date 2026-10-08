@@ -4,13 +4,11 @@
   "properties": {
     "week_start": { "type": "string", "description": "Monday of the week (yyyy-MM-dd)" },
     "project_id": { "type": "string" },
-    "title": { "type": "string" },
-    "description": { "type": "string" },
-    "expected_outcome": { "type": "string" },
-    "unit": { "type": "string", "description": "What the target counts, e.g. posts, leads, pages" },
-    "hours_per_unit": { "type": "number", "minimum": 0, "default": 1 },
+    "project_name": { "type": "string", "description": "Free-text project label (e.g. Others) when there is no Project record" },
+    "title": { "type": "string", "description": "Task" },
+    "expected_result": { "type": "string", "description": "Target / Expected Result, free text" },
+    "estimated_hours": { "type": "number", "minimum": 0, "description": "Total estimated hours for the task (shared between assignees); empty for N/A" },
     "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"], "default": "Medium" },
-    "category": { "type": "string" },
     "notes": { "type": "string" },
     "sort_order": { "type": "number" },
     "allocated_by": { "type": "string", "description": "User id of the leader who last saved this task" }

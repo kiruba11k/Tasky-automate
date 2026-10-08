@@ -3,7 +3,6 @@ import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,11 +18,10 @@ const dayStyle = {
   Pending: 'bg-slate-700/40 border-slate-600 text-slate-300',
 };
 
-export default function MyWeek({ me, tasks, assignments, projectById, refreshKey, onChanged }) {
+export default function MyWeek({ me, tasks, assignments, userById, projectById, refreshKey, onChanged }) {
   const [dailies, setDailies] = useState([]);
   const [submitting, setSubmitting] = useState(null); // assignment
-  const [done, setDone] = useState('');
-  const [note, setNote] = useState('');
+  const [result, setResult] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,7 +36,7 @@ export default function MyWeek({ me, tasks, assignments, projectById, refreshKey
     setBusy(true);
     setError('');
     try {
-      await submitAssignment(submitting.id, { done: done === '' ? undefined : Number(done), note });
+      await submitAssignment(submitting.id, { result });
       setSubmitting(null);
       await onChanged();
     } catch (e) {
@@ -59,6 +57,7 @@ export default function MyWeek({ me, tasks, assignments, projectById, refreshKey
         const days = dailies.filter((d) => d.weekly_assignment_id === a.id).sort((x, y) => x.date.localeCompare(y.date));
         const finished = days.filter((d) => d.task_status === 'Completed').length;
         const canSubmit = a.status === 'Assigned' || a.status === 'Changes Requested';
+        const others = assignments.filter((x) => x.weekly_task_id === a.weekly_task_id && x.user_id !== me.id).map((x) => userById[x.user_id]?.full_name).filter(Boolean);
         return (
           <Card key={a.id} className="glass-effect-enhanced">
             <CardContent className="p-4 space-y-3">
@@ -68,23 +67,28 @@ export default function MyWeek({ me, tasks, assignments, projectById, refreshKey
                     <span className="text-white font-semibold">{t?.title}</span>
                     <StatusBadge status={a.status} />
                   </div>
-                  <div className="text-sm text-slate-400">{projectById[t?.project_id]?.name || 'No project'} · target <span className="text-white font-medium">{a.target}{t?.unit ? ` ${t.unit}` : ''}</span></div>
-                  {t?.expected_outcome && <div className="text-sm text-slate-300">Outcome: {t.expected_outcome}</div>}
+                  <div className="text-sm text-slate-400">
+                    {t?.project_name || projectById[t?.project_id]?.name || 'No project'}
+                    {a.hours > 0 && <> · <span className="text-white">{a.hours} hrs</span></>}
+                    {others.length > 0 && <> · with {others.join(', ')}</>}
+                  </div>
+                  {t?.expected_result && <div className="text-sm text-slate-300">Target: {t.expected_result}</div>}
                 </div>
                 {canSubmit && (
-                  <Button onClick={() => { setSubmitting(a); setDone(String(a.target)); setNote(''); setError(''); }} className="bg-blue-600 hover:bg-blue-700"><Send className="w-4 h-4 mr-1" />Submit for approval</Button>
+                  <Button onClick={() => { setSubmitting(a); setResult(a.result || ''); setError(''); }} className="bg-blue-600 hover:bg-blue-700"><Send className="w-4 h-4 mr-1" />Submit for approval</Button>
                 )}
               </div>
               {a.status === 'Changes Requested' && a.review_note && <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-md p-2">Changes requested: {a.review_note}</p>}
-              {a.status === 'Submitted' && <p className="text-sm text-amber-300">Waiting for a team leader to approve ({a.done ?? a.target} reported done).</p>}
-              {a.status === 'Approved' && <p className="text-sm text-green-300">Approved — {a.done ?? a.target} of {a.target} counted.</p>}
+              {a.status === 'Submitted' && <p className="text-sm text-amber-300">Waiting for a team leader to approve.</p>}
+              {a.status === 'Approved' && <p className="text-sm text-green-300">Approved ✓</p>}
+              {a.result && <p className="text-sm text-slate-200 whitespace-pre-line bg-slate-800/60 rounded-md p-2"><span className="text-slate-400">Your result: </span>{a.result}</p>}
               {days.length > 0 && (
                 <>
                   <Progress value={days.length ? (finished / days.length) * 100 : 0} className="h-1.5" />
                   <div className="flex flex-wrap gap-2">
                     {days.map((d) => (
                       <div key={d.id} className={`text-xs rounded-md border px-2 py-1 ${dayStyle[d.task_status] || dayStyle.Pending}`} title={d.task_status}>
-                        {dayLabel(d.date)} · {d.task.match(/— ([\d.]+)/)?.[1] ?? ''}
+                        {dayLabel(d.date)}
                       </div>
                     ))}
                   </div>
@@ -103,17 +107,13 @@ export default function MyWeek({ me, tasks, assignments, projectById, refreshKey
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="done">How many did you complete? (target {submitting?.target})</Label>
-              <Input id="done" type="number" min="0" step="any" value={done} onChange={(e) => setDone(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="note">Note (optional)</Label>
-              <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+              <Label htmlFor="result">Result — what did you complete?</Label>
+              <Textarea id="result" rows={5} value={result} onChange={(e) => setResult(e.target.value)} placeholder="e.g. 44% connection rate. Sent 104 first-level messages." className="bg-slate-800 border-slate-700 text-white" />
             </div>
             {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           </div>
           <DialogFooter>
-            <Button onClick={submit} disabled={busy} className="bg-blue-600 hover:bg-blue-700">{busy ? 'Submitting...' : 'Submit'}</Button>
+            <Button onClick={submit} disabled={busy || !result.trim()} className="bg-blue-600 hover:bg-blue-700">{busy ? 'Submitting...' : 'Submit'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

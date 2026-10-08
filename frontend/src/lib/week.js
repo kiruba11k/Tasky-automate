@@ -7,20 +7,5 @@ export const weekDates = (weekStart) => Array.from({ length: 7 }, (_, i) => toIS
 export const dayLabel = (iso) => format(parseISO(iso), 'EEE d');
 export const weekLabel = (weekStart) => `${format(parseISO(weekStart), 'MMM d')} – ${format(addDays(parseISO(weekStart), 6), 'MMM d, yyyy')}`;
 
-const round = (n) => Math.round(n * 100) / 100;
-
-/** Splits `target` across `dates` (whole numbers stay whole; earlier days take the remainder). Mirrors the server. */
-export function evenSplit(target, dates) {
-  const plan = {};
-  const n = dates.length;
-  if (!n || !(target > 0)) return plan;
-  if (Number.isInteger(target)) {
-    dates.forEach((d, i) => { plan[d] = Math.floor(target / n) + (i < target % n ? 1 : 0); });
-  } else {
-    dates.forEach((d) => { plan[d] = round(target / n); });
-    plan[dates[n - 1]] = round(target - round(target / n) * (n - 1));
-  }
-  return plan;
-}
-
-export const planTotal = (plan) => round(Object.values(plan || {}).reduce((s, v) => s + (Number(v) || 0), 0));
+export const shiftDate = (iso, days) => toISO(addDays(parseISO(iso), days));
+export const sheetDateRange = (weekStart) => `${format(parseISO(weekStart), 'dd/MM/yy')} - ${format(addDays(parseISO(weekStart), 4), 'dd/MM/yy')}`;

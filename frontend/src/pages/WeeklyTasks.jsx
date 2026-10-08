@@ -35,6 +35,8 @@ export default function WeeklyTasks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tick, setTick] = useState(0);
+  const [loadedWeek, setLoadedWeek] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null); // rows imported for another week, applied once that week is showing
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +50,7 @@ export default function WeeklyTasks() {
       setUsers(u); setProjects(p); setTasks(t); setAssignments(a); setSubmitted(s);
       setAllTasks(isLeader && s.length ? await WeeklyTask.list('-week_start', 500) : t);
       setError('');
+      setLoadedWeek(week);
       setTick((n) => n + 1);
     } catch (e) {
       setError(e.message);
@@ -65,6 +68,8 @@ export default function WeeklyTasks() {
     Object.entries(patch).forEach(([k, v]) => (v ? next.set(k, v) : next.delete(k)));
     setParams(next, { replace: true });
   };
+
+  const jumpWeek = (w, rows) => { setPendingImport({ week: w, rows }); go({ week: w }); };
 
   const userById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
@@ -97,17 +102,17 @@ export default function WeeklyTasks() {
               <TabsTrigger value="mine">My week</TabsTrigger>
             </TabsList>
             <TabsContent value="allocate" className="mt-4">
-              <AllocationGrid week={week} users={users} projects={projects} tasks={tasks} assignments={assignments} onSaved={load} />
+              <AllocationGrid week={week} users={users} projects={projects} tasks={tasks} assignments={assignments} pendingImport={loadedWeek === week ? pendingImport : null} onPendingApplied={() => setPendingImport(null)} onJumpWeek={jumpWeek} onSaved={load} />
             </TabsContent>
             <TabsContent value="approvals" className="mt-4">
               <ApprovalsPanel submitted={submitted} taskById={taskById} userById={userById} projectById={projectById} me={me} onChanged={load} />
             </TabsContent>
             <TabsContent value="mine" className="mt-4">
-              <MyWeek me={me} tasks={tasks} assignments={assignments} projectById={projectById} refreshKey={tick} onChanged={load} />
+              <MyWeek me={me} tasks={tasks} assignments={assignments} userById={userById} projectById={projectById} refreshKey={tick} onChanged={load} />
             </TabsContent>
           </Tabs>
         ) : (
-          <MyWeek me={me} tasks={tasks} assignments={assignments} projectById={projectById} refreshKey={tick} onChanged={load} />
+          <MyWeek me={me} tasks={tasks} assignments={assignments} userById={userById} projectById={projectById} refreshKey={tick} onChanged={load} />
         )}
       </div>
     </div>
