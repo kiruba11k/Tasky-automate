@@ -379,3 +379,28 @@ body.calm .page-hero, body.calm .hero-flash { animation: none; }
 .fitting-curtain.l { left: 0; border-radius: 0 0 40% 0; } .fitting-curtain.r { right: 0; border-radius: 0 0 0 40%; }
 .fitting-spot { position: absolute; top: -10%; left: 25%; width: 50%; height: 110%; background: linear-gradient(to bottom, rgba(253, 224, 71, .35), transparent 85%); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); pointer-events: none; z-index: 1; }
 .fitting-label { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: .72rem; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; z-index: 3; pointer-events: none; }
+
+/* ===================== the rest of the app: runner bar, rocket, saver, voice, rows, alerts, focus ===================== */
+.busy-runner { position: fixed; left: 0; right: 0; top: 0; height: 28px; z-index: 210; pointer-events: none; }
+.busy-bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, transparent, #34d399, #facc15, #f472b6, transparent); background-size: 200% 100%; animation: busy-shimmer 1s linear infinite; }
+@keyframes busy-shimmer { to { background-position: -200% 0; } }
+.busy-chase { position: absolute; top: 0; display: flex; align-items: flex-end; gap: 4px; animation: busy-run 1.5s linear infinite; line-height: 0; }
+@keyframes busy-run { from { left: -90px; } to { left: 100%; } }
+.rocket-top { position: fixed; right: 18px; bottom: 90px; z-index: 110; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; border: 3px solid #0b1220; background: rgb(var(--slate-800)); box-shadow: 3px 4px 0 rgba(0,0,0,.5); animation: pop-in .35s cubic-bezier(.34, 1.56, .64, 1) both; }
+.rocket-top.launch { animation: rocket-launch 1s cubic-bezier(.5, 0, .9, .4) both; }
+@keyframes pop-in { from { transform: scale(.2); opacity: 0; } }
+@keyframes rocket-launch { 0% { transform: translate(0, 0) rotate(0); } 15% { transform: translate(-2px, 2px) rotate(-3deg); } 30% { transform: translate(2px, 0) rotate(3deg); } 100% { transform: translateY(-110vh) scale(1.2); } }
+.rocket-flame { position: absolute; bottom: -20px; left: 50%; width: 14px; height: 26px; transform: translateX(-50%); border-radius: 50% 50% 50% 50% / 20% 20% 80% 80%; background: linear-gradient(to bottom, #fde047, #f97316 60%, transparent); animation: flicker .12s linear infinite alternate; }
+@keyframes flicker { to { transform: translateX(-50%) scaleY(1.3); opacity: .8; } }
+.idle-saver { position: fixed; inset: 0; z-index: 400; background: rgba(2, 6, 23, .92); animation: lunch-in .8s ease both; overflow: hidden; }
+.idle-clock { position: absolute; top: 18%; left: 0; right: 0; text-align: center; z-index: 2; pointer-events: none; }
+.wave-bars { display: flex; align-items: center; gap: 3px; height: 34px; }
+.wave-bars span { width: 4px; height: 100%; border-radius: 3px; background: linear-gradient(to top, #f87171, #fde047); transform-origin: center; animation: wave-bar .7s ease-in-out infinite; }
+@keyframes wave-bar { 0%, 100% { transform: scaleY(.15); } 50% { transform: scaleY(1); } }
+.row-pop { animation: row-pop 1.5s ease-out both; }
+@keyframes row-pop { 0% { transform: translateX(-18px); opacity: 0; background: rgba(52, 211, 153, .45); } 40% { transform: none; opacity: 1; background: rgba(52, 211, 153, .3); } 100% { background: transparent; } }
+[role='alert'] { animation: alert-shake .5s ease-in-out; }
+@keyframes alert-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+body.fun input:focus-visible, body.fun textarea:focus-visible, body.fun select:focus-visible { box-shadow: 0 0 0 3px rgba(52, 211, 153, .45), 0 0 18px rgba(52, 211, 153, .25); transition: box-shadow .2s ease; }
+body.calm .busy-chase, body.calm .busy-bar, body.calm .rocket-top, body.calm .idle-saver, body.calm .wave-bars span, body.calm .row-pop, body.calm [role='alert'] { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .busy-chase, .busy-bar, .wave-bars span, .row-pop, [role='alert'] { animation: none !important; } }

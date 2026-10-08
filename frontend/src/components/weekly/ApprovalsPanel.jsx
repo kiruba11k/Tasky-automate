@@ -29,7 +29,7 @@ export default function ApprovalsPanel({ submitted, taskById, userById, projectB
   };
 
   if (!submitted.length) {
-    return <EmptyState mood="happy" title="Inbox zero!" hint="Nothing is waiting for your approval. Go grab a coffee ☕" />;
+    return <EmptyState mood="calm" title="Inbox zero!" hint="Nothing is waiting for your approval. Go grab a coffee ☕" />;
   }
 
   return (

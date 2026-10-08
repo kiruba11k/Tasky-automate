@@ -40,7 +40,9 @@ export default function PageMotion() {
       });
     };
     enhance(main);
-    const mo = new MutationObserver((records) => records.forEach((r) => r.addedNodes.forEach((n) => { if (n.nodeType === 1) { if (n.matches?.('.glass-effect-enhanced')) enhance(n.parentElement); enhance(n); } })));
+    const start = Date.now();
+    const popRows = (n) => { if (calm() || Date.now() - start < 1500) return; (n.matches?.('tr') ? [n] : [...(n.querySelectorAll?.('tbody tr') || [])].slice(0, 3)).forEach((tr) => { tr.classList.add('row-pop'); setTimeout(() => tr.classList.remove('row-pop'), 1600); }); };
+    const mo = new MutationObserver((records) => records.forEach((r) => r.addedNodes.forEach((n) => { if (n.nodeType === 1) { if (n.matches?.('.glass-effect-enhanced')) enhance(n.parentElement); enhance(n); popRows(n); } })));
     mo.observe(main, { childList: true, subtree: true });
     return () => { mo.disconnect(); io.disconnect(); };
   }, [pathname]);

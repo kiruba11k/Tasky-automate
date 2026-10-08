@@ -99,4 +99,19 @@ export const effects = {
     ], { duration: 950, easing: 'cubic-bezier(.3,.6,.4,1)' });
     anim.onfinish = () => { el.remove(); target.classList.add('jar-wobble'); setTimeout(() => target.classList.remove('jar-wobble'), 700); };
   },
+  /** A tiny burst of stars where you clicked a button or link. */
+  sparkle: (x, y) => {
+    if (calm()) return;
+    const host = layer();
+    const colors = ['#fde047', '#f472b6', '#67e8f9', '#a7f3d0'];
+    for (let i = 0; i < 6; i += 1) {
+      const el = document.createElement('div');
+      const size = rand(6, 10);
+      el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${size}px;height:${size}px;background:${colors[i % 4]};clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);pointer-events:none`;
+      host.appendChild(el);
+      const a = rand(0, Math.PI * 2); const d = rand(18, 38);
+      const anim = el.animate([{ transform: 'translate(-50%,-50%) scale(.3) rotate(0)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(1) rotate(160deg)`, opacity: 0 }], { duration: rand(420, 650), easing: 'ease-out' });
+      anim.onfinish = () => el.remove();
+    }
+  },
 };

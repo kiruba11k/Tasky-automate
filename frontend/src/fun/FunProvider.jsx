@@ -10,6 +10,9 @@ import DropJar from './DropJar';
 import Seasons from './Seasons';
 import CastParty from './CastParty';
 import TeamParade from './TeamParade';
+import BusyRunner from './BusyRunner';
+import RocketTop from './RocketTop';
+import IdleSaver from './IdleSaver';
 import BadgeUnlock from './BadgeUnlock';
 import ChaseCutscene from './chase/ChaseCutscene';
 import { effects } from './effects';
@@ -23,7 +26,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, heroes: true, season: true, rhythm: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, heroes: true, sparkles: true, saver: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -289,7 +292,10 @@ export function FunProvider({ children }) {
   useEffect(() => {
     const r = refs.current;
     const touch = () => { r.lastActive = Date.now(); };
-    const onDown = (e) => { r.pointer = { x: e.clientX, y: e.clientY }; touch(); };
+    const onDown = (e) => {
+      r.pointer = { x: e.clientX, y: e.clientY }; touch();
+      if (r.settings.anim === 'full' && r.settings.sparkles !== false && e.target?.closest?.('button,a,[role="tab"],[role="menuitem"]')) effects.sparkle(e.clientX, e.clientY);
+    };
     const code = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
     let pos = 0;
     const onKey = (e) => {
@@ -352,6 +358,9 @@ export function FunProvider({ children }) {
           )}
         </div>
       )}
+      <BusyRunner />
+      <RocketTop />
+      <IdleSaver />
       <HighFive />
       <DayRhythm onParade={() => setParadeOpen(true)} />
       <LunchBreak />

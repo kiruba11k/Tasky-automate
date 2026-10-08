@@ -238,6 +238,7 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
       case 'highfive': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aRx: -2.7, aRz: -0.15, hx: -0.1 }); break;
       case 'highfive2': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aLx: -2.7, aLz: 0.15, hx: -0.1 }); break;
       case 'type': Object.assign(o, { y: sn(t * 2) * 0.01, hx: 0.38, hz: sn(t * 1.1) * 0.04, hy: 0, aLx: -1.15 + sn(t * 15) * 0.12, aRx: -1.15 - sn(t * 15) * 0.12, aLz: 0.12, aRz: -0.12, eye: (t % 4) < 0.14 ? 0.1 : 0.85 }); break;
+      case 'listen': Object.assign(o, { hz: 0.28, hx: 0.05, hy: sn(t * 0.7) * 0.12, aRz: -2.15, aRx: -0.45, eye: 1.25 }); break;
       case 'present': Object.assign(o, { hy: 0.35, hz: sn(t * 1.4) * 0.05, aRx: -1.55 + sn(t * 2) * 0.12, aRz: -0.35 }); break;
       case 'cast': Object.assign(o, { y: sn(t * 2) * 0.03, hz: sn(t * 1.6) * 0.06, aRx: -0.5, aRz: -(1.9 + sn(t * 5) * 0.35), aLz: 0.5 }); break;
       case 'build': Object.assign(o, { y: Math.abs(sn(t * 4.5)) * 0.03, rx: 0.06, hx: 0.12, aRx: -1.3 + sn(t * 9) * 0.95, aRz: -0.2, aLx: -0.4 }); break;

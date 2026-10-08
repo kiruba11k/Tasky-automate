@@ -12,9 +12,10 @@ import { Emoji, Rich } from '@/icons/Emoji';
 export default function EmptyState({ title, hint, mood = 'sleep', className = '' }) {
   const { settings } = useFun();
   const three = settings.view3d && hasWebGL();
+  if (mood === 'calm') return <div className={`rounded-lg glass-effect-enhanced overflow-hidden ${className}`}><CalmScene title={title} hint={hint} className="min-h-[15rem]" /></div>;
   return (
     <div className={`flex flex-col items-center text-center gap-1 py-12 rounded-lg glass-effect-enhanced ${className}`}>
-      {mood === 'calm' ? <CalmScene title="All clear" hint="Nothing here right now." /> : three ? <Suspense fallback={<div style={{ height: 130 }} />}><Buddy3D species="cat" pose={mood === 'sleep' ? 'sleep' : 'idle'} size={104} calm={settings.anim === 'calm'} /></Suspense> : mood === 'sleep' ? <Scene /> : <Mascot mood={mood} size={96} className="tasky-bob" />}
+      {three ? <Suspense fallback={<div style={{ height: 130 }} />}><Buddy3D species="cat" pose={mood === 'sleep' ? 'sleep' : 'idle'} size={104} calm={settings.anim === 'calm'} /></Suspense> : mood === 'sleep' ? <Scene /> : <Mascot mood={mood} size={96} className="tasky-bob" />}
       <h3 className="text-lg font-extrabold text-white mt-1"><Rich text={title} /></h3>
       {hint && <p className="text-sm text-slate-400 max-w-sm"><Rich text={hint} /></p>}
     </div>

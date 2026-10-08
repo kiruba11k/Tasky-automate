@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import ListeningBuddy from '@/fun/ListeningBuddy';
 import { Mic, MicOff, Trash2, UserPlus, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -151,7 +152,7 @@ export default function VoiceTaskDialog({ open, onOpenChange, mode, week, onAppl
                   {LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               )}
-              {speech.listening && <span className="flex items-center gap-2 text-sm text-red-300"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />Listening…</span>}
+              {speech.listening && <ListeningBuddy />}
             </div>
             <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={7} aria-label="Transcript" placeholder="Your words appear here. You can edit them before continuing." className={field} />
             {speech.interim && <p className="text-sm text-slate-400 italic">{speech.interim}</p>}
