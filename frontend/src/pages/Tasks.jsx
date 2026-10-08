@@ -77,7 +77,7 @@ export default function Tasks() {
     <Card className="glass-effect-enhanced hover:border-blue-500/50 transition-all duration-300 group relative">
        <button 
         onClick={() => onEdit(task)} // Call onEdit with the task
-        className="absolute top-3 right-3 p-1.5 bg-slate-700/50 hover:bg-slate-600/70 rounded-md text-slate-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+        className="absolute top-3 right-3 p-1.5 bg-slate-700/50 hover:bg-slate-600/70 rounded-md text-slate-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100 z-10"
         aria-label={`Edit ${task.title}`}
       >
         <Edit3 className="w-4 h-4" />

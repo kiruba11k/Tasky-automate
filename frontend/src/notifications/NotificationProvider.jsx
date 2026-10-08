@@ -122,7 +122,7 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-[22rem] max-w-[calc(100vw-2rem)]" aria-live="polite">
+      <div style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }} className="fixed right-4 z-[100] flex flex-col gap-2 w-[22rem] max-w-[calc(100vw-2rem)]" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className="toast-comic animate-pop rounded-2xl border-[3px] border-slate-900 bg-slate-800 shadow-[4px_4px_0_rgba(0,0,0,.5)] p-3 pr-8 relative cursor-pointer" onClick={() => open(t)}>
             <button aria-label="Dismiss" className="absolute top-2 right-2 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); dismissToast(t.id); }}>

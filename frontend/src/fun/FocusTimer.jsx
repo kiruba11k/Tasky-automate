@@ -90,7 +90,7 @@ export function FocusProvider({ children }) {
     <FocusContext.Provider value={value}>
       {children}
       {session && (
-        <div className="fixed bottom-3 left-1/2 z-[95] flex items-center gap-3 rounded-3xl border-[3px] border-slate-900 bg-slate-800 pl-2 pr-4 py-2 shadow-[4px_4px_0_rgba(0,0,0,.5)] animate-pop-x" role="timer" aria-label={isBreak ? 'Break timer' : 'Focus timer'}>
+        <div style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }} className="focus-pill fixed left-1/2 z-[95] flex items-center gap-3 max-w-[calc(100vw-1rem)] rounded-3xl border-[3px] border-slate-900 bg-slate-800 pl-2 pr-4 py-2 shadow-[4px_4px_0_rgba(0,0,0,.5)] animate-pop-x" role="timer" aria-label={isBreak ? 'Break timer' : 'Focus timer'}>
           {three ? (
             <Suspense fallback={<div style={{ width: 84, height: 100 }} />}>
               {!isBreak && mode === 'race'

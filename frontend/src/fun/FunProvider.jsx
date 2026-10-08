@@ -26,7 +26,8 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, heroes: true, sparkles: true, saver: true, season: true, rhythm: true };
+  const lowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2));
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -347,7 +348,7 @@ export function FunProvider({ children }) {
     <FunContext.Provider value={value}>
       {children}
       {settings.mascot && (
-        <div className="fixed bottom-3 left-3 z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]">
+        <div className="mascot-corner fixed left-3 z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]" style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
           <button type="button" onClick={poke} aria-label="Tap Tasky for a joke" className="pointer-events-auto shrink-0 focus:outline-none">
             <MascotAvatar mood={mood} settings={settings} />
           </button>

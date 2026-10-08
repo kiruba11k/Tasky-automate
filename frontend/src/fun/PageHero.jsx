@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { request } from '@/api/client';
@@ -58,8 +58,18 @@ export default function PageHero() {
   const cfg = CONFIG[page];
   const data = useHeroData(page);
   const [flash, setFlash] = useState(0);
+  const box = useRef(null);
+  const [zoom, setZoom] = useState(62);
   const [off, setOff] = useState(() => { try { return localStorage.getItem(`tasky_hero_off_${page}`) === '1'; } catch { return false; } });
   useEffect(() => { try { setOff(localStorage.getItem(`tasky_hero_off_${page}`) === '1'); } catch { setOff(false); } }, [page]);
+  const shown = Boolean(cfg) && !off;
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([e]) => setZoom(Math.max(26, Math.min(62, Math.round(e.contentRect.width / 8.6)))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [shown, page]);
   if (!cfg || off || !settings.heroes || !settings.view3d || !hasWebGL()) return null;
   const hide = () => { setOff(true); try { localStorage.setItem(`tasky_hero_off_${page}`, '1'); } catch { /* ignore */ } };
   const day = new Date().getDay();
@@ -74,14 +84,14 @@ export default function PageHero() {
   }[page] || [];
   return (
     <div className="max-w-7xl mx-auto px-6 md:px-8 pt-4">
-      <section className="page-hero" style={{ '--hero': cfg.hue }} aria-label={cfg.title}>
+      <section className="page-hero" style={{ '--hero': cfg.hue, '--hero-h': `${Math.round(Math.max(118, Math.min(190, zoom * 3.07)))}px` }} aria-label={cfg.title}>
         <div className="relative z-10 min-w-0 pr-2">
           <h2 className="text-xl font-extrabold text-white">{cfg.title}</h2>
           <p className="text-sm text-slate-200 max-w-xs">{cfg.tagline}</p>
           <div className="flex flex-wrap gap-1.5 mt-2">{chips.map((c) => <span key={c} className="rounded-full bg-black/30 border border-white/15 px-2.5 py-0.5 text-xs font-bold text-white">{c}</span>)}</div>
         </div>
-        <div className="hero-canvas">
-          <Suspense fallback={null}><HeroStage page={page} data={data} calm={settings.anim === 'calm'} onFlash={() => setFlash((f) => f + 1)} /></Suspense>
+        <div className="hero-canvas" ref={box}>
+          <Suspense fallback={null}><HeroStage page={page} zoom={zoom} data={data} calm={settings.anim === 'calm'} onFlash={() => setFlash((f) => f + 1)} /></Suspense>
         </div>
         {flash > 0 && <div key={flash} className="hero-flash" />}
         <button type="button" onClick={hide} aria-label="Hide this banner" className="absolute right-2 top-2 z-20 p-1 rounded-full bg-black/30 text-white/80 hover:text-white"><X className="w-3.5 h-3.5" /></button>

@@ -107,7 +107,7 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
                 variant="ghost"
                 size="icon"
                 onClick={() => onEdit(task)}
-                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
               >
                 <Edit3 className="w-4 h-4" />
               </Button>

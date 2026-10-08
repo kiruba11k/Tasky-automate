@@ -39,14 +39,14 @@ body.fun .glass-effect-enhanced {
   box-shadow: 4px 4px 0 var(--hard-shadow, rgba(0, 0, 0, 0.45)) !important;
   transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease;
 }
-body.fun .glass-effect-enhanced:hover { transform: translate(-2px, -2px) rotate(-.3deg); box-shadow: 7px 7px 0 var(--hard-shadow, rgba(0, 0, 0, 0.5)) !important; }
+@media (hover: hover) { body.fun .glass-effect-enhanced:hover { transform: translate(-2px, -2px) rotate(-.3deg); box-shadow: 7px 7px 0 var(--hard-shadow, rgba(0, 0, 0, 0.5)) !important; } }
 body.calm .glass-effect-enhanced:hover { transform: none; }
 
 /* Squishy buttons */
 body.fun button, body.fun [role="button"], body.fun [role="tab"] { transition: transform .15s cubic-bezier(.34,1.56,.64,1), filter .15s ease, background-color .15s ease; }
-body.fun button:not(:disabled):hover { transform: translateY(-2px) scale(1.03); }
+@media (hover: hover) { body.fun button:not(:disabled):hover { transform: translateY(-2px) scale(1.03); } }
 body.fun button:not(:disabled):active { transform: translateY(1px) scale(.93); }
-body.fun [role="tab"]:hover { transform: translateY(-1px); }
+@media (hover: hover) { body.fun [role="tab"]:hover { transform: translateY(-1px); } }
 body.fun .nav-pill:hover svg { animation: wiggle .6s ease-in-out; }
 body.fun input, body.fun textarea, body.fun select { border-radius: .8rem; }
 body.fun [data-radix-popper-content-wrapper] > div, body.fun [role="dialog"] { border-width: 2px; border-color: var(--outline, rgba(15, 23, 42, .95)); box-shadow: 5px 5px 0 var(--hard-shadow, rgba(0, 0, 0, .5)); }
@@ -364,9 +364,9 @@ body.calm input[type='checkbox']:checked, body.calm [role='checkbox'][data-state
 @media (prefers-reduced-motion: reduce) { .season-layer, .highfive-word, .parade-bunting, .parade-ground, .egg-ready, .calm-star, .calm-cloud, .sky-cloud, .balloon-bob { animation: none !important; } }
 
 /* page hero banners */
-.page-hero { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 190px; padding: .9rem 1.25rem; border-radius: 1.2rem; border: 3px solid #0b1220; overflow: hidden; background: linear-gradient(110deg, var(--hero) 0%, color-mix(in srgb, var(--hero) 55%, #0f172a) 55%, #0f172a 100%); box-shadow: 4px 5px 0 rgba(0,0,0,.4); animation: hero-in .55s cubic-bezier(.34, 1.4, .5, 1) both; }
+.page-hero { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: var(--hero-h, 190px); padding: .9rem 1.25rem; border-radius: 1.2rem; border: 3px solid #0b1220; overflow: hidden; background: linear-gradient(110deg, var(--hero) 0%, color-mix(in srgb, var(--hero) 55%, #0f172a) 55%, #0f172a 100%); box-shadow: 4px 5px 0 rgba(0,0,0,.4); animation: hero-in .55s cubic-bezier(.34, 1.4, .5, 1) both; }
 @keyframes hero-in { from { transform: translateY(-14px) scale(.98); opacity: 0; } }
-.hero-canvas { position: relative; flex: 0 0 min(52%, 560px); height: 190px; margin: -.9rem -1.25rem -.9rem 0; }
+.hero-canvas { position: relative; flex: 0 0 min(52%, 560px); height: var(--hero-h, 190px); margin: -.9rem -1.25rem -.9rem 0; }
 .hero-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; z-index: 15; animation: hero-flash .6s ease-out both; }
 @keyframes hero-flash { 0% { opacity: .95; } 100% { opacity: 0; } }
 @media (max-width: 640px) { .hero-canvas { flex-basis: 55%; } .page-hero p { display: none; } }
@@ -404,3 +404,37 @@ body.calm .page-hero, body.calm .hero-flash { animation: none; }
 body.fun input:focus-visible, body.fun textarea:focus-visible, body.fun select:focus-visible { box-shadow: 0 0 0 3px rgba(52, 211, 153, .45), 0 0 18px rgba(52, 211, 153, .25); transition: box-shadow .2s ease; }
 body.calm .busy-chase, body.calm .busy-bar, body.calm .rocket-top, body.calm .idle-saver, body.calm .wave-bars span, body.calm .row-pop, body.calm [role='alert'] { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .busy-chase, .busy-bar, .wave-bars span, .row-pop, [role='alert'] { animation: none !important; } }
+
+
+/* ===================== every screen: phones, tablets, laptops, big monitors ===================== */
+:root { --safe-b: env(safe-area-inset-bottom, 0px); }
+html { -webkit-text-size-adjust: 100%; }
+nav.sticky { padding-top: env(safe-area-inset-top, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.rhythm-card { bottom: calc(1rem + var(--safe-b)); }
+.rocket-top { bottom: calc(90px + var(--safe-b)); right: calc(18px + env(safe-area-inset-right, 0px)); }
+@media (max-width: 640px) {
+  .mascot-corner { transform: scale(.78); transform-origin: bottom left; }
+  .mascot-corner .speech-bubble { max-width: 10.5rem; font-size: .8rem; }
+  .rhythm-card { width: calc(100vw - 1rem); padding: .5rem .75rem .5rem .25rem; }
+  .rocket-top { width: 40px; height: 40px; bottom: calc(150px + var(--safe-b)); }
+  .focus-pill { gap: .5rem; padding-right: .75rem; }
+  .highfive-word { font-size: 1.5rem; }
+  .highfive-names { gap: 5rem; }
+  .cast-party-title { font-size: 2rem; -webkit-text-stroke: 2px #141225; text-shadow: 3px 3px 0 #141225; }
+  .book-spread { grid-template-columns: 1fr; } .book-spread .book-spine, .book-spread .book-page.r { display: none; }
+  .fitting-room { margin-inline: auto; }
+}
+@media (max-width: 560px) {
+  .page-hero { flex-direction: column; align-items: stretch; gap: .25rem; min-height: 0; padding-bottom: 0; }
+  .page-hero .hero-canvas { flex: none; width: calc(100% + 2.5rem); margin: 0 -1.25rem 0 -1.25rem; height: var(--hero-h, 130px); }
+  .page-hero p { display: block; font-size: .8rem; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .page-hero { display: none; }
+  .mascot-corner { transform: scale(.6); }
+  .rhythm-card, .lunch-screen .text-3xl { transform-origin: bottom center; }
+}
+@media (min-width: 1800px) { html { font-size: 18px; } }
+@media (min-width: 2400px) { html { font-size: 22px; } }
+@media (min-width: 3200px) { html { font-size: 28px; } }
+@media (pointer: coarse) { button, [role='tab'], a.nav-pill, [role='checkbox'] { min-height: 36px; } }

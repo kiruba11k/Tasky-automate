@@ -37,7 +37,7 @@ function Lane({ members, holder, calm }) {
   return (
     <>
       {members.map((m, i) => (
-        <group key={m.id} position={[xs[i], y, 0]} scale={0.62}>
+        <group key={m.id} position={[xs[i], y, 0]} scale={Math.min(0.62, W / n / 1.5)}>
           <Critter3D species={m.species} equipped={m.equipped} calm={calm} pose={m.id === cheerId ? 'cheer' : m.id === holder ? 'march' : 'idle'} rotation={[0, 0.5, 0]} />
         </group>
       ))}

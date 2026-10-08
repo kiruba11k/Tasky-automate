@@ -3,7 +3,7 @@ import Stage from './Stage';
 import { BarsScene, BuildScene, CratesScene, GearsScene, LinkScene, MagicScene, PhotoScene, TrainScene, WorkbenchScene, Z } from './scenes';
 
 /** The 3D scene for a page's hero banner. */
-export default function HeroStage({ page, data, calm, onFlash }) {
+export default function HeroStage({ page, data, calm, onFlash, zoom = Z }) {
   let scene = null;
   switch (page) {
     case 'DailyTasks': scene = <WorkbenchScene pending={data.pending} calm={calm} />; break;
@@ -17,5 +17,5 @@ export default function HeroStage({ page, data, calm, onFlash }) {
     case 'SheetsSetup': scene = <LinkScene calm={calm} />; break;
     default: return null;
   }
-  return <Stage ortho zoom={Z} calm={calm} style={{ position: 'absolute', inset: 0 }}>{scene}</Stage>;
+  return <Stage ortho zoom={zoom} calm={calm} style={{ position: 'absolute', inset: 0 }}>{scene}</Stage>;
 }

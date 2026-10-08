@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import Critter3D, { Part } from './Critter3D';
 
 export const Z = 62;
-const useLayout = () => { const { size } = useThree(); const W = size.width / Z; const H = size.height / Z; return { W, H, gy: -H / 2 + 0.28 }; };
+const useLayout = () => { const { size, camera } = useThree(); const z = camera.zoom || Z; const W = size.width / z; const H = size.height / z; return { W, H, gy: -H / 2 + 0.28 }; };
 const damp = (cur, target, dt, rate = 4) => cur + (target - cur) * (1 - Math.exp(-dt * rate));
 const COL = ['#34d399', '#60a5fa', '#f472b6', '#facc15', '#a78bfa', '#fb923c'];
 

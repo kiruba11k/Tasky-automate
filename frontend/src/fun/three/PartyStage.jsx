@@ -11,7 +11,7 @@ function Row() {
   const W = size.width / ZOOM;
   const y = -size.height / 2 / ZOOM + 0.6;
   return SPECIES_IDS.map((id, i) => (
-    <group key={id} position={[-W / 2 + ((i + 0.5) * W) / SPECIES_IDS.length, y, 0]} scale={0.95}>
+    <group key={id} position={[-W / 2 + ((i + 0.5) * W) / SPECIES_IDS.length, y, 0]} scale={Math.min(0.95, W / SPECIES_IDS.length / 1.2)}>
       <Critter3D species={id} pose="dance" equipped={{ hat: HATS[i % HATS.length], neck: i % 3 === 0 ? 'rainbow' : undefined, face: i % 4 === 1 ? 'shades' : undefined }} rotation={[0, 0, 0]} />
     </group>
   ));

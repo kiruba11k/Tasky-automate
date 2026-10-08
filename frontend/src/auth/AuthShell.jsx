@@ -8,7 +8,7 @@ const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-redu
 
 export default function AuthShell({ title, subtitle, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950">
+    <div className="min-h-[100dvh] flex items-center justify-center p-6 bg-slate-950">
       <div className="w-full max-w-md rounded-2xl border border-slate-700/60 bg-slate-900/80 p-8 shadow-2xl">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-gradient-to-tr from-accent-green via-accent-blue to-accent-purple rounded-xl flex items-center justify-center">

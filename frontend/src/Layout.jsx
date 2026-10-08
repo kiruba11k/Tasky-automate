@@ -52,7 +52,7 @@ export default function Layout({ children, currentPageName }) {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen animated-gradient-bg-enhanced">
+    <div className="min-h-[100dvh] animated-gradient-bg-enhanced">
       <div className="theme-pattern" aria-hidden="true" />
       <style>
         {`
@@ -314,7 +314,7 @@ export default function Layout({ children, currentPageName }) {
       </nav>
 
       {/* Main Content Area */}
-      <main className="min-h-[calc(100vh-4rem)] relative z-30">
+      <main className="min-h-[calc(100dvh-4rem)] relative z-30">
         {children}
       </main>
     </div>

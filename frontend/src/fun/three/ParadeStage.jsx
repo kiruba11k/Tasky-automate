@@ -10,7 +10,7 @@ function Row({ members, calm }) {
   const n = Math.max(1, members.length);
   const y = -size.height / 2 / ZOOM + 1.45;
   return members.map((m, i) => (
-    <group key={m.id} position={[-W / 2 + ((i + 0.5) * W) / n, y, 0]} scale={n > 6 ? 0.7 : 0.9}>
+    <group key={m.id} position={[-W / 2 + ((i + 0.5) * W) / n, y, 0]} scale={Math.min(n > 6 ? 0.7 : 0.9, W / n / 1.3)}>
       <Critter3D species={m.species} equipped={m.equipped} calm={calm} pose={m.done_today > 0 ? 'dance' : 'march'} rotation={[0, 0.35, 0]} />
     </group>
   ));
