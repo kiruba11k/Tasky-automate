@@ -257,32 +257,30 @@ export default function Layout({ children, currentPageName }) {
               <div className="w-9 h-9 bg-gradient-to-tr from-accent-green via-accent-blue to-accent-purple rounded-xl flex items-center justify-center shadow-lg shadow-accent-green/30">
                 <CheckSquare className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white tracking-tight">TaskFlow</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight hidden sm:block">TaskFlow</h1>
             </div>
 
-            {/* Navigation Pills */}
-            <div className="flex items-center bg-slate-800/70 p-1 rounded-xl border border-slate-700/60 shadow-md">
+            {/* Navigation Pills: full labels on very wide screens, icons (plus the current page's name) on laptops, a scrolling row below on small screens */}
+            <div className="hidden lg:flex items-center bg-slate-800/70 p-1 rounded-xl border border-slate-700/60 shadow-md min-w-0">
               {navigationItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
                   <Link
                     key={item.name}
                     to={item.url}
-                    className={`nav-pill flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap ${
-                      isActive
-                        ? "active" 
-                        : "text-slate-300" 
-                    }`}
+                    title={item.name}
+                    aria-label={item.name}
+                    className={`nav-pill flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap ${isActive ? "active" : "text-slate-300"}`}
                   >
                     <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
-                    <span className="text-sm font-medium">{item.name}</span>
+                    <span className={`text-sm font-medium ${isActive ? '' : 'hidden 2xl:inline'}`}>{item.name}</span>
                   </Link>
                 );
               })}
             </div>
 
             {/* Signed-in user */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               <div className="text-right leading-tight hidden 2xl:block whitespace-nowrap">
                 <div className="text-sm font-medium text-white">{user?.full_name}</div>
                 <div className="text-xs text-slate-400">{user?.role?.replace("_", " ")}</div>
@@ -301,6 +299,16 @@ export default function Layout({ children, currentPageName }) {
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
+          </div>
+          <div className="lg:hidden flex gap-1 overflow-x-auto pb-2 -mx-1 px-1" aria-label="Pages">
+            {navigationItems.map((item) => {
+              const isActive = location.pathname === item.url;
+              return (
+                <Link key={item.name} to={item.url} className={`nav-pill flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap text-sm font-medium shrink-0 ${isActive ? 'active' : 'text-slate-300 bg-slate-800/70 border border-slate-700/60'}`}>
+                  <item.icon className="w-4 h-4" />{item.name}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </nav>

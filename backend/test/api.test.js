@@ -664,3 +664,50 @@ describe('theme preferences', () => {
     assert.equal((await api('GET', '/api/auth/me')).body.theme_custom, undefined);
   });
 });
+
+describe('playful features are available to every role', () => {
+  let server, base;
+  const api = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    server = createApp({ store, jwtSecret: 's' }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    const admin = await login('boss@example.com');
+    await api('POST', '/api/entities/User', admin, { full_name: 'Lena Lead', email: 'lena@example.com', role: 'team_leader' });
+    await api('POST', '/api/entities/User', admin, { full_name: 'Mo Member', email: 'mo@example.com', role: 'team_member' });
+  });
+  after(() => server.close());
+
+  for (const [role, email] of [['admin', 'boss@example.com'], ['team leader', 'lena@example.com'], ['team member', 'mo@example.com']]) {
+    test(`${role}: progress, notifications, themes, buddies, eggs and the team views all work`, async () => {
+      const t = await login(email);
+      const T = '2026-10-14';
+      assert.equal((await api('POST', '/api/me/sync', t, { today: T })).status, 200);
+      assert.equal((await api('GET', `/api/me/trophies?today=${T}`, t)).status, 200);
+      assert.equal((await api('GET', '/api/me/buddies', t)).status, 200);
+      assert.equal((await api('GET', `/api/team/parade?today=${T}&week_start=2026-10-12`, t)).status, 200);
+      assert.equal((await api('GET', `/api/team/pulse?today=${T}&week_start=2026-10-12`, t)).status, 200);
+      assert.equal((await api('GET', '/api/notifications', t)).status, 200);
+      assert.equal((await api('POST', '/api/notifications/read', t, {})).status, 200);
+      assert.equal((await api('PATCH', '/api/auth/me', t, { theme: 'bubblegum-pop', theme_auto: false, theme_at: 1700000000000, buddy: 'robot', equipped: {} })).status, 200);
+      assert.equal((await api('POST', '/api/me/hatch', t, { today: T })).status, 409); // allowed to try; just no egg yet
+    });
+  }
+
+  test('anyone can send a high-five to anyone on the team', async () => {
+    const mo = await login('mo@example.com');
+    const lena = (await api('GET', '/api/team/parade?week_start=2026-10-12', mo)).body.find((m) => m.name === 'Lena Lead');
+    assert.equal((await api('POST', '/api/kudos', mo, { to_user_id: lena.id, emoji: '🙌' })).status, 201);
+    const lenaTok = await login('lena@example.com');
+    const mine = (await api('GET', '/api/notifications', lenaTok)).body;
+    assert.ok(JSON.stringify(mine).includes('kudos'));
+  });
+});
