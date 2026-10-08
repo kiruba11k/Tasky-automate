@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { format } from 'date-fns';
 import { request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
-import Mascot from './Mascot';
+import MascotAvatar from './MascotAvatar';
 import BadgeUnlock from './BadgeUnlock';
 import ChaseCutscene from './chase/ChaseCutscene';
 import { effects } from './effects';
@@ -16,7 +16,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, buddy: 'auto' };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -331,7 +331,7 @@ export function FunProvider({ children }) {
       {settings.mascot && (
         <div className="fixed bottom-3 left-3 z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]">
           <button type="button" onClick={poke} aria-label="Tap Tasky for a joke" className="pointer-events-auto shrink-0 focus:outline-none">
-            <Mascot mood={mood} size={76} className={mood === 'cheer' ? 'tasky-jump' : mood === 'oops' ? 'tasky-shake' : mood === 'sleep' ? '' : 'tasky-bob'} />
+            <MascotAvatar mood={mood} settings={settings} />
           </button>
           {bubble && (
             <div key={bubble.id} className="speech-bubble pointer-events-auto mb-8 max-w-[15rem] animate-bubble" role="status">

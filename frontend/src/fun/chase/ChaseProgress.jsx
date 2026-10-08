@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Emoji } from '@/icons/Emoji';
 import { useFun } from '../FunProvider';
 import { Cat, Mouse } from './Critters';
+import { hasWebGL } from '../three/species';
+
+const ChaseActors = lazy(() => import('../three/ChaseActors'));
 
 const HEAD_START = 0.12; // endowed progress: the mouse never starts on the very first step
 const FINISH = 0.88; // where the mouse stands when it is one step from the hole
@@ -59,6 +62,7 @@ export default function ChaseProgress({ value = 0, max = 1, label, text, size = 
   const catPose = pct === 0 ? 'sleep' : done ? (bonked ? 'dizzy' : 'run') : moving ? 'run' : 'sit';
   const mousePose = done ? 'cheer' : moving ? (pct > 0.7 ? 'scared' : 'run') : 'sit';
   const crumbs = [0.25, 0.5, 0.75];
+  const three = settings.view3d && !small && hasWebGL();
 
   return (
     <div className={`chase ${className}`} role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.min(value, max)} aria-label={label || 'Progress'} aria-valuetext={text ?? `${value} of ${max}`}>
@@ -79,12 +83,20 @@ export default function ChaseProgress({ value = 0, max = 1, label, text, size = 
         <div className="chase-hole" style={{ width: small ? 22 : 40, height: small ? 14 : 26, left: '100%', marginLeft: small ? -10 : -18 }} />
         <span className={`chase-cheese ${done ? 'won' : ''}`} style={{ left: '100%', marginLeft: small ? -8 : -14 }}><Emoji e="🧀" size={small ? '1.1rem' : '2rem'} /></span>
 
-        <div className="chase-actor" style={{ left: `${catX * 100}%`, transitionDuration: '1.2s', transitionDelay: moving ? '140ms' : '0ms', zIndex: 3 }}>
-          <Cat pose={catPose} size={catSize} />
-        </div>
-        <div className={`chase-actor ${done ? 'hidden-in-hole' : ''}`} style={{ left: `${mouseX * 100}%`, zIndex: 4 }}>
-          <Mouse pose={mousePose} size={mouseSize} />
-        </div>
+        {three ? (
+          <Suspense fallback={null}>
+            <ChaseActors height={stageH} calm={settings.anim === 'calm'} padL={52} padR={52} mouseX={mouseX} catX={catX} catPose={catPose} mousePose={mousePose} done={done} />
+          </Suspense>
+        ) : (
+          <>
+            <div className="chase-actor" style={{ left: `${catX * 100}%`, transitionDuration: '1.2s', transitionDelay: moving ? '140ms' : '0ms', zIndex: 3 }}>
+              <Cat pose={catPose} size={catSize} />
+            </div>
+            <div className={`chase-actor ${done ? 'hidden-in-hole' : ''}`} style={{ left: `${mouseX * 100}%`, zIndex: 4 }}>
+              <Mouse pose={mousePose} size={mouseSize} />
+            </div>
+          </>
+        )}
         {done && bonked && !small && <span className="chase-bonk" aria-hidden="true">BONK!</span>}
         {done && (
           <div className="chase-peek" style={{ left: '100%', marginLeft: small ? -8 : -14 }} aria-hidden="true"><Mouse pose="cheer" size={small ? 16 : 30} /></div>

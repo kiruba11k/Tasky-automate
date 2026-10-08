@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import AIAllocation from './pages/AIAllocation';
 import Analytics from './pages/Analytics';
 import DailyTasks from './pages/DailyTasks';
+import Cast from './pages/Cast';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Management from './pages/Management';
@@ -20,7 +21,7 @@ import { FocusProvider } from './fun/FocusTimer';
 import PageMotion from './fun/PageMotion';
 import FunLoader from './fun/FunLoader';
 
-const pages = { AIAllocation, Analytics, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
+const pages = { AIAllocation, Analytics, Cast, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
 
 function Protected() {
   const { user, loading } = useAuth();

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React from 'react';
 import { useState } from 'react';
 import TrophyShelf from './TrophyShelf';
@@ -59,6 +60,8 @@ export default function ProgressChip() {
             ))}
           </div>
         </div>
+        <Toggle label="3D characters" hint="Buddies and the chase are drawn in 3D (turn off on slow devices)" on={settings.view3d} onChange={(v) => setSettings({ view3d: v })} />
+        <Link to="/Cast" className="block text-center rounded-lg border-2 border-slate-900 bg-slate-800 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700">Meet the cast and pick your buddy</Link>
         <Toggle label="Wandering critters" hint="Now and then the cat chases the mouse across the screen" on={settings.critters} onChange={(v) => setSettings({ critters: v })} />
         <Toggle label="Cartoon look" on={settings.cartoon} onChange={(v) => setSettings({ cartoon: v })} />
         <Toggle label="Celebrations" hint="Confetti, comic bursts, stamps" on={settings.anim === 'full'} onChange={(v) => setSettings({ anim: v ? 'full' : 'calm' })} />
