@@ -362,3 +362,12 @@ input[type='checkbox']:checked { animation: check-pop .38s cubic-bezier(.3, 1.8,
 body.calm .highfive-word, body.calm .highfive-names, body.calm .parade-bunting, body.calm .parade-ground, body.calm .egg-ready, body.calm .marble-drop, body.calm .calm-star, body.calm .calm-cloud, body.calm .calm-z, body.calm .steam, body.calm .sky-cloud, body.calm .balloon-bob, body.calm .rhythm-card, body.calm .sticker-slap, body.calm .book-spread { animation: none !important; }
 body.calm input[type='checkbox']:checked, body.calm [role='checkbox'][data-state='checked'] { animation: none; }
 @media (prefers-reduced-motion: reduce) { .season-layer, .highfive-word, .parade-bunting, .parade-ground, .egg-ready, .calm-star, .calm-cloud, .sky-cloud, .balloon-bob { animation: none !important; } }
+
+/* page hero banners */
+.page-hero { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 190px; padding: .9rem 1.25rem; border-radius: 1.2rem; border: 3px solid #0b1220; overflow: hidden; background: linear-gradient(110deg, var(--hero) 0%, color-mix(in srgb, var(--hero) 55%, #0f172a) 55%, #0f172a 100%); box-shadow: 4px 5px 0 rgba(0,0,0,.4); animation: hero-in .55s cubic-bezier(.34, 1.4, .5, 1) both; }
+@keyframes hero-in { from { transform: translateY(-14px) scale(.98); opacity: 0; } }
+.hero-canvas { position: relative; flex: 0 0 min(52%, 560px); height: 190px; margin: -.9rem -1.25rem -.9rem 0; }
+.hero-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; z-index: 15; animation: hero-flash .6s ease-out both; }
+@keyframes hero-flash { 0% { opacity: .95; } 100% { opacity: 0; } }
+@media (max-width: 640px) { .hero-canvas { flex-basis: 55%; } .page-hero p { display: none; } }
+body.calm .page-hero, body.calm .hero-flash { animation: none; }

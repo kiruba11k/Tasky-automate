@@ -20,6 +20,7 @@ import { BuddyProvider } from './fun/BuddyContext';
 import { ThemeProvider } from './themes/ThemeProvider';
 import { FocusProvider } from './fun/FocusTimer';
 import PageMotion from './fun/PageMotion';
+import PageHero from './fun/PageHero';
 import FunLoader from './fun/FunLoader';
 
 const pages = { AIAllocation, Analytics, Cast, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
@@ -46,6 +47,7 @@ function Protected() {
     <Layout currentPageName={currentPageName}>
       <div key={location.pathname} className="page-enter">
       <PageMotion />
+      <PageHero />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         {Object.entries(pages).map(([name, Page]) => (

@@ -13,6 +13,7 @@ function Geo({ g, args }) {
     case 'cap': return <capsuleGeometry args={args || [1, 1, 4, 14]} />;
     case 'cyl': return <cylinderGeometry args={args || [1, 1, 1, 18]} />;
     case 'box': return <boxGeometry args={args || [1, 1, 1]} />;
+    case 'ico': return <icosahedronGeometry args={args || [1, 1]} />;
     case 'oct': return <octahedronGeometry args={args || [1, 0]} />;
     case 'torus': return <torusGeometry args={args || [1, 0.15, 8, 16, Math.PI]} />;
     default: return <sphereGeometry args={args || [1, 28, 20]} />;
@@ -167,7 +168,39 @@ function DizzyStars() {
  * A chibi 3D character built from primitives. `pose`: idle | run | sleep | cheer | dizzy | scared | wave.
  * Poses can change at any time (read each frame). `calm` freezes the animation for reduced-motion users.
  */
-export default function Critter3D({ species = 'cat', pose = 'idle', calm = false, scale = 1, equipped, prop, ...rest }) {
+/** Something in the right hand (the arm group's origin is the shoulder; the hand hangs about 0.5 below it). */
+function Held({ kind }) {
+  return (
+    <group position={[0, -0.5, 0.06]}>
+      {kind === 'wand' && (<>
+        <Part g="cyl" args={[1, 1, 1, 8]} color="#7c3aed" s={[0.025, 0.42, 0.025]} p={[0, 0.2, 0]} r={[0.3, 0, 0]} basic outline={false} />
+        <Part g="oct" color="#fde047" s={0.1} p={[0, 0.45, 0.12]} basic outline={false} />
+      </>)}
+      {kind === 'hammer' && (<>
+        <Part g="cyl" args={[1, 1, 1, 8]} color="#92400e" s={[0.035, 0.34, 0.035]} p={[0, 0.12, 0]} />
+        <Part g="box" color="#9ca3af" s={[0.17, 0.09, 0.09]} p={[0, 0.5, 0]} />
+      </>)}
+      {kind === 'clipboard' && (<>
+        <Part g="box" color="#a16207" s={[0.17, 0.22, 0.02]} p={[0.04, 0.18, 0.04]} r={[-0.3, 0, 0]} />
+        <Part g="box" color="#fff7ed" s={[0.14, 0.19, 0.02]} p={[0.04, 0.18, 0.065]} r={[-0.3, 0, 0]} outline={false} />
+      </>)}
+      {kind === 'camera' && (<>
+        <Part g="box" color="#1f2937" s={[0.18, 0.12, 0.1]} p={[0, 0.25, 0.1]} />
+        <Part g="cyl" args={[1, 1, 1, 14]} color="#9ca3af" s={[0.07, 0.05, 0.07]} p={[0, 0.25, 0.22]} r={[Math.PI / 2, 0, 0]} />
+      </>)}
+      {kind === 'telescope' && (<>
+        <Part g="cyl" args={[1, 1, 1, 12]} color="#b45309" s={[0.06, 0.32, 0.06]} p={[0, 0.3, 0.1]} r={[0.2, 0, 0]} />
+        <Part g="cyl" args={[1, 1, 1, 12]} color="#fbbf24" s={[0.08, 0.05, 0.08]} p={[0, 0.62, 0.17]} r={[0.2, 0, 0]} />
+      </>)}
+      {kind === 'magnifier' && (<>
+        <Part g="cyl" args={[1, 1, 1, 8]} color="#92400e" s={[0.025, 0.2, 0.025]} p={[0, 0.1, 0.05]} />
+        <Part g="torus" args={[1, 0.14, 8, 24, Math.PI * 2]} color="#38bdf8" s={[0.16, 0.16, 0.16]} p={[0, 0.34, 0.05]} basic outline={false} />
+      </>)}
+    </group>
+  );
+}
+
+export default function Critter3D({ species = 'cat', pose = 'idle', calm = false, scale = 1, equipped, prop, held, ...rest }) {
   const c = SPECIES[species] || SPECIES.cat;
   const poseRef = useRef(pose);
   poseRef.current = pose;
@@ -204,6 +237,12 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
       case 'pack': Object.assign(o, { y: Math.abs(sn(t * 5)) * 0.06, aRz: -(2.4 + sn(t * 9) * 0.35), hz: sn(t * 5) * 0.06 }); break;
       case 'highfive': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aRx: -2.7, aRz: -0.15, hx: -0.1 }); break;
       case 'highfive2': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aLx: -2.7, aLz: 0.15, hx: -0.1 }); break;
+      case 'type': Object.assign(o, { y: sn(t * 2) * 0.01, hx: 0.38, hz: sn(t * 1.1) * 0.04, hy: 0, aLx: -1.15 + sn(t * 15) * 0.12, aRx: -1.15 - sn(t * 15) * 0.12, aLz: 0.12, aRz: -0.12, eye: (t % 4) < 0.14 ? 0.1 : 0.85 }); break;
+      case 'present': Object.assign(o, { hy: 0.35, hz: sn(t * 1.4) * 0.05, aRx: -1.55 + sn(t * 2) * 0.12, aRz: -0.35 }); break;
+      case 'cast': Object.assign(o, { y: sn(t * 2) * 0.03, hz: sn(t * 1.6) * 0.06, aRx: -0.5, aRz: -(1.9 + sn(t * 5) * 0.35), aLz: 0.5 }); break;
+      case 'build': Object.assign(o, { y: Math.abs(sn(t * 4.5)) * 0.03, rx: 0.06, hx: 0.12, aRx: -1.3 + sn(t * 9) * 0.95, aRz: -0.2, aLx: -0.4 }); break;
+      case 'shoot': Object.assign(o, { hx: -0.05, hy: 0, hz: 0, aRx: -2.35, aRz: -0.1, aLx: -1.9, aLz: 0.1, eye: 0.7 }); break;
+      case 'look': Object.assign(o, { hx: -0.1, hy: sn(t * 0.9) * 0.3, aRx: -2.0 + sn(t * 1.3) * 0.15, aRz: -0.15 }); break;
       case 'dance': Object.assign(o, { y: Math.abs(sn(t * 6)) * 0.2, rz: sn(t * 3) * 0.14, hz: sn(t * 3) * 0.2, aLz: 1.7 + sn(t * 6) * 0.8, aRz: -(1.7 + sn(t * 6 + Math.PI) * 0.8), lL: sn(t * 6) * 0.4, lR: -sn(t * 6) * 0.4, tail: sn(t * 9) * 0.6 }); break;
       default: break;
     }
@@ -252,6 +291,7 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
               : <Part g="cap" args={[1, 0.6, 4, 10]} color={limb} s={[0.13, 0.22, 0.13]} p={[0, -0.26, 0]} />}
           </group>
           <group ref={armR} position={[-0.6, 0.98, 0.04]}>
+            {held && <Held kind={held} />}
             {wings
               ? <Part color={c.body === '#2f3a52' ? '#26314a' : '#82603f'} s={[0.1, 0.38, 0.22]} p={[-0.04, -0.3, 0]} />
               : <Part g="cap" args={[1, 0.6, 4, 10]} color={limb} s={[0.13, 0.22, 0.13]} p={[0, -0.26, 0]} />}
@@ -270,6 +310,13 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
               <Part color="#4ade80" s={[0.21, 0.025, 0.17]} p={[0, 0.02, 0]} outline={false} />
               <Part color="#ef4444" s={[0.19, 0.025, 0.15]} p={[0, -0.005, 0]} outline={false} />
               <Part color="#e9b44c" s={[0.2, 0.05, 0.16]} p={[0, -0.05, 0]} />
+            </group>
+          )}
+          {prop === 'laptop' && (
+            <group position={[0, 0.78, 0.72]}>
+              <Part g="box" color="#cbd5e1" s={[0.34, 0.025, 0.24]} p={[0, 0, 0]} />
+              <Part g="box" color="#94a3b8" s={[0.34, 0.2, 0.02]} p={[0, 0.2, -0.22]} r={[-0.25, 0, 0]} />
+              <Part g="box" color="#38bdf8" s={[0.3, 0.16, 0.02]} p={[0, 0.2, -0.2]} r={[-0.25, 0, 0]} basic outline={false} />
             </group>
           )}
           {(prop === 'bag' || pose === 'pack') && (

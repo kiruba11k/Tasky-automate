@@ -23,7 +23,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, season: true, rhythm: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, heroes: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
