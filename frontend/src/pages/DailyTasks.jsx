@@ -324,6 +324,7 @@ export default function DailyTasks() {
                   task={task}
                   userName={currentUser?.role === 'team_leader' ? getUserName(task.user_id) : null}
                   onEdit={handleEditTask}
+                  onCompleted={loadData}
                   canEdit={currentUser?.role === 'team_leader' || task.user_id === currentUser?.id}
                 />
               ))}

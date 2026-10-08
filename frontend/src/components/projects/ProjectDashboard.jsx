@@ -255,6 +255,7 @@ export default function ProjectDashboard({ project, onBack, teams = [], tasks = 
                     key={task.id}
                     task={task}
                     onEdit={handleEditTask}
+                    onCompleted={onTasksUpdated}
                     canEdit={canEditTasks() || task.user_id === currentUser?.id}
                   />
                 ))}

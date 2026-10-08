@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNotifications } from './NotificationProvider';
 
 export default function NotificationBell() {
-  const { items, unread, markAllRead, open } = useNotifications();
+  const { items, unread, latest, markAllRead, open } = useNotifications();
+  const [ring, setRing] = useState(false);
+  useEffect(() => {
+    if (!latest) return undefined;
+    setRing(true);
+    const t = setTimeout(() => setRing(false), 900);
+    return () => clearTimeout(t);
+  }, [latest?.id]);
   const [isOpen, setIsOpen] = useState(false);
   const [permission, setPermission] = useState(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
 
@@ -15,7 +22,7 @@ export default function NotificationBell() {
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <button aria-label={`Notifications${unread ? ` (${unread} unread)` : ''}`} className="relative p-2 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300 hover:text-white">
-          <Bell className="w-4 h-4" />
+          <Bell className={`w-4 h-4 ${ring ? 'animate-wiggle' : ''}`} />
           {unread > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
               {unread > 99 ? '99+' : unread}

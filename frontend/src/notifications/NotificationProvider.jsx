@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { getToken, request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { emitFun } from '@/fun/bus';
 
 const NotificationContext = createContext(null);
 const TOAST_MS = 8000;
+const TOAST_EMOJI = { weekly_allocation: '📬', task_assigned: '📦', task_updated: '✏️', task_removed: '💨', weekly_submitted: '📨', weekly_approved: '🏆', weekly_rejected: '🛠️', weekly_plan_saved: '🗓️', task_status: '✅' };
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
@@ -32,6 +34,7 @@ export function NotificationProvider({ children }) {
     seen.current.add(n.id);
     setItems((prev) => [n, ...prev].slice(0, 100));
     setLatest(n);
+    emitFun({ type: 'notify', notification: n });
     setToasts((t) => [...t, n].slice(-4));
     setTimeout(() => dismissToast(n.id), TOAST_MS);
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
@@ -120,11 +123,11 @@ export function NotificationProvider({ children }) {
       {children}
       <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-[22rem] max-w-[calc(100vw-2rem)]" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className="rounded-xl border border-slate-600 bg-slate-900/95 shadow-2xl p-3 pr-8 relative cursor-pointer" onClick={() => open(t)}>
+          <div key={t.id} className="toast-comic animate-pop rounded-2xl border-[3px] border-slate-900 bg-slate-800 shadow-[4px_4px_0_rgba(0,0,0,.5)] p-3 pr-8 relative cursor-pointer" onClick={() => open(t)}>
             <button aria-label="Dismiss" className="absolute top-2 right-2 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); dismissToast(t.id); }}>
               <X className="w-4 h-4" />
             </button>
-            <div className="text-sm font-semibold text-white">{t.title}</div>
+            <div className="text-sm font-bold text-white"><span className="mr-1.5" aria-hidden="true">{TOAST_EMOJI[t.type] || '🔔'}</span>{t.title}</div>
             {t.message && <div className="text-xs text-slate-300 mt-1 whitespace-pre-line line-clamp-4">{t.message}</div>}
           </div>
         ))}

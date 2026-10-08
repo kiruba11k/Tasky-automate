@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '@/entities/User';
+import FunLoader from '@/fun/FunLoader';
 
 export default function RoleBasedAccess({ children, allowedRoles = [], fallback = null }) {
   const [user, setUser] = useState(null);
@@ -22,9 +23,7 @@ export default function RoleBasedAccess({ children, allowedRoles = [], fallback 
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      </div>
+      <FunLoader label="Checking your badge…" className="py-8" />
     );
   }
 

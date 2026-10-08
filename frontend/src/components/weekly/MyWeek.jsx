@@ -10,6 +10,7 @@ import { DailyTask } from '@/entities/DailyTask';
 import { submitAssignment } from '@/api/weekly';
 import { dayLabel } from '@/lib/week';
 import StatusBadge from './StatusBadge';
+import EmptyState from '@/fun/EmptyState';
 
 const dayStyle = {
   Completed: 'bg-green-500/20 border-green-500/40 text-green-300',
@@ -47,7 +48,7 @@ export default function MyWeek({ me, tasks, assignments, userById, projectById, 
   };
 
   if (!mine.length) {
-    return <div className="text-center py-16 text-slate-400 glass-effect-enhanced rounded-lg">Nothing is allocated to you this week.</div>;
+    return <EmptyState title="Nothing on your plate this week" hint="Tasky is napping. When a leader allocates work to you it shows up here, with a ping!" />;
   }
 
   return (

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { approveAssignment, rejectAssignment } from '@/api/weekly';
+import EmptyState from '@/fun/EmptyState';
 
 export default function ApprovalsPanel({ submitted, taskById, userById, projectById, me, onChanged }) {
   const [busy, setBusy] = useState(null);
@@ -28,7 +29,7 @@ export default function ApprovalsPanel({ submitted, taskById, userById, projectB
   };
 
   if (!submitted.length) {
-    return <div className="text-center py-16 text-slate-400 glass-effect-enhanced rounded-lg">Nothing is waiting for approval.</div>;
+    return <EmptyState mood="happy" title="Inbox zero!" hint="Nothing is waiting for your approval. Go grab a coffee ☕" />;
   }
 
   return (

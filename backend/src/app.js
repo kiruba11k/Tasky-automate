@@ -10,6 +10,7 @@ import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
+import { computeStats } from './stats.js';
 
 const RESERVED_QUERY = new Set(['sort', 'limit', 'skip']);
 const SERVED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(csv|plain))$/;
@@ -152,6 +153,17 @@ export function createApp({ store, jwtSecret, staticDir, llm } = {}) {
     const [users, projects] = await Promise.all([store.list('User'), store.list('Project')]);
     const today = new Date().toISOString().slice(0, 10);
     res.json(await parseVoice({ transcript, mode, users, projects, me: req.user, today: req.body.today && /^\d{4}-\d{2}-\d{2}$/.test(req.body.today) ? req.body.today : today, weekStart: mode === 'weekly' ? weekStart : null, llm: voiceLlm }));
+  }));
+
+  // ---- playful progress: XP, level and streak, derived from real work (nothing extra is stored) ----
+  app.get('/api/me/stats', wrap(async (req, res) => {
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(req.query.today || '') ? req.query.today : new Date().toISOString().slice(0, 10);
+    const [done, approved, planned] = await Promise.all([
+      store.list('DailyTask', { query: { user_id: req.user.id, task_status: 'Completed' } }),
+      store.list('WeeklyAssignment', { query: { user_id: req.user.id, status: 'Approved' } }),
+      store.list('DailyTask', { query: { user_id: req.user.id, date: today } }),
+    ]);
+    res.json(computeStats({ done, approved, planned, today }));
   }));
 
   // ---- users: managed by admins (any role) and team leaders (team members only) ----

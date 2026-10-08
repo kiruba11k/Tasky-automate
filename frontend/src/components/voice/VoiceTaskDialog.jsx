@@ -12,6 +12,7 @@ import { User } from '@/entities/User';
 import { request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import { useSpeech } from '@/lib/useSpeech';
+import { emitFun } from '@/fun/bus';
 import { dayLabel, weekDates } from '@/lib/week';
 
 const LANGS = [['en-IN', 'English (India)'], ['en-US', 'English (US)'], ['en-GB', 'English (UK)'], ['hi-IN', 'Hindi']];
@@ -109,11 +110,13 @@ export default function VoiceTaskDialog({ open, onOpenChange, mode, week, onAppl
     }
     setBusy(false);
     if (failed.length) { setError(`Created ${made}, but ${failed.length} failed — ${failed.join('; ')}`); onCreatedDaily?.(); return; }
+    emitFun({ type: 'voice' });
     onCreatedDaily?.(made);
     onOpenChange(false);
   };
 
   const applyWeekly = (saveNow) => {
+    emitFun({ type: 'voice' });
     onApplyWeekly(items, { saveNow });
     onOpenChange(false);
   };

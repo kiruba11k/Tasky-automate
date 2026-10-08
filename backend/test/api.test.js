@@ -419,3 +419,56 @@ for (const [name, makeStore] of backends.slice(0, 1)) {
     });
   });
 }
+
+import { computeStats, levelForXp, xpForLevel, streakDays } from '../src/stats.js';
+
+describe('stats (XP, levels, streaks)', () => {
+  test('levels line up with their XP thresholds', () => {
+    for (let l = 1; l <= 12; l += 1) {
+      assert.equal(levelForXp(xpForLevel(l)), l);
+      assert.equal(levelForXp(xpForLevel(l + 1) - 1), l);
+    }
+    assert.equal(levelForXp(0), 1);
+  });
+
+  test('streaks', () => {
+    assert.equal(streakDays([], '2026-10-14'), 0);
+    assert.equal(streakDays(['2026-10-14', '2026-10-13', '2026-10-12', '2026-10-10'], '2026-10-14'), 3);
+    assert.equal(streakDays(['2026-10-13', '2026-10-12'], '2026-10-14'), 2); // today not done yet: the streak is still alive
+    assert.equal(streakDays(['2026-10-11'], '2026-10-14'), 0);
+    assert.equal(streakDays(['2026-10-14', '2026-10-14'], '2026-10-14'), 1);
+  });
+
+  test('computeStats', () => {
+    const s = computeStats({ done: Array.from({ length: 6 }, () => ({ date: '2026-10-14' })), approved: [{}], planned: [{ task_status: 'Completed' }, { task_status: 'Pending' }], today: '2026-10-14' });
+    assert.equal(s.xp, 100); // 6*10 + 40
+    assert.equal(s.level, 2); // 50 <= 100 < 150
+    assert.equal(s.title, 'Checklist Cadet');
+    assert.equal(s.next_level_xp, 150);
+    assert.equal(s.completed_today, 1);
+    assert.equal(s.planned_today, 2);
+  });
+});
+
+describe('stats endpoint', () => {
+  test('derived from real completed work', async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    const server = createApp({ store, jwtSecret: 's' }).listen(0);
+    const base = `http://localhost:${server.address().port}`;
+    const token = (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'boss@example.com' }) })).json()).token;
+    const h = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
+    const me = await (await fetch(`${base}/api/auth/me`, { headers: h })).json();
+    assert.equal((await fetch(`${base}/api/me/stats`)).status, 401);
+    for (const [date, status] of [['2026-10-14', 'Completed'], ['2026-10-13', 'Completed'], ['2026-10-14', 'Pending']]) {
+      await fetch(`${base}/api/entities/DailyTask`, { method: 'POST', headers: h, body: JSON.stringify({ date, user_id: me.id, task: 't', expected_outcome: 'o', expected_time: 1, task_status: status }) });
+    }
+    const stats = await (await fetch(`${base}/api/me/stats?today=2026-10-14`, { headers: h })).json();
+    assert.equal(stats.xp, 20);
+    assert.equal(stats.streak, 2);
+    assert.equal(stats.completed_today, 1);
+    assert.equal(stats.planned_today, 2);
+    server.close();
+  });
+});

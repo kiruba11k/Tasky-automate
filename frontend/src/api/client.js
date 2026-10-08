@@ -1,3 +1,5 @@
+import { emitFun } from '@/fun/bus';
+
 const TOKEN_KEY = 'tasky_token';
 
 export function getToken() {
@@ -42,6 +44,19 @@ export async function request(method, url, body) {
   return data;
 }
 
+/** Runs a write request, telling the fun layer when work starts/ends/fails (so Tasky can look busy, happy or sorry). */
+async function mutate(fn) {
+  emitFun({ type: 'busy', on: true });
+  try {
+    return await fn();
+  } catch (e) {
+    emitFun({ type: 'error', message: e.message });
+    throw e;
+  } finally {
+    emitFun({ type: 'busy', on: false });
+  }
+}
+
 /** Entity SDK: list/filter/get/create/update/delete over the generic REST API. */
 export function createEntity(name) {
   const base = `/api/entities/${name}`;
@@ -58,8 +73,20 @@ export function createEntity(name) {
     list: (sort, limit) => request('GET', base + qs({ sort, limit })),
     filter: (query = {}, sort, limit) => request('GET', base + qs({ ...query, sort, limit })),
     get: (id) => request('GET', `${base}/${encodeURIComponent(id)}`),
-    create: (data) => request('POST', base, data),
-    update: (id, data) => request('PUT', `${base}/${encodeURIComponent(id)}`, data),
-    delete: (id) => request('DELETE', `${base}/${encodeURIComponent(id)}`),
+    create: async (data) => {
+      const rec = await mutate(() => request('POST', base, data));
+      emitFun({ type: 'entity', entity: name, action: 'create', data: rec });
+      return rec;
+    },
+    update: async (id, data) => {
+      const rec = await mutate(() => request('PUT', `${base}/${encodeURIComponent(id)}`, data));
+      emitFun({ type: 'entity', entity: name, action: 'update', data: rec, patch: data });
+      return rec;
+    },
+    delete: async (id) => {
+      const res = await mutate(() => request('DELETE', `${base}/${encodeURIComponent(id)}`));
+      emitFun({ type: 'entity', entity: name, action: 'delete', id });
+      return res;
+    },
   };
 }

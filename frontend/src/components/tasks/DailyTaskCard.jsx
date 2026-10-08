@@ -2,7 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit3, Clock, Target, User, Calendar } from "lucide-react";
+import { Check, Edit3, Clock, Target, User, Calendar } from "lucide-react";
+import { DailyTask } from "@/entities/DailyTask";
 import { format } from 'date-fns';
 
 const priorityColors = {
@@ -19,7 +20,22 @@ const statusColors = {
   "Blocked": "bg-red-500/20 text-red-300 border-red-500/40"
 };
 
-export default function DailyTaskCard({ task, onEdit, userName, canEdit = false }) {
+const statusEmoji = { Pending: '🕒', 'In Progress': '🚀', Completed: '✅', Blocked: '🙈' };
+const priorityEmoji = { Low: '🌱', Medium: '⚡', High: '🔥', Critical: '🚨' };
+
+export default function DailyTaskCard({ task, onEdit, userName, canEdit = false, onCompleted }) {
+  const [completing, setCompleting] = React.useState(false);
+  const markDone = async () => {
+    setCompleting(true);
+    try {
+      await DailyTask.update(task.id, { task_status: 'Completed', actual_time_taken: task.actual_time_taken || task.expected_time });
+      onCompleted?.(task);
+    } catch (e) {
+      console.error('Could not complete task:', e);
+    } finally {
+      setCompleting(false);
+    }
+  };
   const getTimeVariance = () => {
     if (task.actual_time_taken && task.expected_time) {
       const variance = task.actual_time_taken - task.expected_time;
@@ -52,7 +68,7 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false 
           </div>
           <div className="flex items-start gap-2 ml-4">
             <Badge className={`${priorityColors[task.priority]} border px-2 py-1 text-xs`}>
-              {task.priority}
+              {priorityEmoji[task.priority]} {task.priority}
             </Badge>
             {canEdit && (
               <Button
@@ -70,9 +86,16 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false 
 
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
-          <Badge className={`${statusColors[task.task_status]} border px-2 py-1 text-xs`}>
-            {task.task_status}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={`${statusColors[task.task_status]} border px-2 py-1 text-xs`}>
+              {statusEmoji[task.task_status]} {task.task_status}
+            </Badge>
+            {canEdit && task.task_status !== 'Completed' && (
+              <Button size="sm" onClick={markDone} disabled={completing} title="Mark as done" className="h-7 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold rounded-full">
+                <Check className="w-4 h-4 mr-1" />{completing ? '…' : 'Done!'}
+              </Button>
+            )}
+          </div>
           {task.category && (
             <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded">
               {task.category}

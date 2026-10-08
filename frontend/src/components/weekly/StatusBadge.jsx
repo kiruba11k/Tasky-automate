@@ -8,6 +8,8 @@ const styles = {
   'Changes Requested': 'bg-red-500/20 text-red-300 border-red-500/40',
 };
 
+const EMOJI = { Assigned: '🕒', Submitted: '📨', Approved: '🏆', 'Changes Requested': '🛠️' };
+
 export default function StatusBadge({ status, className = '' }) {
-  return <Badge variant="outline" className={`${styles[status] || styles.Assigned} ${className}`}>{status === 'Assigned' ? 'To do' : status}</Badge>;
+  return <Badge variant="outline" className={`${styles[status] || styles.Assigned} ${className}`}>{EMOJI[status] || '🕒'} {status === 'Assigned' ? 'To do' : status}</Badge>;
 }

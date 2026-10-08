@@ -14,6 +14,7 @@ import { mondayOf, shiftWeek, weekLabel } from '@/lib/week';
 import AllocationGrid from '@/components/weekly/AllocationGrid';
 import ApprovalsPanel from '@/components/weekly/ApprovalsPanel';
 import MyWeek from '@/components/weekly/MyWeek';
+import FunLoader from '@/fun/FunLoader';
 
 const WEEKLY_EVENTS = /^weekly_/;
 
@@ -93,7 +94,7 @@ export default function WeeklyTasks() {
 
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         {loading ? (
-          <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>
+          <FunLoader label="Unrolling the week…" />
         ) : isLeader ? (
           <Tabs value={tab} onValueChange={(v) => go({ tab: v })}>
             <TabsList className="bg-slate-800/70">

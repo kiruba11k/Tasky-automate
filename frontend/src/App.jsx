@@ -14,6 +14,8 @@ import Tasks from './pages/Tasks';
 import Team from './pages/Team';
 import WeeklyTasks from './pages/WeeklyTasks';
 import { NotificationProvider } from './notifications/NotificationProvider';
+import { FunProvider } from './fun/FunProvider';
+import FunLoader from './fun/FunLoader';
 
 const pages = { AIAllocation, Analytics, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
 
@@ -25,7 +27,7 @@ function Protected() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <FunLoader label="Waking up Tasky…" />
       </div>
     );
   }
@@ -33,7 +35,9 @@ function Protected() {
 
   return (
     <NotificationProvider>
+    <FunProvider>
     <Layout currentPageName={currentPageName}>
+      <div key={location.pathname} className="page-enter">
       <Routes>
         <Route path="/" element={<Dashboard />} />
         {Object.entries(pages).map(([name, Page]) => (
@@ -41,7 +45,9 @@ function Protected() {
         ))}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
     </Layout>
+    </FunProvider>
     </NotificationProvider>
   );
 }

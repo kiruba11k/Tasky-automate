@@ -1,0 +1,54 @@
+import React from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useFun } from './FunProvider';
+
+const Toggle = ({ label, on, onChange, hint }) => (
+  <label className="flex items-center justify-between gap-3 py-1.5 cursor-pointer">
+    <span className="text-sm text-slate-200">{label}{hint && <span className="block text-[11px] text-slate-500">{hint}</span>}</span>
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className={`w-11 h-6 rounded-full border-2 border-slate-900 transition-colors relative ${on ? 'bg-emerald-400' : 'bg-slate-600'}`}>
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-6' : 'left-0.5'}`} />
+    </button>
+  </label>
+);
+
+/** Header chip: level + XP bar + streak. Opens a panel with progress details and the fun settings. */
+export default function ProgressChip() {
+  const { stats, settings, setSettings } = useFun();
+  const span = stats ? Math.max(1, stats.next_level_xp - stats.level_start_xp) : 1;
+  const pct = stats ? Math.min(100, Math.round(((stats.xp - stats.level_start_xp) / span) * 100)) : 0;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label="Your level and fun settings" className="chip-sticker flex items-center gap-2 rounded-full border border-slate-700/60 bg-slate-800/70 pl-1.5 pr-3 py-1 text-xs text-white">
+          <span className="grid place-items-center w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-400 to-blue-500 font-extrabold text-[11px] text-slate-900">{stats ? stats.level : '…'}</span>
+          <span className="hidden md:flex flex-col leading-tight text-left">
+            <span className="font-semibold whitespace-nowrap">{stats ? stats.title : "Loading"}</span>
+            <span className="h-1.5 w-20 rounded-full bg-slate-700 overflow-hidden"><span className="block h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${pct}%` }} /></span>
+          </span>
+          {stats?.streak > 0 && <span title={`${stats.streak}-day streak`} className="font-bold text-orange-300">🔥{stats.streak}</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 bg-slate-900 border-slate-700 text-white">
+        {stats && (
+          <div className="space-y-2 pb-3 mb-3 border-b border-slate-700">
+            <div className="text-lg font-extrabold">Level {stats.level} · {stats.title}</div>
+            <div className="h-3 rounded-full bg-slate-700 overflow-hidden border border-slate-900"><div className="h-full bg-gradient-to-r from-emerald-400 to-yellow-300 xp-bar" style={{ width: `${pct}%` }} /></div>
+            <div className="text-xs text-slate-400">{stats.xp} XP · {stats.next_level_xp - stats.xp} to level {stats.level + 1}</div>
+            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">{stats.completed_total}</div>tasks done</div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">{stats.approved_total}</div>approved</div>
+              <div className="rounded-lg bg-slate-800 p-2"><div className="text-lg font-bold">🔥 {stats.streak}</div>day streak</div>
+            </div>
+            <p className="text-[11px] text-slate-500">+10 XP per finished daily task, +40 XP per approved weekly task.</p>
+          </div>
+        )}
+        <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Fun settings</div>
+        <Toggle label="Cartoon look" on={settings.cartoon} onChange={(v) => setSettings({ cartoon: v })} />
+        <Toggle label="Celebrations" hint="Confetti, comic bursts, stamps" on={settings.anim === 'full'} onChange={(v) => setSettings({ anim: v ? 'full' : 'calm' })} />
+        <Toggle label="Sound effects" on={settings.sound} onChange={(v) => setSettings({ sound: v })} />
+        <Toggle label="Tasky the mascot" on={settings.mascot} onChange={(v) => setSettings({ mascot: v })} />
+      </PopoverContent>
+    </Popover>
+  );
+}

@@ -58,6 +58,17 @@ A **Dictate** button sits on Weekly Tasks → Allocate (leaders) and on Daily Ta
 
 With `ANTHROPIC_API_KEY` set, an AI model does the understanding (handles free-form speech, corrects misheard names against your team/project lists). Without it a simpler rule-based parser is used, which copes with clear phrasing ("Komala and Alok review 100 prospects for BlueDove, target 35% connection rate, 8 hours") but not complex speech. Browser dictation may send audio to the browser vendor's speech service.
 
+## Fun layer (Tasky the mascot)
+
+Everything you do gets a playful reaction, driven by one event bus (`frontend/src/fun`):
+
+- **Tasky**, an animated SVG mascot (bottom-left) with moods — cheering, thinking while something saves, sorry on errors, asleep when idle. Tap Tasky for a joke.
+- **Celebrations:** emoji confetti, comic "POW! / BAM! / ZOOM!" bursts, an "APPROVED!" stamp, synthesized sound effects. Creating, completing, assigning, allocating, submitting, approving, sending back, deleting and dictating each have their own moment. Bursts of activity (imports, bulk creates) collapse into one celebration, and big effects are rate-limited.
+- **Receiving too:** when someone assigns you work or approves yours, your screen reacts live (via the notification stream).
+- **Levels and streaks:** +10 XP per finished daily task, +40 XP per approved weekly task; ten silly level titles (Task Hatchling → Cosmic Closer); day streaks with milestone fireworks. Computed from real data at `GET /api/me/stats`. A one-click **Done!** button on daily task cards completes a task.
+- **Look and feel:** rounded Fredoka font, sticker-style cards, bouncy dialogs and page transitions, squishy buttons, bouncing loaders, sleepy empty states, a greeting banner on the dashboard.
+- **Control:** the level chip in the header opens a panel to turn off the cartoon look, celebrations (calm mode), sound, or the mascot. `prefers-reduced-motion` starts in calm mode automatically.
+
 ## Deploy on Render (free)
 
 1. Push this repo to GitHub and create the Neon database (above).
