@@ -17,6 +17,7 @@ import { NotificationProvider } from './notifications/NotificationProvider';
 import { FunProvider } from './fun/FunProvider';
 import { ThemeProvider } from './themes/ThemeProvider';
 import { FocusProvider } from './fun/FocusTimer';
+import PageMotion from './fun/PageMotion';
 import FunLoader from './fun/FunLoader';
 
 const pages = { AIAllocation, Analytics, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
@@ -41,6 +42,7 @@ function Protected() {
     <FocusProvider>
     <Layout currentPageName={currentPageName}>
       <div key={location.pathname} className="page-enter">
+      <PageMotion />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         {Object.entries(pages).map(([name, Page]) => (

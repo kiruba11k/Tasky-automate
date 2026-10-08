@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/AuthContext";
 import NotificationBell from "@/notifications/NotificationBell";
 import ProgressChip from "@/fun/ProgressChip";
 import ThemeControls from "@/themes/ThemeControls";
+import MotionToggle from "@/fun/MotionToggle";
 import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
 
 const navigationItems = [
@@ -286,6 +287,7 @@ export default function Layout({ children, currentPageName }) {
                 <div className="text-xs text-slate-400">{user?.role?.replace("_", " ")}</div>
               </div>
               <ProgressChip />
+              <MotionToggle />
               <ThemeControls />
               <NotificationBell />
               <button

@@ -51,6 +51,15 @@ export default function ProgressChip() {
           </div>
         )}
         <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Fun settings</div>
+        <div className="py-1.5">
+          <div className="text-sm text-slate-200 mb-1">Progress style</div>
+          <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Progress style">
+            {[['chase', 'Cat & mouse'], ['rocket', 'Rocket'], ['classic', 'Classic bar']].map(([v, l]) => (
+              <button key={v} type="button" role="radio" aria-checked={settings.progress === v} onClick={() => setSettings({ progress: v })} className={`rounded-lg border-2 border-slate-900 py-1 text-[11px] font-bold ${settings.progress === v ? 'bg-emerald-400 text-ink' : 'bg-slate-800 text-slate-200'}`}>{l}</button>
+            ))}
+          </div>
+        </div>
+        <Toggle label="Wandering critters" hint="Now and then the cat chases the mouse across the screen" on={settings.critters} onChange={(v) => setSettings({ critters: v })} />
         <Toggle label="Cartoon look" on={settings.cartoon} onChange={(v) => setSettings({ cartoon: v })} />
         <Toggle label="Celebrations" hint="Confetti, comic bursts, stamps" on={settings.anim === 'full'} onChange={(v) => setSettings({ anim: v ? 'full' : 'calm' })} />
         <Toggle label="Sound effects" on={settings.sound} onChange={(v) => setSettings({ sound: v })} />

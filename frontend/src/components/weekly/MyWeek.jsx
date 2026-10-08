@@ -11,6 +11,7 @@ import { submitAssignment } from '@/api/weekly';
 import { dayLabel } from '@/lib/week';
 import StatusBadge from './StatusBadge';
 import EmptyState from '@/fun/EmptyState';
+import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 const dayStyle = {
   Completed: 'bg-green-500/20 border-green-500/40 text-green-300',
@@ -85,7 +86,7 @@ export default function MyWeek({ me, tasks, assignments, userById, projectById, 
               {a.result && <p className="text-sm text-slate-200 whitespace-pre-line bg-slate-800/60 rounded-md p-2"><span className="text-slate-400">Your result: </span>{a.result}</p>}
               {days.length > 0 && (
                 <>
-                  <Progress value={days.length ? (finished / days.length) * 100 : 0} className="h-1.5" />
+                  <ChaseProgress size="sm" label="Days finished" value={finished} max={days.length} text={`${finished}/${days.length} days`} />
                   <div className="flex flex-wrap gap-2">
                     {days.map((d) => (
                       <div key={d.id} className={`text-xs rounded-md border px-2 py-1 ${dayStyle[d.task_status] || dayStyle.Pending}`} title={d.task_status}>

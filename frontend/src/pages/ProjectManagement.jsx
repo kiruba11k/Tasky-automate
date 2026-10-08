@@ -17,6 +17,7 @@ import TeamMemberForm from '../components/team/TeamMemberForm';
 import ProjectDashboard from '../components/projects/ProjectDashboard';
 import Analytics from './Analytics';
 import DeleteConfirmationDialog from '../components/shared/DeleteConfirmationDialog';
+import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 export default function ProjectManagement() {
   const [projects, setProjects] = useState([]);
@@ -276,11 +277,7 @@ export default function ProjectManagement() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-sm">
-                    <div className="flex justify-between mb-1">
-                      <span>Progress</span>
-                      <span>{stats.completionRate}%</span>
-                    </div>
-                    <Progress value={stats.completionRate} className="h-2"/>
+                    <ChaseProgress size="sm" label="Progress" value={stats.completionRate} max={100} text={`${stats.completionRate}%`} />
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-slate-700/50">
                     <Button variant="ghost" size="icon" onClick={() => setSelectedProject(project)}>

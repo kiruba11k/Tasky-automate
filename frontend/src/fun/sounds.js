@@ -33,6 +33,8 @@ const recipes = {
   boing: (c) => tone(c, { freq: 200, to: 620, dur: 0.28, type: 'sine', vol: 0.14 }),
   womp: (c) => { tone(c, { freq: 330, dur: 0.2, type: 'triangle' }); tone(c, { freq: 247, at: 0.2, dur: 0.35, type: 'triangle' }); },
   stamp: (c) => { tone(c, { freq: 120, to: 50, dur: 0.18, type: 'square', vol: 0.18 }); },
+  squeak: (c) => { tone(c, { freq: 1400, to: 2300, dur: 0.09, type: 'sine', vol: 0.07 }); tone(c, { freq: 1800, to: 2600, at: 0.12, dur: 0.08, type: 'sine', vol: 0.06 }); },
+  bonk: (c) => { tone(c, { freq: 180, to: 60, dur: 0.2, type: 'square', vol: 0.16 }); tone(c, { freq: 520, to: 300, at: 0.08, dur: 0.18, type: 'triangle', vol: 0.08 }); },
   poof: (c) => tone(c, { freq: 700, to: 120, dur: 0.22, type: 'sawtooth', vol: 0.05 }),
   levelUp: (c) => [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(c, { freq: f, at: i * 0.09, dur: 0.22, type: 'triangle', vol: 0.1 })),
 };

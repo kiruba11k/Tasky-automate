@@ -4,6 +4,7 @@ import { request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import Mascot from './Mascot';
 import BadgeUnlock from './BadgeUnlock';
+import ChaseCutscene from './chase/ChaseCutscene';
 import { effects } from './effects';
 import { play } from './sounds';
 import { Emoji, Rich } from '@/icons/Emoji';
@@ -15,7 +16,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -75,7 +76,8 @@ export function FunProvider({ children }) {
   const [badgeQueue, setBadgeQueue] = useState([]);
   const [floaters, setFloaters] = useState([]);
   const [partyOn, setPartyOn] = useState(false);
-  const refs = useRef({ pointer: { x: 0, y: 0 }, lastActive: Date.now(), lastNudge: 0, stats: null, settings, pending: 0, queue: [], flush: null, lastBig: 0, bubbleTimer: null, bubbleActive: false, idle: null, busyTimer: null, statsTimer: null });
+  const [scene, setScene] = useState(null); // { id, kind } cat-and-mouse cutscene
+  const refs = useRef({ pointer: { x: 0, y: 0 }, lastActive: Date.now(), lastNudge: 0, lastScene: 0, stats: null, settings, pending: 0, queue: [], flush: null, lastBig: 0, bubbleTimer: null, bubbleActive: false, idle: null, busyTimer: null, statsTimer: null });
   refs.current.settings = settings;
 
   const setSettings = useCallback((patch) => {
@@ -127,6 +129,12 @@ export function FunProvider({ children }) {
     const big = BIG.has(kind) && now - r.lastBig > 2500 && !soft;
     if (big) r.lastBig = now;
 
+    if (full && r.settings.critters && ['completed', 'party', 'approved'].includes(kind) && !soft && now - r.lastScene > 9000) {
+      r.lastScene = now;
+      setScene({ id: now, kind: 'escape' });
+      setTimeout(() => play('squeak', sound), 150);
+      setTimeout(() => play('bonk', sound), 2350);
+    }
     if (full) {
       if (BURST[kind] && !soft) {
         const id = `${now}-${Math.random()}`;
@@ -252,6 +260,22 @@ export function FunProvider({ children }) {
 
   useEffect(() => { sleepSoon(); return () => { const r = refs.current; clearTimeout(r.idle); clearTimeout(r.bubbleTimer); clearTimeout(r.flush); clearTimeout(r.statsTimer); clearTimeout(r.busyTimer); }; }, [sleepSoon]);
 
+  // Now and then the critters scamper across the bottom of the screen (decorative, rare, and off in calm mode or via the setting).
+  useEffect(() => {
+    if (!user) return undefined;
+    let timer;
+    const schedule = () => {
+      timer = setTimeout(() => {
+        const r = refs.current;
+        const busy = document.hidden || document.querySelector('[role="dialog"]') || r.settings.anim !== 'full' || !r.settings.critters || Date.now() - r.lastActive < 4000;
+        if (!busy) { r.lastScene = Date.now(); setScene({ id: Date.now(), kind: 'wander' }); play('squeak', r.settings.sound); }
+        schedule();
+      }, 150000 + Math.random() * 150000);
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [user]);
+
   // Track the pointer (for floating XP), idle time (for gentle nudges) and a secret code.
   useEffect(() => {
     const r = refs.current;
@@ -325,6 +349,7 @@ export function FunProvider({ children }) {
       <div className="pointer-events-none fixed inset-0 z-[160] overflow-hidden" aria-hidden="true">
         {floaters.map((f) => <div key={f.id} className="xp-float" style={{ left: f.x, top: f.y }}>{f.text}</div>)}
       </div>
+      {scene && <ChaseCutscene key={scene.id} kind={scene.kind} onDone={() => setScene(null)} />}
       <BadgeUnlock badge={badgeQueue[0]} onClose={() => setBadgeQueue((q) => q.slice(1))} />
     </FunContext.Provider>
   );

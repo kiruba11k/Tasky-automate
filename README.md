@@ -63,7 +63,8 @@ With `ANTHROPIC_API_KEY` set, an AI model does the understanding (handles free-f
 Everything you do gets a playful reaction, driven by one event bus (`frontend/src/fun`):
 
 - **Tasky**, an animated SVG mascot (bottom-left) with moods — cheering, thinking while something saves, sorry on errors, asleep when idle. Tap Tasky for a joke.
-- **Celebrations:** emoji confetti, comic "POW! / BAM! / ZOOM!" bursts, an "APPROVED!" stamp, synthesized sound effects. Creating, completing, assigning, allocating, submitting, approving, sending back, deleting and dictating each have their own moment. Bursts of activity (imports, bulk creates) collapse into one celebration, and big effects are rate-limited.
+- **Cat & mouse chase progress:** every target (today's tasks, quests, weekly days, projects, team goal) is a chase: a sleepy cat wakes and pursues a mouse who runs for his hole; at 100% the mouse escapes and the cat bonks into the wall. Original characters. Choose Cat & mouse / Rocket / Classic bar and toggle wandering critters in the level chip's settings. A header button pauses all motion (WCAG 2.2.2); `prefers-reduced-motion` defaults to calm. Pages also stagger-in and reveal on scroll.
+- **Celebrations:** icon confetti, comic "POW! / BAM! / ZOOM!" bursts, an "APPROVED!" stamp, synthesized sound effects. Creating, completing, assigning, allocating, submitting, approving, sending back, deleting and dictating each have their own moment. Bursts of activity (imports, bulk creates) collapse into one celebration, and big effects are rate-limited.
 - **Receiving too:** when someone assigns you work or approves yours, your screen reacts live (via the notification stream).
 - **Levels and streaks:** +10 XP per finished daily task, +40 XP per approved weekly task; ten silly level titles (Task Hatchling → Cosmic Closer); day streaks with milestone fireworks. Computed from real data at `GET /api/me/stats`. A one-click **Done!** button on daily task cards completes a task.
 - **Look and feel:** rounded Fredoka font, sticker-style cards, bouncy dialogs and page transitions, squishy buttons, bouncing loaders, sleepy empty states, a greeting banner on the dashboard.
@@ -97,9 +98,9 @@ Eight built-in themes — **light:** Sunny Day, Bubblegum Pop, Mint Fresh, Sky P
 
 ## Icons
 
-The UI uses illustrated cartoon icons instead of OS emoji, so it looks identical on every device and works offline. Emoji characters stay as the stable keys in the data (kudos, badges, stickers); `src/icons/Emoji.jsx` swaps them for artwork at render time (`<Emoji e="🔥" />`, or `<Rich text="Nice 🎉" />` for strings), and the confetti/burst effects use the same art. The artwork is bundled in `frontend/src/icons/emojiIcons.generated.js`. When you introduce a new emoji anywhere in `frontend/src` or `backend/src`, run `npm --prefix frontend run build:icons` to add its artwork.
+The UI uses real icon-library artwork (Streamline Plump/Flex Color line icons and Game-Icons.net illustrations) instead of any emoji art, so it looks identical on every device and works offline. Emoji characters stay as the stable keys in the data (kudos, badges, stickers); `src/icons/Emoji.jsx` swaps them for artwork at render time (`<Emoji e="🔥" />`, or `<Rich text="Nice 🎉" />` for strings), and the confetti/burst effects use the same art. The artwork is bundled in `frontend/src/icons/emojiIcons.generated.js`. When you introduce a new emoji anywhere in `frontend/src` or `backend/src`, run `npm --prefix frontend run build:icons` to add its artwork.
 
-Artwork: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (Flat), MIT License, Copyright (c) Microsoft Corporation.
+Artwork credits: [Streamline Plump & Flex Color](https://www.streamlinehq.com/) (CC BY 4.0) and [Game-Icons.net](https://game-icons.net) (CC BY 3.0; Lorc, Delapouite & contributors), via Iconify. The character→icon mapping lives in `frontend/scripts/build-emoji-icons.mjs`.
 
 ## Deploy on Render (free)
 

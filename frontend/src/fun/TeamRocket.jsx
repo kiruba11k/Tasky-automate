@@ -6,10 +6,11 @@ import { useFun } from './FunProvider';
 import { effects } from './effects';
 import CountUp from './CountUp';
 import { Emoji, Rich } from '@/icons/Emoji';
+import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 /** Shared weekly goal: every finished task moves the team's rocket. Collective progress, no ranking. */
 export default function TeamRocket() {
-  const { celebrate } = useFun();
+  const { celebrate, settings } = useFun();
   const [pulse, setPulse] = useState(null);
   const week = mondayOf();
 
@@ -48,12 +49,18 @@ export default function TeamRocket() {
         </div>
         <div className="text-right"><div className="text-3xl font-extrabold text-white"><CountUp value={pct} suffix="%" /></div><div className="text-[11px] text-slate-400">{pulse.week.done}/{pulse.week.planned} tasks</div></div>
       </div>
+      {settings.progress === 'chase' ? (
+        <ChaseProgress label="Team goal" value={pulse.week.done} max={Math.max(pulse.week.planned, 1)} text={`${pulse.week.done}/${pulse.week.planned} tasks`} />
+      ) : settings.progress === 'classic' ? (
+        <div className="h-3 rounded-full bg-slate-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${pct}%` }} /></div>
+      ) : (
       <div className="rocket-sky relative h-28 rounded-xl overflow-hidden border-2 border-slate-900" role="img" aria-label={`Team is ${pct}% of the way to this week's goal`}>
         <div className="absolute inset-0 stars" aria-hidden="true" />
         <div className="absolute right-3 top-3" aria-hidden="true"><Emoji e={launched ? '🌕' : '🪐'} size="2.6rem" /></div>
         <div className="absolute bottom-2 left-3 right-3 h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-1000" style={{ width: `${pct}%` }} /></div>
         <div className={`absolute bottom-3 ${launched ? 'rocket-launch' : 'rocket-fly'}`} style={{ left: `${x}%`, transition: 'left 1s cubic-bezier(.34,1.56,.64,1)', transform: 'translateX(-50%) rotate(45deg)' }} aria-hidden="true"><Emoji e="🚀" size="2.4rem" /></div>
       </div>
+      )}
       <p className="text-sm text-slate-300">
         <Rich text={launched ? 'GOAL SMASHED! The whole team made it to the moon 🌕' : `${pulse.today.active_members} of ${pulse.today.members} teammates have finished something today.`} />
       </p>

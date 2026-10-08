@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Search, Filter, Plus, Edit, Trash2, Calendar, Users, Target } from "lucide-react";
 import { format } from 'date-fns';
+import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 export default function ProjectsCRUD({ projects = [], users = [], tasks = [], currentUser, onDataChange, onLogActivity }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -231,11 +232,7 @@ export default function ProjectsCRUD({ projects = [], users = [], tasks = [], cu
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Progress</span>
-                    <span className="text-white">{progress}%</span>
-                  </div>
-                  <Progress value={progress} className="h-2" />
+                  <ChaseProgress size="sm" label="Progress" value={progress} max={100} text={`${progress}%`} />
                 </div>
 
                 <div className="space-y-2">

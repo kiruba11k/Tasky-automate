@@ -7,6 +7,7 @@ import StreakFlame from './StreakFlame';
 import ChestDialog from './ChestDialog';
 import TrophyShelf from './TrophyShelf';
 import { Emoji, Rich } from '@/icons/Emoji';
+import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 function Ring({ value, max, size = 92 }) {
   const r = 38;
@@ -54,8 +55,7 @@ export default function QuestBoard() {
               <span className={`font-semibold flex-1 ${q.done ? 'text-emerald-200 line-through decoration-2' : 'text-white'}`}>{q.title}</span>
               {q.done ? <span className="grid place-items-center w-6 h-6 rounded-full bg-emerald-400 text-ink"><Check className="w-4 h-4" /></span> : <span className="text-xs font-bold text-yellow-300">+{q.xp} XP</span>}
             </div>
-            <div className="mt-1.5 h-2 rounded-full bg-slate-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${Math.round((q.progress / q.target) * 100)}%` }} /></div>
-            <div className="text-[11px] text-slate-500 mt-0.5">{q.progress}/{q.target}</div>
+            <div className="mt-1.5"><ChaseProgress size="sm" header={false} label={q.title} value={q.progress} max={q.target} text={`${q.progress}/${q.target}`} /></div>
           </li>
         ))}
       </ul>
