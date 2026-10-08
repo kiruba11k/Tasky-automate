@@ -6,6 +6,7 @@ import { useFun } from './FunProvider';
 import { effects } from './effects';
 import CountUp from './CountUp';
 import { Emoji, Rich } from '@/icons/Emoji';
+import BalloonProgress from './BalloonProgress';
 import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 /** Shared weekly goal: every finished task moves the team's rocket. Collective progress, no ranking. */
@@ -51,6 +52,8 @@ export default function TeamRocket() {
       </div>
       {settings.progress === 'chase' ? (
         <ChaseProgress label="Team goal" value={pulse.week.done} max={Math.max(pulse.week.planned, 1)} text={`${pulse.week.done}/${pulse.week.planned} tasks`} />
+      ) : settings.progress === 'balloon' ? (
+        <BalloonProgress label="Team goal" value={pulse.week.done} max={Math.max(pulse.week.planned, 1)} text={`${pulse.week.done}/${pulse.week.planned} tasks`} />
       ) : settings.progress === 'classic' ? (
         <div className="h-3 rounded-full bg-slate-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-yellow-300 transition-all duration-700" style={{ width: `${pct}%` }} /></div>
       ) : (

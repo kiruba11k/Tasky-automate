@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/AuthContext";
 import NotificationBell from "@/notifications/NotificationBell";
 import ProgressChip from "@/fun/ProgressChip";
 import ThemeControls from "@/themes/ThemeControls";
+import { LunchButton } from './fun/LunchBreak';
 import MotionToggle from "@/fun/MotionToggle";
 import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
 
@@ -288,6 +289,7 @@ export default function Layout({ children, currentPageName }) {
               </div>
               <ProgressChip />
               <MotionToggle />
+            <LunchButton />
               <ThemeControls />
               <NotificationBell />
               <button

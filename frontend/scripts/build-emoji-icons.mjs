@@ -60,6 +60,9 @@ const MAP = {
   '🧐': ['P', 'search-visual'], '🧑‍🏫': ['G', 'teacher', '#60a5fa,#1d4ed8'], '🧘': ['G', 'meditation', '#a78bfa,#6d28d9'],
   '🧠': ['G', 'brain', '#f9a8d4,#be185d'], '🪐': ['G', 'ringed-planet', '#c084fc,#6d28d9'], '🪴': ['P', 'potted-flower'],
   '🫣': ['P', 'invisible-2'],
+  '🥚': ['G', 'big-egg', '#fde68a,#f59e0b'], '🎈': ['P', 'balloon'], '🎒': ['G', 'backpack', '#fbbf24,#d97706'], '🫙': ['G', 'mason-jar', '#7dd3fc,#0284c7'],
+  '🥪': ['G', 'sandwich', '#fbbf24,#b45309'], '🍽': ['P', 'fork-plate'], '🏁': ['G', 'checkered-flag', '#e2e8f0,#475569'], '🎮': ['G', 'gamepad', '#818cf8,#4338ca'],
+  '🍂': ['G', 'falling-leaf', '#fb923c,#b45309'], '🍁': ['G', 'maple-leaf', '#f87171,#b91c1c'], '❄': ['G', 'snowflake-1', '#bae6fd,#38bdf8'],
 };
 
 const ICON = 32;

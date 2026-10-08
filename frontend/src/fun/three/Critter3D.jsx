@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { SPECIES } from './species';
 import { flat, inkMat, toon } from './toon';
+import { HeadGear, NeckGear } from './Gear';
 
 const OUTLINE = 0.035;
 const arr = (s) => (typeof s === 'number' ? [s, s, s] : s);
@@ -11,6 +12,7 @@ function Geo({ g, args }) {
     case 'cone': return <coneGeometry args={args || [1, 2, 20]} />;
     case 'cap': return <capsuleGeometry args={args || [1, 1, 4, 14]} />;
     case 'cyl': return <cylinderGeometry args={args || [1, 1, 1, 18]} />;
+    case 'box': return <boxGeometry args={args || [1, 1, 1]} />;
     case 'oct': return <octahedronGeometry args={args || [1, 0]} />;
     case 'torus': return <torusGeometry args={args || [1, 0.15, 8, 16, Math.PI]} />;
     default: return <sphereGeometry args={args || [1, 28, 20]} />;
@@ -18,7 +20,7 @@ function Geo({ g, args }) {
 }
 
 /** One solid shape with a cartoon ink outline (an inverted, slightly larger hull). */
-function Part({ g = 'sphere', args, color, p = [0, 0, 0], s = 1, r = [0, 0, 0], outline = true, basic = false, children }) {
+export function Part({ g = 'sphere', args, color, p = [0, 0, 0], s = 1, r = [0, 0, 0], outline = true, basic = false, children }) {
   const sc = arr(s);
   return (
     <group position={p} rotation={r}>
@@ -131,6 +133,7 @@ function Face({ c }) {
         ? <Part g="cone" args={[1, 2, 4]} color={c.beak} s={[0.11, 0.11, 0.08]} p={[0, -0.1, 0.72]} r={[Math.PI / 2, 0, 0]} />
         : c.nose && <Part color={c.nose} s={[0.07, 0.05, 0.05]} p={[0, -0.08, 0.74]} outline={false} />}
       {!robot && !c.beak && <Part g="torus" args={[0.09, 0.016, 6, 14, Math.PI]} color="#2b1b2b" p={[0, -0.17, 0.72]} r={[0, 0, Math.PI]} s={1} basic outline={false} />}
+      {!robot && <group name="mouthO" position={[0, -0.2, 0.7]} scale={0.001}><Part color="#5b1226" s={[0.1, 0.12, 0.05]} outline={false} basic /></group>}
       {c.whisk && [-1, 1].flatMap((x) => [0.04, -0.05].map((y, i) => (
         <Part key={`w${x}${i}`} g="cap" args={[1, 1, 3, 6]} color="#f3f4f6" s={[0.012, 0.2, 0.012]} p={[x * 0.5, -0.13 + y, 0.6]} r={[0, 0, x * (1.45 + i * 0.25)]} outline={false} basic />
       )))}
@@ -164,7 +167,7 @@ function DizzyStars() {
  * A chibi 3D character built from primitives. `pose`: idle | run | sleep | cheer | dizzy | scared | wave.
  * Poses can change at any time (read each frame). `calm` freezes the animation for reduced-motion users.
  */
-export default function Critter3D({ species = 'cat', pose = 'idle', calm = false, scale = 1, ...rest }) {
+export default function Critter3D({ species = 'cat', pose = 'idle', calm = false, scale = 1, equipped, prop, ...rest }) {
   const c = SPECIES[species] || SPECIES.cat;
   const poseRef = useRef(pose);
   poseRef.current = pose;
@@ -173,38 +176,50 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
   const seed = useMemo(() => Math.random() * 10, []);
   const limb = c.limbs || c.body;
 
+  const bookPage = useRef(); const bite = useRef();
   useFrame((state) => {
-    const t = calm ? 0 : state.clock.elapsedTime + seed;
+    const t = calm ? 0.35 : state.clock.elapsedTime + seed;
     const p = poseRef.current;
-    const run = p === 'run'; const sleep = p === 'sleep'; const cheer = p === 'cheer';
-    const dizzy = p === 'dizzy'; const scared = p === 'scared'; const wave = p === 'wave';
-    const w = run ? 16 : 2.2;
-    if (root.current) {
-      root.current.position.y = run ? Math.abs(Math.sin(t * w * 0.5)) * 0.14 : cheer ? Math.abs(Math.sin(t * 7)) * 0.5 : sleep ? -0.18 : Math.sin(t * 2) * 0.025;
-      root.current.position.x = scared ? Math.sin(t * 45) * 0.025 : 0;
-      root.current.rotation.z = run ? -0.08 : dizzy ? Math.sin(t * 5) * 0.12 : 0;
+    const sn = Math.sin;
+    // targets for this frame; each pose only overrides what it needs
+    const o = { y: sn(t * 2) * 0.025, x: 0, rz: 0, rx: 0, bsy: 1, hx: 0, hz: sn(t * 1.3) * 0.05, hy: p === 'idle' ? sn(t * 0.8) * 0.25 : 0, eye: 1, lL: 0, lR: 0, aLz: 0.25, aLx: 0, aRz: -0.25, aRx: 0, tail: sn(t * 3) * 0.55, mouth: 0 };
+    switch (p) {
+      case 'run': { const w = 16; Object.assign(o, { y: Math.abs(sn(t * w * 0.5)) * 0.14, rz: -0.08, hx: 0.1, lL: sn(t * w) * 0.95, lR: -sn(t * w) * 0.95, aLx: -sn(t * w) * 0.9, aRx: sn(t * w) * 0.9, tail: sn(t * 14) * 0.55 }); break; }
+      case 'march': { const w = 7; Object.assign(o, { y: Math.abs(sn(t * w * 0.5)) * 0.07, lL: sn(t * w) * 0.6, lR: -sn(t * w) * 0.6, aLx: -sn(t * w) * 0.7, aRx: sn(t * w) * 0.7, hz: sn(t * w * 0.5) * 0.06 }); break; }
+      case 'sleep': Object.assign(o, { y: -0.18, bsy: 0.88 + sn(t * 1.6) * 0.03, hx: 0.55, hz: 0.12, eye: 0.1, tail: sn(t * 3) * 0.1 }); break;
+      case 'cheer': Object.assign(o, { y: Math.abs(sn(t * 7)) * 0.5, aLz: 2.7 + sn(t * 10) * 0.3, aRz: -(2.7 + sn(t * 10 + 1) * 0.3) }); break;
+      case 'dizzy': Object.assign(o, { rz: sn(t * 5) * 0.12, hz: sn(t * 6) * 0.35, eye: 0.55 }); break;
+      case 'scared': Object.assign(o, { x: sn(t * 45) * 0.025, eye: 1.3 }); break;
+      case 'wave': Object.assign(o, { aRz: -(2.4 + sn(t * 9) * 0.35) }); break;
+      case 'study': Object.assign(o, { hx: 0.42, hz: sn(t * 0.9) * 0.04, hy: 0, aLx: -1.0, aRx: -1.0, aLz: 0.08, aRz: -0.08, eye: (t % 5) < 0.14 ? 0.1 : 0.8 }); break;
+      case 'eat': Object.assign(o, { y: Math.abs(sn(t * 10)) * 0.015, hx: 0.05 + sn(t * 10) * 0.05, hz: 0, hy: 0, aRx: -2.15, aRz: -0.35, eye: 0.35 }); break;
+      case 'yawn': { const k = Math.max(0, sn((t % 4.5) / 4.5 * Math.PI)); Object.assign(o, { y: k * 0.05, hx: -0.35 * k, hz: 0, hy: 0, aLz: 0.25 + k * 2.1, aRz: -(0.25 + k * 2.1), eye: 1 - k * 0.9, mouth: k }); break; }
+      case 'stretch': {
+        const cyc = Math.floor(t / 2.4) % 3; const env = sn(((t % 2.4) / 2.4) * Math.PI);
+        if (cyc === 0) Object.assign(o, { y: env * 0.08, hx: -env * 0.3, aLz: 0.3 + env * 2.5, aRz: -(0.3 + env * 2.5), eye: 0.4 });
+        else if (cyc === 1) Object.assign(o, { rz: sn(t * 2.6) * 0.25, aLz: 2.7, aRz: -2.7, eye: 0.4 });
+        else Object.assign(o, { rx: env * 0.5, hx: env * 0.2, aLx: env * 0.6, aRx: env * 0.6, eye: 0.4 });
+        break;
+      }
+      case 'pack': Object.assign(o, { y: Math.abs(sn(t * 5)) * 0.06, aRz: -(2.4 + sn(t * 9) * 0.35), hz: sn(t * 5) * 0.06 }); break;
+      case 'highfive': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aRx: -2.7, aRz: -0.15, hx: -0.1 }); break;
+      case 'highfive2': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aLx: -2.7, aLz: 0.15, hx: -0.1 }); break;
+      case 'dance': Object.assign(o, { y: Math.abs(sn(t * 6)) * 0.2, rz: sn(t * 3) * 0.14, hz: sn(t * 3) * 0.2, aLz: 1.7 + sn(t * 6) * 0.8, aRz: -(1.7 + sn(t * 6 + Math.PI) * 0.8), lL: sn(t * 6) * 0.4, lR: -sn(t * 6) * 0.4, tail: sn(t * 9) * 0.6 }); break;
+      default: break;
     }
-    if (body.current) body.current.scale.set(1, (sleep ? 0.88 : 1) + (sleep ? Math.sin(t * 1.6) * 0.03 : 0), 1);
-    if (head.current) {
-      head.current.rotation.x = sleep ? 0.55 : run ? 0.1 : 0;
-      head.current.rotation.z = dizzy ? Math.sin(t * 6) * 0.35 : sleep ? 0.12 : Math.sin(t * 1.3) * 0.05;
-      head.current.rotation.y = pose === 'idle' ? Math.sin(t * 0.8) * 0.25 : 0;
-    }
+    if (root.current) { root.current.position.set(o.x, o.y, 0); root.current.rotation.z = o.rz; root.current.rotation.x = o.rx; }
+    if (body.current) body.current.scale.set(1, o.bsy, 1);
+    if (head.current) { head.current.rotation.set(o.hx, o.hy, o.hz); }
     if (eyes.current) {
-      const blink = (t % 4) < 0.12;
-      const sy = sleep || blink ? 0.1 : dizzy ? 0.55 : scared ? 1.3 : 1;
-      eyes.current.traverse((o) => { if (o.name === 'eye') o.scale.y = sy; });
+      const sy = (t % 4) < 0.12 ? 0.1 : o.eye;
+      eyes.current.traverse((n) => { if (n.name === 'eye') n.scale.y = sy; if (n.name === 'mouthO') n.scale.setScalar(Math.max(0.001, o.mouth)); });
     }
-    if (legL.current) { legL.current.rotation.x = run ? Math.sin(t * w) * 0.95 : 0; legR.current.rotation.x = run ? -Math.sin(t * w) * 0.95 : 0; }
-    if (armL.current) {
-      armL.current.rotation.z = cheer ? 2.7 + Math.sin(t * 10) * 0.3 : 0.25;
-      armL.current.rotation.x = run ? -Math.sin(t * w) * 0.9 : 0;
-    }
-    if (armR.current) {
-      armR.current.rotation.z = cheer ? -(2.7 + Math.sin(t * 10 + 1) * 0.3) : wave ? -(2.4 + Math.sin(t * 9) * 0.35) : -0.25;
-      armR.current.rotation.x = run ? Math.sin(t * w) * 0.9 : 0;
-    }
-    if (tail.current) tail.current.rotation.y = Math.sin(t * (run ? 14 : 3)) * (sleep ? 0.1 : 0.55);
+    if (legL.current) { legL.current.rotation.x = o.lL; legR.current.rotation.x = o.lR; }
+    if (armL.current) { armL.current.rotation.z = o.aLz; armL.current.rotation.x = o.aLx; }
+    if (armR.current) { armR.current.rotation.z = o.aRz; armR.current.rotation.x = o.aRx; }
+    if (tail.current) tail.current.rotation.y = o.tail;
+    if (bookPage.current) bookPage.current.rotation.z = -Math.abs(sn(t * 1.2)) * 2.6;
+    if (bite.current) bite.current.scale.setScalar(1 - ((t % 6) / 6) * 0.6);
   });
 
   const wings = c.wings;
@@ -241,6 +256,30 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
               ? <Part color={c.body === '#2f3a52' ? '#26314a' : '#82603f'} s={[0.1, 0.38, 0.22]} p={[-0.04, -0.3, 0]} />
               : <Part g="cap" args={[1, 0.6, 4, 10]} color={limb} s={[0.13, 0.22, 0.13]} p={[0, -0.26, 0]} />}
           </group>
+          {equipped && <NeckGear equipped={equipped} />}
+          {(prop === 'book' || pose === 'study') && (
+            <group position={[0, 0.98, 0.7]} rotation={[-0.55, 0, 0]}>
+              <Part g="box" color="#3b82f6" s={[0.3, 0.2, 0.025]} p={[-0.0, 0, -0.02]} />
+              <Part g="box" color="#fff7ed" s={[0.27, 0.18, 0.02]} p={[-0.14, 0, 0.012]} outline={false} />
+              <group ref={bookPage} position={[0, 0, 0.03]}><Part g="box" color="#fff7ed" s={[0.13, 0.18, 0.012]} p={[0.13, 0, 0]} outline={false} /></group>
+            </group>
+          )}
+          {(prop === 'sandwich' || pose === 'eat') && (
+            <group ref={bite} position={[-0.12, 1.3, 0.78]}>
+              <Part color="#e9b44c" s={[0.2, 0.06, 0.16]} p={[0, 0.06, 0]} />
+              <Part color="#4ade80" s={[0.21, 0.025, 0.17]} p={[0, 0.02, 0]} outline={false} />
+              <Part color="#ef4444" s={[0.19, 0.025, 0.15]} p={[0, -0.005, 0]} outline={false} />
+              <Part color="#e9b44c" s={[0.2, 0.05, 0.16]} p={[0, -0.05, 0]} />
+            </group>
+          )}
+          {(prop === 'bag' || pose === 'pack') && (
+            <group position={[0, 0.82, -0.58]}>
+              <Part color="#f59e0b" s={[0.42, 0.5, 0.2]} />
+              <Part color="#d97706" s={[0.3, 0.16, 0.06]} p={[0, -0.1, 0.17]} outline={false} />
+              <Part g="cap" args={[1, 1, 3, 8]} color="#92400e" s={[0.035, 0.34, 0.035]} p={[0.2, 0.2, 0.48]} r={[0.9, 0, 0]} outline={false} />
+              <Part g="cap" args={[1, 1, 3, 8]} color="#92400e" s={[0.035, 0.34, 0.035]} p={[-0.2, 0.2, 0.48]} r={[0.9, 0, 0]} outline={false} />
+            </group>
+          )}
           <group ref={tail} position={[0, 0.42, -0.5]}>{c.tail !== 'none' && TAILS[c.tail]?.(c)}</group>
         </group>
         {/* head */}
@@ -249,6 +288,7 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
           <Ears c={c} species={species} />
           <group ref={eyes}><Face c={c} /></group>
           {pose === 'dizzy' && <DizzyStars />}
+          {equipped && <HeadGear equipped={equipped} />}
         </group>
       </group>
     </group>

@@ -1,3 +1,4 @@
+import CalmScene from '@/fun/CalmScene';
 import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -42,7 +43,7 @@ export default function NotificationBell() {
           </button>
         )}
         <div className="max-h-96 overflow-y-auto">
-          {items.length === 0 && <div className="px-4 py-8 text-center text-sm text-slate-400">You're all caught up.</div>}
+          {items.length === 0 && <CalmScene />}
           {items.map((n) => (
             <button
               key={n.id}

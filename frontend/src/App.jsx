@@ -16,6 +16,7 @@ import Team from './pages/Team';
 import WeeklyTasks from './pages/WeeklyTasks';
 import { NotificationProvider } from './notifications/NotificationProvider';
 import { FunProvider } from './fun/FunProvider';
+import { BuddyProvider } from './fun/BuddyContext';
 import { ThemeProvider } from './themes/ThemeProvider';
 import { FocusProvider } from './fun/FocusTimer';
 import PageMotion from './fun/PageMotion';
@@ -39,6 +40,7 @@ function Protected() {
 
   return (
     <NotificationProvider>
+    <BuddyProvider>
     <FunProvider>
     <FocusProvider>
     <Layout currentPageName={currentPageName}>
@@ -55,6 +57,7 @@ function Protected() {
     </Layout>
     </FocusProvider>
     </FunProvider>
+    </BuddyProvider>
     </NotificationProvider>
   );
 }

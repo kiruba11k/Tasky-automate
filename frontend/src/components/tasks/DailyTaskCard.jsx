@@ -1,4 +1,7 @@
 import React from 'react';
+import { GripVertical } from 'lucide-react';
+import { motion, useDragControls, useMotionValue, useSpring, useTransform, useVelocity } from 'framer-motion';
+import { emitFun } from '@/fun/bus';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +41,25 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
       setCompleting(false);
     }
   };
+  const draggable = canEdit && task.task_status !== 'Completed';
+  const controls = useDragControls();
+  const x = useMotionValue(0); const y = useMotionValue(0);
+  const vx = useVelocity(x); const vy = useVelocity(y);
+  // squash and stretch: the card stretches along its direction of travel and wobbles back with a spring when released
+  const sx = useSpring(useTransform([vx, vy], ([a, b]) => Math.max(0.82, Math.min(1.2, 1 + Math.abs(a) / 7000 - Math.abs(b) / 14000))), { stiffness: 380, damping: 14 });
+  const sy = useSpring(useTransform([vx, vy], ([a, b]) => Math.max(0.82, Math.min(1.2, 1 + Math.abs(b) / 7000 - Math.abs(a) / 14000))), { stiffness: 380, damping: 14 });
+  const tilt = useSpring(useTransform(vx, [-1800, 1800], [-7, 7]), { stiffness: 300, damping: 18 });
+  const [dropped, setDropped] = React.useState(false);
+  const onDragEnd = async (e) => {
+    emitFun({ type: 'taskDrag', on: false });
+    const r = document.getElementById('drop-jar')?.getBoundingClientRect();
+    const cx = e.clientX ?? 0; const cy = e.clientY ?? 0;
+    if (r && cx >= r.left - 20 && cx <= r.right + 20 && cy >= r.top - 20 && cy <= r.bottom + 20) {
+      setDropped(true);
+      setTimeout(markDone, 280);
+    }
+  };
+
   const getTimeVariance = () => {
     if (task.actual_time_taken && task.expected_time) {
       const variance = task.actual_time_taken - task.expected_time;
@@ -49,11 +71,19 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
   const timeVariance = getTimeVariance();
 
   return (
+    <motion.div
+      drag={draggable} dragListener={false} dragControls={controls} dragSnapToOrigin dragElastic={0.18} dragMomentum={false}
+      style={{ x, y, scaleX: sx, scaleY: sy, rotate: tilt, position: 'relative', zIndex: 0 }}
+      animate={dropped ? { scale: 0.1, opacity: 0, rotate: 25 } : undefined} transition={{ duration: 0.28 }}
+      whileDrag={{ zIndex: 60, boxShadow: '0 18px 32px rgba(0,0,0,.45)' }}
+      onDragStart={() => emitFun({ type: 'taskDrag', on: true })} onDragEnd={(e) => onDragEnd(e)}
+    >
     <Card className="glass-effect-enhanced hover:border-blue-500/50 transition-all duration-300 group">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
+              {draggable && <button type="button" onPointerDown={(e) => { e.preventDefault(); controls.start(e); }} aria-label="Drag to the done jar to finish this task" title="Drag me onto the done jar!" className="touch-none cursor-grab active:cursor-grabbing text-slate-500 hover:text-white -ml-1"><GripVertical className="w-4 h-4" /></button>}
               <Calendar className="w-4 h-4 text-slate-400" />
               <span className="text-sm text-slate-400">{format(new Date(task.date), 'MMM dd, yyyy')}</span>
               {userName && (
@@ -151,5 +181,6 @@ export default function DailyTaskCard({ task, onEdit, userName, canEdit = false,
         )}
       </CardContent>
     </Card>
+    </motion.div>
   );
 }

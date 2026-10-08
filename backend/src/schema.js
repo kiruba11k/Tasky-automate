@@ -30,6 +30,8 @@ schemas.User = {
     theme_auto: { type: 'boolean' },
     theme_custom: { type: 'string' },
     theme_at: { type: 'number' },
+    buddy: { type: 'string' },
+    equipped: { type: 'object' },
   },
   required: ['full_name', 'email'],
 };

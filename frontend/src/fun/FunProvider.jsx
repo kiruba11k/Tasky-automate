@@ -3,6 +3,13 @@ import { format } from 'date-fns';
 import { request } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import MascotAvatar from './MascotAvatar';
+import HighFive from './HighFive';
+import DayRhythm from './DayRhythm';
+import LunchBreak from './LunchBreak';
+import DropJar from './DropJar';
+import Seasons from './Seasons';
+import CastParty from './CastParty';
+import TeamParade from './TeamParade';
 import BadgeUnlock from './BadgeUnlock';
 import ChaseCutscene from './chase/ChaseCutscene';
 import { effects } from './effects';
@@ -16,7 +23,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, buddy: 'auto' };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -75,6 +82,7 @@ export function FunProvider({ children }) {
   const [stats, setStats] = useState(null);
   const [badgeQueue, setBadgeQueue] = useState([]);
   const [floaters, setFloaters] = useState([]);
+  const [paradeOpen, setParadeOpen] = useState(false);
   const [partyOn, setPartyOn] = useState(false);
   const [scene, setScene] = useState(null); // { id, kind } cat-and-mouse cutscene
   const refs = useRef({ pointer: { x: 0, y: 0 }, lastActive: Date.now(), lastNudge: 0, lastScene: 0, stats: null, settings, pending: 0, queue: [], flush: null, lastBig: 0, bubbleTimer: null, bubbleActive: false, idle: null, busyTimer: null, statsTimer: null });
@@ -224,6 +232,7 @@ export function FunProvider({ children }) {
       if (d.type === 'kudosSent') { celebrate('kudosSent'); refreshStatsSoon(); return; }
       if (d.type === 'focus') { celebrate(d.on ? 'focusStart' : 'focusDone'); return; }
       if (d.type === 'say') { say(d.text, d.mood || 'happy'); return; }
+      if (d.type === 'parade') { setParadeOpen(true); return; }
       if (d.type === 'weekly') {
         if (d.action === 'save') { if (d.count) celebrate('allocated'); } else celebrate({ submit: 'submitted', approve: 'approved', reject: 'rejected' }[d.action]);
         refreshStatsSoon();
@@ -236,7 +245,7 @@ export function FunProvider({ children }) {
         else if (d.action === 'delete') celebrate('deleted', { x: noun });
         else {
           const status = d.patch?.task_status || d.patch?.status;
-          if (status === 'Completed') { celebrate('completed'); if (d.entity === 'DailyTask') floatXp('+10 XP'); }
+          if (status === 'Completed') { celebrate('completed'); if (d.entity === 'DailyTask') { floatXp('+10 XP'); if (r.settings.anim === 'full') effects.marble(r.pointer.x ? r.pointer : { x: window.innerWidth / 2, y: window.innerHeight / 2 }); } }
           else if (status === 'In Progress') celebrate('statusProgress');
           else celebrate('updated');
         }
@@ -291,7 +300,7 @@ export function FunProvider({ children }) {
         setPartyOn(true);
         celebrate('party');
         effects.fireworks();
-        setTimeout(() => setPartyOn(false), 6000);
+        setTimeout(() => setPartyOn(false), 9000);
       }
     };
     window.addEventListener('pointerdown', onDown);
@@ -315,9 +324,12 @@ export function FunProvider({ children }) {
     };
   }, [celebrate, say]);
 
-  useEffect(() => { document.body.classList.toggle('party', partyOn); }, [partyOn]);
 
+  const pokes = useRef([]);
   const poke = () => {
+    const nowMs = Date.now();
+    pokes.current = [...pokes.current.filter((t) => nowMs - t < 4000), nowMs];
+    if (pokes.current.length >= 7) { pokes.current = []; setPartyOn(true); celebrate('party'); effects.fireworks(); setTimeout(() => setPartyOn(false), 9000); return; }
     play('boing', settings.sound);
     say(pick(JOKES), 'wink', 6000);
     sleepSoon();
@@ -340,6 +352,13 @@ export function FunProvider({ children }) {
           )}
         </div>
       )}
+      <HighFive />
+      <DayRhythm onParade={() => setParadeOpen(true)} />
+      <LunchBreak />
+      <DropJar />
+      <Seasons />
+      <CastParty on={partyOn} onClose={() => setPartyOn(false)} />
+      <TeamParade open={paradeOpen} onOpenChange={setParadeOpen} />
       <div className="pointer-events-none fixed inset-0 z-[150] flex items-center justify-center overflow-hidden" aria-hidden="true">
         {bursts.map((b) => (
           <div key={b.id} className="comic-burst absolute animate-burst"><span><Rich text={b.word} size="1.1em" /></span></div>

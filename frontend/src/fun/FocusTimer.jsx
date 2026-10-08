@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Pause, Timer } from 'lucide-react';
+import React, { Suspense, lazy, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { BookOpen, Footprints, Pause, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { DailyTask } from '@/entities/DailyTask';
@@ -7,6 +8,12 @@ import { emitFun } from './bus';
 import { play } from './sounds';
 import { useFun } from './FunProvider';
 import { Emoji, Rich } from '@/icons/Emoji';
+import { useBuddy } from './BuddyContext';
+import { buddyFor, hasWebGL } from './three/species';
+
+const Buddy3D = lazy(() => import('./three/Buddy3D'));
+const RaceStage = lazy(() => import('./three/FocusStage').then((m) => ({ default: m.RaceStage })));
+const CUES = ['Reach up high and breathe in', 'Roll your shoulders back', 'Look at something far away', 'Fold forward and let your arms hang', 'Shake out your hands'];
 
 const KEY = 'tasky_focus';
 const FocusContext = createContext(null);
@@ -15,6 +22,10 @@ const fmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Str
 /** Pomodoro-style focus sessions tied to a task. Survives reloads; on finish it offers to log the time on the task. */
 export function FocusProvider({ children }) {
   const { settings } = useFun();
+  const { pinned, equipped } = useBuddy();
+  const loc = useLocation();
+  const [mode, setModeState] = useState(() => { try { return localStorage.getItem('tasky_focus_mode') || 'study'; } catch { return 'study'; } });
+  const setMode = (m) => { setModeState(m); try { localStorage.setItem('tasky_focus_mode', m); } catch { /* ignore */ } };
   const [session, setSession] = useState(() => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; } });
   const [now, setNow] = useState(Date.now());
   const [finished, setFinished] = useState(null);
@@ -31,6 +42,11 @@ export function FocusProvider({ children }) {
     emitFun({ type: 'focus', on: true });
   }, []);
 
+  const startBreak = useCallback((minutes = 5) => {
+    const s = { kind: 'break', title: 'Stretch break', minutes, endsAt: Date.now() + minutes * 60000 };
+    doneRef.current = false; persist(s); setSession(s); setFinished(null);
+  }, []);
+
   const stop = useCallback(() => { persist(null); setSession(null); }, []);
 
   useEffect(() => {
@@ -40,8 +56,9 @@ export function FocusProvider({ children }) {
       if (!doneRef.current && Date.now() >= session.endsAt) {
         doneRef.current = true;
         persist(null);
-        setFinished(session);
         setSession(null);
+        if (session.kind === 'break') { play('ding', settings.sound); emitFun({ type: 'say', text: 'Break over. Refreshed? Back to it!', mood: 'cheer' }); return; }
+        setFinished(session);
         play('fanfare', settings.sound);
         emitFun({ type: 'focus', on: false });
       }
@@ -61,25 +78,49 @@ export function FocusProvider({ children }) {
     }
   };
 
-  const value = useMemo(() => ({ session, start, stop }), [session, start, stop]);
+  const value = useMemo(() => ({ session, start, stop, startBreak }), [session, start, stop, startBreak]);
+  const page = loc.pathname.split('/').filter(Boolean)[0] || 'Dashboard';
+  const species = buddyFor(page, pinned);
+  const three = settings.view3d && hasWebGL();
+  const isBreak = session?.kind === 'break';
+  const total = session ? session.minutes * 60000 : 1;
+  const pct = session ? Math.max(0, Math.min(1, 1 - (session.endsAt - now) / total)) : 0;
+  const cue = CUES[Math.floor((now / 7000) % CUES.length)];
   return (
     <FocusContext.Provider value={value}>
       {children}
       {session && (
-        <div className="fixed bottom-3 left-1/2 z-[95] flex items-center gap-3 rounded-full border-[3px] border-slate-900 bg-slate-800 px-4 py-2 shadow-[4px_4px_0_rgba(0,0,0,.5)] animate-pop-x" role="timer" aria-label="Focus timer">
-          <Emoji e="🍅" size="1.6rem" />
-          <div className="leading-tight"><div className="font-mono text-lg font-extrabold text-white">{fmt(session.endsAt - now)}</div><div className="text-[11px] text-slate-400 max-w-[11rem] truncate">{session.title}</div></div>
-          <button type="button" onClick={stop} aria-label="Stop focus session" className="p-1.5 rounded-full bg-slate-700 text-slate-200 hover:text-white"><Pause className="w-4 h-4" /></button>
+        <div className="fixed bottom-3 left-1/2 z-[95] flex items-center gap-3 rounded-3xl border-[3px] border-slate-900 bg-slate-800 pl-2 pr-4 py-2 shadow-[4px_4px_0_rgba(0,0,0,.5)] animate-pop-x" role="timer" aria-label={isBreak ? 'Break timer' : 'Focus timer'}>
+          {three ? (
+            <Suspense fallback={<div style={{ width: 84, height: 100 }} />}>
+              {!isBreak && mode === 'race'
+                ? <RaceStage species={species} equipped={equipped} pct={pct} calm={settings.anim === 'calm'} />
+                : <Buddy3D species={species} pose={isBreak ? 'stretch' : 'study'} size={84} equipped={equipped} calm={settings.anim === 'calm'} />}
+            </Suspense>
+          ) : <Emoji e={isBreak ? '🧘' : '🍅'} size="1.6rem" />}
+          <div className="leading-tight">
+            <div className="font-mono text-lg font-extrabold text-white">{fmt(session.endsAt - now)}</div>
+            <div className="text-[11px] text-slate-400 max-w-[11rem] truncate">{isBreak ? cue : session.title}</div>
+            {!isBreak && (
+              <div className="flex gap-1 mt-1" role="radiogroup" aria-label="Companion mode">
+                <button type="button" role="radio" aria-checked={mode === 'study'} onClick={() => setMode('study')} title="Study together" className={`p-1 rounded-md ${mode === 'study' ? 'bg-emerald-400 text-ink' : 'bg-slate-700 text-slate-300'}`}><BookOpen className="w-3.5 h-3.5" /></button>
+                <button type="button" role="radio" aria-checked={mode === 'race'} onClick={() => setMode('race')} title="Race together" className={`p-1 rounded-md ${mode === 'race' ? 'bg-emerald-400 text-ink' : 'bg-slate-700 text-slate-300'}`}><Footprints className="w-3.5 h-3.5" /></button>
+              </div>
+            )}
+          </div>
+          <button type="button" onClick={stop} aria-label={isBreak ? 'End break' : 'Stop focus session'} className="p-1.5 rounded-full bg-slate-700 text-slate-200 hover:text-white"><Pause className="w-4 h-4" /></button>
         </div>
       )}
       <Dialog open={!!finished} onOpenChange={(o) => !o && setFinished(null)}>
         <DialogContent className="max-w-sm bg-slate-900 border-slate-700 text-white text-center">
-          <div className="flex justify-center"><Emoji e="🍅" size="4.5rem" /></div>
+          <div className="flex justify-center">
+            {three ? <Suspense fallback={<div style={{ height: 150 }} />}><Buddy3D species={species} pose="stretch" size={130} equipped={equipped} calm={settings.anim === 'calm'} /></Suspense> : <Emoji e="🍅" size="4.5rem" />}
+          </div>
           <DialogTitle className="text-xl font-extrabold">Focus session complete!</DialogTitle>
-          <DialogDescription className="text-slate-300">{finished?.minutes} minutes on “{finished?.title}”. Take a quick stretch <Emoji e="🧘" /></DialogDescription>
+          <DialogDescription className="text-slate-300">{finished?.minutes} minutes on “{finished?.title}”. Your buddy is stretching, join in!</DialogDescription>
           <div className="flex gap-2 justify-center">
             <Button onClick={logTime} disabled={busy} className="bg-emerald-500 hover:bg-emerald-400 text-ink font-bold">{busy ? 'Logging…' : `Log ${finished?.minutes} min on the task`}</Button>
-            <Button variant="outline" onClick={() => setFinished(null)} className="bg-transparent border-slate-600 text-slate-200">Skip</Button>
+            <Button variant="outline" onClick={() => { startBreak(5); }} className="bg-transparent border-slate-600 text-slate-200">5-min stretch break</Button>
           </div>
         </DialogContent>
       </Dialog>

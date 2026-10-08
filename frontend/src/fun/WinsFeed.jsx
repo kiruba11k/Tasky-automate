@@ -34,7 +34,7 @@ export default function WinsFeed() {
     try {
       await request('POST', '/api/kudos', { to_user_id: win.user_id, emoji, message: '' });
       setSent((s) => ({ ...s, [key]: emoji }));
-      emitFun({ type: 'kudosSent' });
+      emitFun({ type: 'kudosSent', to_user_id: win.user_id });
     } catch (e) {
       setError(e.message);
     }

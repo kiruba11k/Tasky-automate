@@ -9,6 +9,7 @@ import { parseTable } from './extract.js';
 import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { validateThemePrefs } from './theme.js';
+import { buddyStatus, hatchEgg, parade, validateBuddyPrefs } from './buddies.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
 import { openDailyDrop, syncProgress, teamPulse, trophies } from './gamify.js';
@@ -98,11 +99,15 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   app.patch('/api/auth/me', wrap(async (req, res) => {
     // Self-service profile edits only: no role/email/status changes.
-    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at'];
+    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at', 'buddy', 'equipped'];
     const body = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
     const themeError = validateThemePrefs(body);
     if (themeError) return res.status(400).json({ error: themeError });
     if (body.theme_custom === '') body.theme_custom = null; // clearing a custom theme
+    if (body.buddy !== undefined || body.equipped !== undefined) {
+      const buddyError = validateBuddyPrefs(body, await buddyStatus(store, req.user));
+      if (buddyError) return res.status(400).json({ error: buddyError });
+    }
     const { data, errors } = validate(schemas.User, body, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
     res.json(await store.update('User', req.user.id, data));
@@ -172,6 +177,18 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     const r = await openDailyDrop(store, req.user, todayParam(req), random);
     if (r.error) return res.status(r.status).json({ error: r.error });
     res.json(r);
+  }));
+
+  app.get('/api/me/buddies', wrap(async (req, res) => res.json(await buddyStatus(store, req.user))));
+  app.post('/api/me/hatch', wrap(async (req, res) => {
+    const r = await hatchEgg(store, req.user, random, todayParam(req));
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    res.json(r);
+  }));
+  app.get('/api/team/parade', wrap(async (req, res) => {
+    const ws = /^\d{4}-\d{2}-\d{2}$/.test(req.query.week_start || '') ? req.query.week_start : null;
+    if (!ws) return res.status(400).json({ error: 'week_start is required' });
+    res.json(await parade(store, todayParam(req), ws));
   }));
 
   app.get('/api/team/pulse', wrap(async (req, res) => {

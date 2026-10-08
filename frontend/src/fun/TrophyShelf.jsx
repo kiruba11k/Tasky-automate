@@ -1,3 +1,4 @@
+import StickerBook from './StickerBook';
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,7 +23,7 @@ export default function TrophyShelf({ open, onOpenChange }) {
           <Tabs defaultValue="badges">
             <TabsList className="bg-slate-800">
               <TabsTrigger value="badges">Badges {earned}/{data.badges.length}</TabsTrigger>
-              <TabsTrigger value="stickers">Sticker album {owned}/{data.stickers.length}</TabsTrigger>
+              <TabsTrigger value="stickers">Sticker book {owned}/{data.stickers.length}</TabsTrigger>
             </TabsList>
             <TabsContent value="badges" className="mt-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
@@ -39,14 +40,7 @@ export default function TrophyShelf({ open, onOpenChange }) {
               </div>
             </TabsContent>
             <TabsContent value="stickers" className="mt-3">
-              <p className="text-xs text-slate-400 mb-2">Finish a task each day to unlock a chest with a random sticker. Rare and epic ones are harder to find.</p>
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                {data.stickers.map((s) => (
-                  <div key={s.id} title={s.owned ? `${s.rarity} sticker` : 'Not found yet'} className={`aspect-square grid place-items-center rounded-xl border-2 ${s.owned ? `bg-slate-800 ${s.rarity === 'epic' ? 'border-yellow-400' : s.rarity === 'rare' ? 'border-sky-400' : 'border-slate-600'}` : 'bg-slate-800/40 border-dashed border-slate-700 text-slate-600'}`}>
-                    {s.owned ? <Emoji e={s.emoji} size="2.2rem" /> : <span className="text-2xl">?</span>}
-                  </div>
-                ))}
-              </div>
+              <StickerBook stickers={data.stickers} />
             </TabsContent>
           </Tabs>
         )}

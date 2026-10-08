@@ -3,6 +3,7 @@ import { useAuth } from '@/auth/AuthContext';
 import Mascot from './Mascot';
 import { useFun } from './FunProvider';
 import { Emoji, Rich } from '@/icons/Emoji';
+import SkyBackdrop from './SkyBackdrop';
 import ChaseProgress from '@/fun/chase/ChaseProgress';
 
 const hello = () => {
@@ -23,8 +24,9 @@ export default function Greeting() {
     return `${left} task${left === 1 ? '' : 's'} left to crush today${stats.completed_today ? ` — ${stats.completed_today} already down!` : '!'}`;
   }, [stats]);
   return (
-    <div className="glass-effect-enhanced rounded-2xl p-4 mb-6 space-y-3">
-    <div className="flex items-center gap-4">
+    <div className="glass-effect-enhanced rounded-2xl p-4 mb-6 space-y-3 relative overflow-hidden">
+    <SkyBackdrop className="opacity-60" />
+    <div className="flex items-center gap-4 relative">
       <Mascot mood="wave" size={72} className="tasky-bob shrink-0" />
       <div className="min-w-0">
         <h2 className="text-xl md:text-2xl font-extrabold text-white">{hello()}, {first}! <Emoji e="👋" /></h2>
@@ -32,7 +34,7 @@ export default function Greeting() {
       </div>
       {stats?.streak > 0 && <div className="ml-auto text-center shrink-0 rounded-xl bg-orange-500/15 border border-orange-400/40 px-3 py-1.5"><div className="text-2xl font-extrabold text-orange-300 flex items-center justify-center gap-1"><Emoji e="🔥" size="1.4rem" /> {stats.streak}</div><div className="text-[11px] text-orange-200">day streak</div></div>}
     </div>
-    {stats && <ChaseProgress label="Today's target" value={stats.completed_today} max={Math.max(stats.planned_today, 1)} text={stats.planned_today ? `${stats.completed_today}/${stats.planned_today} tasks` : 'No tasks planned yet'} />}
+    {stats && <div className="relative"><ChaseProgress label="Today's target" value={stats.completed_today} max={Math.max(stats.planned_today, 1)} text={stats.planned_today ? `${stats.completed_today}/${stats.planned_today} tasks` : 'No tasks planned yet'} /></div>}
     </div>
   );
 }

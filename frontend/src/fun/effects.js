@@ -76,4 +76,27 @@ export const effects = {
   },
   rain: (char) => icons(char, { count: 18, rain: true, size: 42 }),
   poof: () => icons('💨', { count: 6, origin: { x: 0.5, y: 0.55 }, spread: 160, size: 44 }),
+  /** A marble that flies from where you clicked into the done jar (or the level chip when no jar is on screen). */
+  marble: (from) => {
+    if (calm() || !from) return;
+    const target = document.getElementById('done-jar') || document.querySelector('[data-fun-target="xp"]');
+    if (!target) return;
+    const r = target.getBoundingClientRect();
+    if (!r.width) return;
+    const tx = r.left + r.width / 2;
+    const ty = r.top + r.height * 0.55;
+    const el = document.createElement('div');
+    const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    el.style.cssText = `position:fixed;left:0;top:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;pointer-events:none;z-index:210;background:radial-gradient(circle at 35% 30%,#fff 0 12%,${color} 14%);border:2px solid #0b1220;box-shadow:2px 3px 0 rgba(0,0,0,.35)`;
+    document.body.appendChild(el);
+    const midX = (from.x + tx) / 2;
+    const midY = Math.min(from.y, ty) - 90;
+    const anim = el.animate([
+      { transform: `translate(${from.x}px,${from.y}px) scale(.4)`, offset: 0 },
+      { transform: `translate(${midX}px,${midY}px) scale(1.25,.85)`, offset: 0.45 },
+      { transform: `translate(${tx}px,${ty}px) scale(.9,1.15)`, offset: 0.9 },
+      { transform: `translate(${tx}px,${ty}px) scale(0)`, offset: 1 },
+    ], { duration: 950, easing: 'cubic-bezier(.3,.6,.4,1)' });
+    anim.onfinish = () => { el.remove(); target.classList.add('jar-wobble'); setTimeout(() => target.classList.remove('jar-wobble'), 700); };
+  },
 };

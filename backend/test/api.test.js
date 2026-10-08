@@ -555,6 +555,30 @@ describe('engagement endpoints', () => {
     assert.equal((await api('POST', '/api/me/daily-drop', { token: alok, body: { today: '2026-10-15', rng: 0.99 } })).status, 409); // clients cannot steer the roll
   });
 
+  test('mystery eggs: earned by finished work, hatch once each on the server, unlock buddies and accessories', async () => {
+    assert.equal((await api('POST', '/api/me/hatch', { token: lena, body: { today: T } })).status, 409); // no work, no egg
+    const st = (await api('GET', '/api/me/buddies', { token: alok })).body;
+    assert.equal(st.eggs.available, st.eggs.earned);
+    assert.ok(st.eggs.available >= 1);
+    assert.deepEqual(st.owned_buddies.sort(), ['bunny', 'cat', 'mouse', 'robot']);
+    assert.equal((await api('PATCH', '/api/auth/me', { token: alok, body: { buddy: 'dino' } })).status, 400); // not unlocked
+    const hatch = await api('POST', '/api/me/hatch', { token: alok, body: { today: T, rng: 0 } });
+    assert.equal(hatch.status, 200);
+    assert.ok(['buddy', 'accessory'].includes(hatch.body.kind));
+    assert.equal(hatch.body.is_new, true);
+    const after = (await api('GET', '/api/me/buddies', { token: alok })).body;
+    assert.equal(after.eggs.available, st.eggs.available - 1);
+    if (hatch.body.kind === 'accessory') {
+      const slot = hatch.body.slot;
+      assert.equal((await api('PATCH', '/api/auth/me', { token: alok, body: { equipped: { [slot]: hatch.body.id } } })).status, 200);
+      assert.equal((await api('PATCH', '/api/auth/me', { token: alok, body: { equipped: { hat: 'nonsense' } } })).status, 400);
+    } else {
+      assert.equal((await api('PATCH', '/api/auth/me', { token: alok, body: { buddy: hatch.body.id } })).status, 200);
+    }
+    const board = (await api('GET', `/api/team/parade?today=${T}&week_start=2026-10-12`, { token: alok })).body;
+    assert.ok(board.find((m) => m.name));
+  });
+
   test('achievements and kudos cannot be written directly', async () => {
     assert.equal((await api('POST', '/api/entities/Achievement', { token: alok, body: { user_id: 'x', key: 'badge:century' } })).status, 403);
     assert.equal((await api('POST', '/api/entities/Kudos', { token: alok, body: { from_user_id: 'a', to_user_id: 'b', emoji: '🙌' } })).status, 403);
