@@ -293,3 +293,129 @@ for (const [name, makeStore] of backends) {
     });
   });
 }
+
+import { heuristicParse, parseVoice, resolveDay } from '../src/voice.js';
+
+describe('voice parsing', () => {
+  const users = [
+    { id: 'u1', full_name: 'Alok Kumar', role: 'team_member', status: 'Active' },
+    { id: 'u2', full_name: 'Komala R', role: 'team_member', status: 'Active' },
+    { id: 'u3', full_name: 'Lena Lead', role: 'team_leader', status: 'Active' },
+    { id: 'u4', full_name: 'Alok Singh', role: 'team_member', status: 'Active' },
+  ];
+  const projects = [{ id: 'p1', name: 'BlueDove Hospitality' }, { id: 'p2', name: 'SSDI' }];
+  const me = users[2];
+  const ctx = { users, projects, me, today: '2026-10-14', weekStart: '2026-10-12' };
+
+  test('resolveDay', () => {
+    const weekDates = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'];
+    assert.equal(resolveDay('Friday', { today: '2026-10-14', weekDates }), '2026-10-16');
+    assert.equal(resolveDay('tomorrow', { today: '2026-10-14' }), '2026-10-15');
+    assert.equal(resolveDay('monday', { today: '2026-10-14' }), '2026-10-19'); // next Monday in daily mode
+    assert.equal(resolveDay('wed', { today: '2026-10-14' }), '2026-10-14');
+    assert.equal(resolveDay('2026-10-20', { today: '2026-10-14' }), '2026-10-20');
+    assert.equal(resolveDay('someday', { today: '2026-10-14' }), null);
+  });
+
+  test('rule-based parser: several tasks, names, hours, project, target', async () => {
+    const text = 'Assign Komala to review 100 prospects for BlueDove Hospitality, target is 35% connection rate, takes 8 hours. Then Lena and Komala should build a model of 45 companies on Monday and Tuesday for SSDI, 5 hours.';
+    const r = await parseVoice({ ...ctx, mode: 'weekly', transcript: text });
+    assert.equal(r.used_llm, false);
+    assert.equal(r.tasks.length, 2);
+    const [a, b] = r.tasks;
+    assert.match(a.title, /review 100 prospects/i);
+    assert.equal(a.project_name, 'BlueDove Hospitality');
+    assert.equal(a.expected_result, '35% connection rate');
+    assert.equal(a.estimated_hours, 8);
+    assert.deepEqual(a.assignee_ids, ['u2']);
+    assert.match(b.title, /^build a model of 45 companies/i); // connector words like "Then" are not part of the title
+    assert.equal(b.project_id, 'p2');
+    assert.deepEqual(b.assignee_ids.sort(), ['u2', 'u3']);
+    assert.deepEqual(b.days, ['2026-10-12', '2026-10-13']);
+    assert.equal(b.estimated_hours, 5);
+  });
+
+  test('ambiguous or unknown names are flagged, not guessed', async () => {
+    const r = await parseVoice({ ...ctx, mode: 'weekly', llm: async () => ({ tasks: [{ title: 'Write blog', assignees: ['Alok', 'Zorro', 'Komala'] }] }) });
+    assert.equal(r.used_llm, true);
+    assert.deepEqual(r.tasks[0].assignee_ids, ['u2']);
+    assert.equal(r.tasks[0].unresolved.length, 2);
+    assert.ok(r.warnings.some((w) => /more than one person/.test(w)));
+    assert.ok(r.warnings.some((w) => /not a team member/.test(w)));
+  });
+
+  test('LLM output is resolved: me, fuzzy project, weekdays; daily mode defaults to me and today', async () => {
+    const llm = async ({ prompt }) => {
+      assert.match(prompt, /Alok Kumar/);
+      assert.match(prompt, /BlueDove Hospitality/);
+      return { tasks: [
+        { title: 'Prepare weekly report', project_name: 'blue dove hospitality', assignees: ['__me__'], days: ['friday'], estimated_hours: 2.5, priority: 'High' },
+        { title: 'Tele calls', project_name: 'ssdi', assignees: ['Komala R'], days: [], estimated_hours: null, expected_result: '2 meetings' },
+      ] };
+    };
+    const w = await parseVoice({ ...ctx, mode: 'weekly', transcript: 'whatever', llm });
+    assert.equal(w.tasks[0].project_name, 'blue dove hospitality'); // not an exact match: kept as spoken, leader can fix
+    assert.deepEqual(w.tasks[0].assignee_ids, ['u3']);
+    assert.deepEqual(w.tasks[0].days, ['2026-10-16']);
+    assert.equal(w.tasks[0].priority, 'High');
+    assert.equal(w.tasks[1].project_id, 'p2');
+    assert.equal(w.tasks[1].days, null);
+    const d = await parseVoice({ ...ctx, mode: 'daily', transcript: 'whatever', llm: async () => ({ tasks: [{ title: 'Update Zoho', assignees: [], days: ['tomorrow'] }, { title: 'Write post', assignees: ['Komala'], days: [] }] }) });
+    assert.deepEqual(d.tasks[0].assignee_ids, ['u3']);
+    assert.equal(d.tasks[0].date, '2026-10-15');
+    assert.equal(d.tasks[1].date, '2026-10-14');
+  });
+
+  test('LLM failure falls back to rules with a warning', async () => {
+    const r = await parseVoice({ ...ctx, mode: 'daily', transcript: 'Write the newsletter for SSDI, 2 hours', llm: async () => { throw new Error('boom'); } });
+    assert.equal(r.used_llm, false);
+    assert.ok(r.warnings.some((w) => /AI parser was unavailable/.test(w)));
+    assert.equal(r.tasks[0].estimated_hours, 2);
+    assert.equal(r.tasks[0].project_name, 'SSDI');
+  });
+
+  test('empty input finds nothing', async () => {
+    const r = await parseVoice({ ...ctx, mode: 'daily', transcript: 'um okay' });
+    assert.equal(r.tasks.length, 0);
+    assert.ok(r.warnings.length);
+  });
+});
+
+for (const [name, makeStore] of backends.slice(0, 1)) {
+  describe(`voice endpoint (${name})`, () => {
+    let store, server, base, admin, mo;
+    const api = async (method, url, { body, token } = {}) => {
+      const res = await fetch(base + url, { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+      const text = await res.text();
+      return { status: res.status, body: text ? JSON.parse(text) : null };
+    };
+    before(async () => {
+      store = makeStore();
+      await store.init();
+      await bootstrapAdmin(store, { email: 'boss@example.com' });
+      server = createApp({ store, jwtSecret: 's' }).listen(0);
+      base = `http://localhost:${server.address().port}`;
+      admin = (await api('POST', '/api/auth/login', { body: { email: 'boss@example.com' } })).body.token;
+      await api('POST', '/api/entities/User', { token: admin, body: { full_name: 'Mo Member', email: 'mo@x.com' } });
+      mo = (await api('POST', '/api/auth/login', { body: { email: 'mo@x.com' } })).body.token;
+    });
+    after(async () => { server.close(); await store.close(); });
+
+    test('validation and permissions', async () => {
+      assert.equal((await api('POST', '/api/voice/parse', { body: { mode: 'daily', transcript: 'x task' } })).status, 401);
+      assert.equal((await api('POST', '/api/voice/parse', { token: admin, body: { mode: 'nope', transcript: 'write post' } })).status, 400);
+      assert.equal((await api('POST', '/api/voice/parse', { token: admin, body: { mode: 'daily', transcript: ' ' } })).status, 400);
+      assert.equal((await api('POST', '/api/voice/parse', { token: mo, body: { mode: 'weekly', week_start: '2026-10-12', transcript: 'write post' } })).status, 403);
+      assert.equal((await api('POST', '/api/voice/parse', { token: admin, body: { mode: 'weekly', transcript: 'write post' } })).status, 400);
+    });
+
+    test('members can dictate their own daily tasks', async () => {
+      const r = await api('POST', '/api/voice/parse', { token: mo, body: { mode: 'daily', today: '2026-10-14', transcript: 'Write the newsletter, 2 hours. Update Zoho tomorrow' } });
+      assert.equal(r.status, 200);
+      assert.equal(r.body.tasks.length, 2);
+      assert.equal(r.body.tasks[0].estimated_hours, 2);
+      assert.equal(r.body.tasks[1].date, '2026-10-15');
+      assert.ok(r.body.tasks.every((t) => t.assignee_ids.length === 1)); // defaults to the speaker
+    });
+  });
+}

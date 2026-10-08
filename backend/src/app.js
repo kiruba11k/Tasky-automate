@@ -9,6 +9,7 @@ import { parseTable } from './extract.js';
 import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { registerWeekly } from './weekly.js';
+import { parseVoice } from './voice.js';
 
 const RESERVED_QUERY = new Set(['sort', 'limit', 'skip']);
 const SERVED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(csv|plain))$/;
@@ -35,7 +36,10 @@ export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
 }
 
 /** Builds the Express app around an initialised store. */
-export function createApp({ store, jwtSecret, staticDir } = {}) {
+export function createApp({ store, jwtSecret, staticDir, llm } = {}) {
+  // AI parsing needs ANTHROPIC_API_KEY (or an injected function in tests); otherwise voice falls back to simple rules.
+  const voiceLlm = llm || (process.env.ANTHROPIC_API_KEY ? invokeLLM : null);
+  const voiceLimit = createLimiter({ max: 60, windowMs: 60 * 60 * 1000 });
   const notifier = createNotifier(store);
   // Notification side-effects must never fail the request that caused them.
   const afterWrite = (args) => notifier.afterWrite(args).catch((e) => console.error('notify failed:', e));
@@ -136,6 +140,19 @@ export function createApp({ store, jwtSecret, staticDir } = {}) {
     }
     next();
   });
+
+  // ---- voice: dictated text -> structured weekly / daily tasks (nothing is saved here; the UI reviews first) ----
+  app.post('/api/voice/parse', wrap(async (req, res) => {
+    const { transcript, mode, week_start: weekStart } = req.body || {};
+    if (!['weekly', 'daily'].includes(mode)) return res.status(400).json({ error: 'mode must be weekly or daily' });
+    if (typeof transcript !== 'string' || transcript.trim().length < 3) return res.status(400).json({ error: 'Nothing to parse — dictate or type a task first' });
+    if (mode === 'weekly' && req.user.role !== 'admin' && req.user.role !== 'team_leader') return res.status(403).json({ error: 'Only team leaders can plan the week' });
+    if (mode === 'weekly' && !/^\d{4}-\d{2}-\d{2}$/.test(weekStart || '')) return res.status(400).json({ error: 'week_start is required' });
+    if (!voiceLimit(req.user.id)) return res.status(429).json({ error: 'Too many voice requests. Try again later.' });
+    const [users, projects] = await Promise.all([store.list('User'), store.list('Project')]);
+    const today = new Date().toISOString().slice(0, 10);
+    res.json(await parseVoice({ transcript, mode, users, projects, me: req.user, today: req.body.today && /^\d{4}-\d{2}-\d{2}$/.test(req.body.today) ? req.body.today : today, weekStart: mode === 'weekly' ? weekStart : null, llm: voiceLlm }));
+  }));
 
   // ---- users: managed by admins (any role) and team leaders (team members only) ----
   const canManageUser = (actor, target, newRole) => {

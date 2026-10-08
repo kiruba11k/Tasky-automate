@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ClipboardPaste, Copy, Download, Plus, Save, Trash2, UserPlus, X } from 'lucide-react';
+import { CalendarDays, ClipboardPaste, Copy, Download, Mic, Plus, Save, Trash2, UserPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { downloadText, exportSheet } from '@/lib/sheet';
 import { shiftDate, shiftWeek, weekDates } from '@/lib/week';
 import DaysDialog from './DaysDialog';
 import ImportDialog from './ImportDialog';
+import VoiceTaskDialog from '@/components/voice/VoiceTaskDialog';
 
 let seq = 0;
 const newKey = () => `new-${++seq}`;
@@ -45,6 +46,7 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
   const [message, setMessage] = useState(null); // { type: 'error' | 'ok', text }
   const [daysFor, setDaysFor] = useState(null); // { rowKey, userId }
   const [showImport, setShowImport] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
 
   const members = useMemo(() => users.filter((u) => u.status !== 'Inactive'), [users]);
   const userById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
@@ -104,6 +106,21 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
     }
   };
 
+  const addVoice = (items, { saveNow }) => {
+    const incoming = items.map((t) => ({
+      key: newKey(), project_name: t.project_name || '', title: t.title.trim(), expected_result: t.expected_result || '',
+      estimated_hours: t.estimated_hours === null || t.estimated_hours === undefined ? '' : String(t.estimated_hours), priority: t.priority || 'Medium',
+      assign: Object.fromEntries(t.assignee_ids.map((id) => [id, { days: t.days }])),
+    }));
+    if (saveNow) {
+      setRows((rs) => [...rs, ...incoming]);
+      save([...rows, ...incoming]);
+    } else {
+      edit((rs) => [...rs, ...incoming]);
+      setMessage({ type: 'ok', text: `Added ${incoming.length} dictated task${incoming.length === 1 ? '' : 's'}. Check the rows, then Save & notify.` });
+    }
+  };
+
   const addRow = () => edit((rs) => [...rs, { key: newKey(), project_name: rs.at(-1)?.project_name || '', title: '', expected_result: '', estimated_hours: '', priority: 'Medium', assign: {} }]);
 
   const removeRow = (r) => {
@@ -119,12 +136,12 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
     return { ...r, assign };
   }));
 
-  const save = async () => {
+  const save = async (rowsToSave = rows) => {
     if (!defaultDays.length) return setMessage({ type: 'error', text: 'Pick at least one working day.' });
     const planDays = defaultDays.map((i) => dates[i]);
     const payload = {
       week_start: week,
-      tasks: rows.filter((r) => r.title.trim() || Object.keys(r.assign).length).map((r) => ({
+      tasks: rowsToSave.filter((r) => r.title.trim() || Object.keys(r.assign).length).map((r) => ({
         id: r.id,
         title: r.title,
         project_name: r.project_name,
@@ -168,6 +185,7 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
           <Button onClick={addRow} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><Plus className="w-4 h-4 mr-1" />Add task</Button>
           <Button onClick={copyLastWeek} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><Copy className="w-4 h-4 mr-1" />Copy from last week</Button>
           <Button onClick={() => setShowImport(true)} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><ClipboardPaste className="w-4 h-4 mr-1" />Import from sheet</Button>
+          <Button onClick={() => setShowVoice(true)} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><Mic className="w-4 h-4 mr-1" />Dictate</Button>
           <Button onClick={exportCsv} disabled={!tasks.length} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><Download className="w-4 h-4 mr-1" />Export CSV</Button>
           <div className="flex items-center gap-1.5 text-xs text-slate-400" title="Default days for newly assigned people">
             <CalendarDays className="w-4 h-4" />
@@ -181,7 +199,7 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
           </div>
           <div className="ml-auto flex items-center gap-3">
             {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
-            <Button onClick={save} disabled={saving || !dirty} className="bg-green-600 hover:bg-green-700"><Save className="w-4 h-4 mr-1" />{saving ? 'Saving...' : 'Save & notify'}</Button>
+            <Button onClick={() => save()} disabled={saving || !dirty} className="bg-green-600 hover:bg-green-700"><Save className="w-4 h-4 mr-1" />{saving ? 'Saving...' : 'Save & notify'}</Button>
           </div>
         </CardContent>
       </Card>
@@ -264,6 +282,7 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
       </Card>
       <p className="text-xs text-slate-500">Same columns as your weekly sheet. Assign one or more people to a task; the estimated hours are shared between them and spread over their days. Saving creates their daily tasks (leaders and project managers included) and notifies everyone affected immediately. Status turns TRUE once every assignee's work is approved.</p>
 
+      <VoiceTaskDialog open={showVoice} onOpenChange={setShowVoice} mode="weekly" week={week} onApplyWeekly={addVoice} />
       <ImportDialog open={showImport} onOpenChange={setShowImport} users={users} onImport={addImported} />
       {daysFor && daysRow && daysCell && (
         <DaysDialog

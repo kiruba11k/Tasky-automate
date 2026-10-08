@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger }
   from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, Calendar, Users, BarChart3 } from 'lucide-react';
+import { Plus, Search, Filter, Calendar, Users, BarChart3, Mic } from 'lucide-react';
 import DailyTaskForm from '../components/tasks/DailyTaskForm';
+import VoiceTaskDialog from '../components/voice/VoiceTaskDialog';
 import DailyTaskCard from '../components/tasks/DailyTaskCard';
 import PerformanceSummary from '../components/dashboard/PerformanceSummary';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -18,6 +19,7 @@ export default function DailyTasks() {
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [showVoice, setShowVoice] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -177,6 +179,11 @@ export default function DailyTasks() {
             <p className="text-slate-400">Comprehensive overview of project tasks and team performance</p>
           </div>
 
+          <div className="flex items-center gap-3">
+          <Button onClick={() => setShowVoice(true)} variant="outline" className="bg-transparent border-slate-600 text-slate-200">
+            <Mic className="w-4 h-4 mr-2" />
+            Dictate
+          </Button>
           <Button
             onClick={() => setShowTaskForm(true)}
             className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg shadow-blue-500/30"
@@ -184,6 +191,7 @@ export default function DailyTasks() {
             <Plus className="w-4 h-4 mr-2" />
             {currentUser?.role === 'team_leader' ? 'Add/Assign Task' : 'Add Task'}
           </Button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -343,6 +351,7 @@ export default function DailyTasks() {
         </Tabs>
 
         {/* Task Form Dialog */}
+        <VoiceTaskDialog open={showVoice} onOpenChange={setShowVoice} mode="daily" onCreatedDaily={loadData} />
         <DailyTaskForm
           open={showTaskForm}
           onOpenChange={setShowTaskForm}

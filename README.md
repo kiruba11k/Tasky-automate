@@ -46,6 +46,18 @@ There is no sign-up and no password. Signing in needs only an email, and that em
 - **Approval:** a member's *Submit for approval* (with a written result) goes to the leaders; they *Approve* or *Request changes* (a reason is required). Status shows TRUE once every assignee is approved. Changing a submitted/approved allocation reopens it.
 - **Notifications:** pushed live to the screen (bell with unread count, pop-up toasts, optional desktop alerts) when work is allocated, changed, removed, submitted, approved or sent back, and when a leader assigns/edits a daily task or a project. Delivery uses Server-Sent Events with automatic reconnect and catch-up.
 
+## Voice dictation
+
+A **Dictate** button sits on Weekly Tasks → Allocate (leaders) and on Daily Tasks (everyone).
+
+1. Press *Start dictating* and speak (or type / paste text). Speech-to-text uses the browser's built-in speech service (Chrome, Edge, Safari; language selectable, default English-India). It keeps listening through pauses until you press Stop.
+2. *Understand* sends the text to the server, which extracts tasks — project, task, target / expected result, estimated hours, people, days — and matches spoken names to real users (ambiguous or unknown names are flagged, never guessed) and weekdays to dates. "Me/I" means the speaker.
+3. *Check and assign*: every task is editable (assignees, days, hours…). Nothing is created until you confirm.
+   - Weekly: *Add to week* puts the rows in the allocation grid as a draft; *Add & save now* saves and notifies immediately.
+   - Daily: creates the daily tasks (one per assignee); assignees are notified. Members can only create tasks for themselves; leaders can assign teammates.
+
+With `ANTHROPIC_API_KEY` set, an AI model does the understanding (handles free-form speech, corrects misheard names against your team/project lists). Without it a simpler rule-based parser is used, which copes with clear phrasing ("Komala and Alok review 100 prospects for BlueDove, target 35% connection rate, 8 hours") but not complex speech. Browser dictation may send audio to the browser vendor's speech service.
+
 ## Deploy on Render (free)
 
 1. Push this repo to GitHub and create the Neon database (above).
