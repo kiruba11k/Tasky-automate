@@ -7,9 +7,9 @@ export default function HeroStage({ page, data, calm, onFlash }) {
   let scene = null;
   switch (page) {
     case 'DailyTasks': scene = <WorkbenchScene pending={data.pending} calm={calm} />; break;
-    case 'WeeklyTasks': scene = <TrainScene calm={calm} />; break;
+    case 'WeeklyTasks': scene = <TrainScene calm={calm} friday={data.friday} />; break;
     case 'Analytics': scene = <BarsScene planned={data.planned} done={data.done} calm={calm} />; break;
-    case 'Management': scene = <GearsScene activity={data.activity} calm={calm} />; break;
+    case 'Management': scene = <GearsScene activity={data.activity} health={data.health} calm={calm} />; break;
     case 'ProjectManagement': scene = <BuildScene progress={data.progress} calm={calm} />; break;
     case 'Tasks': scene = <CratesScene todo={data.todo} doing={data.doing} done={data.done} calm={calm} />; break;
     case 'Team': scene = <PhotoScene members={data.members} calm={calm} onFlash={onFlash} />; break;

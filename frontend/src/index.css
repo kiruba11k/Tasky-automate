@@ -371,3 +371,11 @@ body.calm input[type='checkbox']:checked, body.calm [role='checkbox'][data-state
 @keyframes hero-flash { 0% { opacity: .95; } 100% { opacity: 0; } }
 @media (max-width: 640px) { .hero-canvas { flex-basis: 55%; } .page-hero p { display: none; } }
 body.calm .page-hero, body.calm .hero-flash { animation: none; }
+
+/* fitting room */
+.fitting-room { position: relative; width: 230px; height: 270px; border-radius: 1rem; overflow: hidden; border: 3px solid #0b1220; background: linear-gradient(to bottom, #3b1d5e, #1e1b4b); cursor: grab; touch-action: none; box-shadow: 3px 4px 0 rgba(0,0,0,.4); }
+.fitting-room:active { cursor: grabbing; }
+.fitting-curtain { position: absolute; top: 0; bottom: 0; width: 22%; background: repeating-linear-gradient(90deg, #be185d 0 8px, #9d174d 8px 16px); z-index: 2; pointer-events: none; }
+.fitting-curtain.l { left: 0; border-radius: 0 0 40% 0; } .fitting-curtain.r { right: 0; border-radius: 0 0 0 40%; }
+.fitting-spot { position: absolute; top: -10%; left: 25%; width: 50%; height: 110%; background: linear-gradient(to bottom, rgba(253, 224, 71, .35), transparent 85%); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); pointer-events: none; z-index: 1; }
+.fitting-label { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: .72rem; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; z-index: 3; pointer-events: none; }

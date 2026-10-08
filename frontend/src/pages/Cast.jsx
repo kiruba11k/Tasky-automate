@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState } from 'react';
 import { SPECIES, SPECIES_IDS } from '@/fun/three/species';
 import { useFun } from '@/fun/FunProvider';
 import { useBuddy } from '@/fun/BuddyContext';
+import FittingRoom from '@/fun/FittingRoom';
 import EggDialog from '@/fun/EggDialog';
 import ArcadeGame from '@/fun/ArcadeGame';
 import { Emoji } from '@/icons/Emoji';
@@ -19,6 +20,9 @@ export default function Cast() {
   const [error, setError] = useState('');
   const run = async (fn) => { setError(''); try { await fn(); } catch (e) { setError(e.message); } };
   const preview = pinned === 'auto' ? 'cat' : pinned;
+  const [tryOn, setTryOn] = useState(null);
+  const shown = tryOn ? { ...equipped, [tryOn.slot]: tryOn.id } : equipped;
+  const tryOnOwned = tryOn ? ownedAccessories.includes(tryOn.id) : true;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-5">
@@ -34,9 +38,7 @@ export default function Cast() {
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
 
       <div className="glass-effect-enhanced rounded-2xl p-4 grid md:grid-cols-[auto_1fr] gap-4 items-center">
-        <Suspense fallback={<div style={{ width: 170, height: 210 }} />}>
-          <Buddy3D species={preview} pose="wave" size={170} equipped={equipped} calm={settings.anim === 'calm'} />
-        </Suspense>
+        <FittingRoom species={preview} equipped={shown} calm={settings.anim === 'calm'} label={tryOn ? (tryOnOwned ? `Trying on: ${accessories.find((x) => x.id === tryOn.id)?.name}` : 'Locked. Hatch eggs to find it!') : 'Fitting room'} />
         <div className="space-y-2">
           <h2 className="font-extrabold text-white">Wardrobe</h2>
           {['hat', 'neck', 'face'].map((slot) => (
@@ -46,8 +48,8 @@ export default function Cast() {
               {accessories.filter((a) => a.slot === slot).map((a) => {
                 const owned = ownedAccessories.includes(a.id);
                 return (
-                  <button key={a.id} type="button" disabled={!owned} onClick={() => run(() => equip(slot, a.id))} aria-pressed={equipped[slot] === a.id} title={owned ? a.name : 'Hatch eggs to find this'} className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-bold ${equipped[slot] === a.id ? 'bg-emerald-400 text-ink' : owned ? 'bg-slate-800 text-slate-200' : 'bg-slate-900 text-slate-600 border-dashed'}`}>
-                    {owned ? a.name : '???'}
+                  <button key={a.id} type="button" aria-disabled={!owned} onMouseEnter={() => setTryOn({ slot, id: a.id })} onMouseLeave={() => setTryOn(null)} onFocus={() => setTryOn({ slot, id: a.id })} onBlur={() => setTryOn(null)} onClick={() => owned && run(() => equip(slot, a.id))} aria-pressed={equipped[slot] === a.id} title={owned ? a.name : 'Hatch eggs to find this'} className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-bold ${equipped[slot] === a.id ? 'bg-emerald-400 text-ink' : owned ? 'bg-slate-800 text-slate-200' : 'bg-slate-900 text-slate-600 border-dashed'}`}>
+                    {a.name}
                   </button>
                 );
               })}

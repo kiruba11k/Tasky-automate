@@ -44,7 +44,10 @@ function useHeroData(page) {
   }, [page]);
   const planned = rows.reduce((n, r) => n + r.planned, 0);
   const done = rows.reduce((n, r) => n + r.done, 0);
-  return { pending: Math.max(0, (stats?.planned_today || 0) - (stats?.completed_today || 0)), planned, done, activity: rows.reduce((n, r) => n + r.done_today, 0), members: rows, ...extra };
+  const active = rows.filter((r) => r.done_today > 0).length;
+  const ratio = planned ? done / planned : 0;
+  const health = rows.length ? Math.min(1, ratio * 0.6 + (active / rows.length) * 0.4) : 0;
+  return { health, friday: new Date().getDay() === 5, pending: Math.max(0, (stats?.planned_today || 0) - (stats?.completed_today || 0)), planned, done, activity: rows.reduce((n, r) => n + r.done_today, 0), members: rows, ...extra };
 }
 
 /** A themed 3D banner at the top of each page (a different scene and buddy per page). Dismissible, and off in settings. */
@@ -62,9 +65,9 @@ export default function PageHero() {
   const day = new Date().getDay();
   const chips = {
     DailyTasks: [`${data.pending} to do today`],
-    WeeklyTasks: [`Today is ${DAYS[day]}${day >= 1 && day <= 5 ? `, stop ${day} of 5` : ''}`],
+    WeeklyTasks: [day === 5 ? 'Friday! Party train' : `Today is ${DAYS[day]}${day >= 1 && day <= 5 ? `, stop ${day} of 5` : ''}`],
     Analytics: [`${data.planned} planned`, `${data.done} done`, `${Math.max(0, data.planned - data.done)} to go`],
-    Management: [`${data.activity} finished today`],
+    Management: [`Team health ${Math.round(data.health * 100)}% · ${data.health < 0.25 ? 'warming up' : data.health < 0.5 ? 'getting warm' : data.health < 0.75 ? 'cooking' : 'on fire'}`, `${data.activity} finished today`],
     ProjectManagement: [`${Math.round(data.progress || 0)}% average progress`],
     Tasks: [`${data.todo || 0} to do`, `${data.doing || 0} in progress`, `${data.done || 0} done`],
     Team: [`${data.members.length} teammates`],

@@ -3,7 +3,7 @@ import { CheckSquare } from 'lucide-react';
 import Mascot from '@/fun/Mascot';
 import { hasWebGL } from '@/fun/three/species';
 
-const Buddy3D = lazy(() => import('@/fun/three/Buddy3D'));
+const PeekStage = lazy(() => import('@/fun/three/PeekStage'));
 const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default function AuthShell({ title, subtitle, children }) {
@@ -18,7 +18,7 @@ export default function AuthShell({ title, subtitle, children }) {
         </div>
         <div className="flex justify-center -mt-2 mb-2">
           {hasWebGL()
-            ? <Suspense fallback={<div style={{ height: 150 }} />}><Buddy3D species="mouse" pose="wave" size={120} calm={calm()} /></Suspense>
+            ? <Suspense fallback={<div style={{ height: 190 }} />}><PeekStage size={200} calm={calm()} /></Suspense>
             : <Mascot mood="wave" size={92} className="tasky-bob" />}
         </div>
         <h2 className="text-2xl font-semibold text-white">{title}</h2>

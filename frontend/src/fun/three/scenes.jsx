@@ -36,13 +36,14 @@ export function WorkbenchScene({ pending = 0, calm }) {
 }
 
 /** Weekly tasks: the week as a train, chugging along with a passenger waving from each car. */
-export function TrainScene({ calm }) {
+export function TrainScene({ calm, friday = false }) {
   const { W, gy } = useLayout();
-  const g = useRef(); const smoke = useRef([]);
+  const g = useRef(); const smoke = useRef([]); const conf = useRef([]);
   const L = 7.2;
   useFrame((s) => {
     const t = calm ? 0.5 : s.clock.elapsedTime;
     if (g.current) g.current.position.x = ((t * 1.3 + W * 0.25 + (calm ? W * 0.3 : 0)) % (W + L + 2)) - W / 2 - 1;
+    conf.current.forEach((m, i) => { if (!m) return; const k = (t * (0.35 + (i % 5) * 0.06) + i * 0.137) % 1; m.position.set(0.7 - ((i * 0.61) % 7.4) + Math.sin(t * 2 + i) * 0.15, 2.3 - k * 2.2, ((i % 3) - 1) * 0.25); m.rotation.set(t * 3 + i, t * 2, i); });
     smoke.current.forEach((m, i) => { if (!m) return; const k = ((t * 0.8 + i * 0.25) % 1); m.position.set(0.55 - k * 0.6, 1.0 + k * 0.9, 0); m.scale.setScalar(0.08 + k * 0.2); m.visible = !calm || i === 0; });
   });
   const cars = ['#34d399', '#60a5fa', '#f472b6', '#facc15', '#a78bfa'];
@@ -65,10 +66,11 @@ export function TrainScene({ calm }) {
             <Part g="box" color={c} s={[0.55, 0.26, 0.28]} p={[0, 0.4, 0]} />
             <Part g="box" color="#fef9c3" s={[0.34, 0.1, 0.02]} p={[0, 0.46, 0.29]} basic outline={false} />
             {[-0.28, 0.28].map((dx) => <Part key={dx} g="cyl" args={[1, 1, 1, 14]} color="#111827" s={[0.1, 0.04, 0.1]} p={[dx, 0.14, 0.17]} r={[Math.PI / 2, 0, 0]} />)}
-            <group position={[0, 0.67, 0]} scale={0.3}><Critter3D species={riders[i]} pose="wave" calm={calm} rotation={[0, 0.5, 0]} /></group>
+            <group position={[0, 0.67, 0]} scale={0.3}><Critter3D species={riders[i]} pose={friday ? 'dance' : 'wave'} equipped={friday ? { hat: 'partyhat' } : undefined} calm={calm} rotation={[0, 0.5, 0]} /></group>
             <Part g="cyl" args={[1, 1, 1, 8]} color="#6b7280" s={[0.02, 0.02, 0.28]} p={[0.72, 0.24, 0]} r={[0, 0, Math.PI / 2]} outline={false} />
           </group>
         ))}
+        {friday && Array.from({ length: 44 }, (_, i) => <group key={`cf${i}`} ref={(el) => { conf.current[i] = el; }}><Part g="box" color={COL[i % COL.length]} s={[0.05, 0.02, 0.08]} basic outline={false} /></group>)}
       </group>
     </>
   );
@@ -110,12 +112,24 @@ function Gear({ r, teeth, color, speed, phase = 0, calm, ...pos }) {
 }
 
 /** Management: meshing gears that spin faster the more the team gets done, with an owl presenting the numbers. */
-export function GearsScene({ activity = 0, calm }) {
+export function GearsScene({ activity = 0, health = 0, calm }) {
   const { W, gy } = useLayout();
   const sp = 0.35 + Math.min(activity, 6) * 0.25;
-  const cx = W * 0.2;
+  const cx = W * 0.1;
+  const liquid = useRef(); const cur = useRef(0.05);
+  useFrame((s, dt) => {
+    cur.current = calm ? health : damp(cur.current, health, dt, 2.5);
+    if (liquid.current) { liquid.current.scale.y = Math.max(0.02, cur.current * 1.6); liquid.current.position.y = (cur.current * 1.6) / 2; }
+  });
+  const hot = health < 0.34 ? '#38bdf8' : health < 0.67 ? '#34d399' : '#fb923c';
   return (
     <>
+      <group position={[cx + 3.0, gy + 0.3, 0]}>
+        <mesh position={[0, 0.9, 0]}><cylinderGeometry args={[0.15, 0.15, 1.8, 16]} /><meshBasicMaterial color="#e0f2fe" transparent opacity={0.3} /></mesh>
+        <Part color={hot} s={0.28} p={[0, 0, 0]} basic outline={false} />
+        <group ref={liquid} position={[0, 0.05, 0]}><Part g="cyl" args={[1, 1, 1, 14]} color={hot} s={[0.08, 0.5, 0.08]} basic outline={false} /></group>
+        {[0.3, 0.6, 0.9, 1.2, 1.5].map((y) => <Part key={y} g="box" color="#e2e8f0" s={[0.09, 0.012, 0.01]} p={[0.2, y, 0]} basic outline={false} />)}
+      </group>
       <Buddy x={cx - 2.4} gy={gy} species="owl" pose="present" held="clipboard" calm={calm} rot={0.9} />
       <Gear p={[cx - 0.3, gy + 1.2, -0.3]} r={0.8} teeth={10} color="#f59e0b" speed={sp} calm={calm} />
       <Gear p={[cx + 1.12, gy + 0.86, -0.3]} r={0.5} teeth={6} color="#38bdf8" speed={-sp * 1.6} phase={0.3} calm={calm} />

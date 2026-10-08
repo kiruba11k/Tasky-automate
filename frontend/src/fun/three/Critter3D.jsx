@@ -200,7 +200,7 @@ function Held({ kind }) {
   );
 }
 
-export default function Critter3D({ species = 'cat', pose = 'idle', calm = false, scale = 1, equipped, prop, held, ...rest }) {
+export default function Critter3D({ species = 'cat', pose = 'idle', calm = false, scale = 1, equipped, prop, held, lookRef, ...rest }) {
   const c = SPECIES[species] || SPECIES.cat;
   const poseRef = useRef(pose);
   poseRef.current = pose;
@@ -246,6 +246,7 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
       case 'dance': Object.assign(o, { y: Math.abs(sn(t * 6)) * 0.2, rz: sn(t * 3) * 0.14, hz: sn(t * 3) * 0.2, aLz: 1.7 + sn(t * 6) * 0.8, aRz: -(1.7 + sn(t * 6 + Math.PI) * 0.8), lL: sn(t * 6) * 0.4, lR: -sn(t * 6) * 0.4, tail: sn(t * 9) * 0.6 }); break;
       default: break;
     }
+    if (lookRef?.current && (p === 'idle' || p === 'wave' || p === 'scared')) { const lk = lookRef.current; o.hy = lk.x * 0.85; o.hx = -lk.y * 0.5 + (p === 'scared' ? 0.15 : 0); }
     if (root.current) { root.current.position.set(o.x, o.y, 0); root.current.rotation.z = o.rz; root.current.rotation.x = o.rx; }
     if (body.current) body.current.scale.set(1, o.bsy, 1);
     if (head.current) { head.current.rotation.set(o.hx, o.hy, o.hz); }
