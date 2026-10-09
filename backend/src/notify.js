@@ -62,5 +62,8 @@ export function createNotifier(store) {
     }
   }
 
-  return { notify, notifyMany, managers, subscribe, afterWrite };
+  /** A live-only signal (nothing is stored or shown in the notification list). Used by the anonymous bird post. */
+  const signal = (userId, payload) => push(userId, payload);
+
+  return { notify, notifyMany, managers, subscribe, afterWrite, signal };
 }

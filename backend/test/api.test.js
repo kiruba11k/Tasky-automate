@@ -711,3 +711,83 @@ describe('playful features are available to every role', () => {
     assert.ok(JSON.stringify(mine).includes('kudos'));
   });
 });
+
+describe('anonymous bird post', () => {
+  let server, base, now, store;
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, text, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+  let admin, ann, bo, cy, ids;
+
+  before(async () => {
+    now = 1_000_000;
+    store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    server = createApp({ store, jwtSecret: 's', clock: () => now }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    admin = await login('boss@example.com');
+    for (const [n, e, r] of [['Ann Sender', 'ann@example.com', 'team_member'], ['Bo Receiver', 'bo@example.com', 'team_member'], ['Cy Receiver', 'cy@example.com', 'team_leader']]) await call('POST', '/api/entities/User', admin, { full_name: n, email: e, role: r });
+    [ann, bo, cy] = [await login('ann@example.com'), await login('bo@example.com'), await login('cy@example.com')];
+    const list = (await call('GET', '/api/birds/recipients', ann)).body;
+    ids = Object.fromEntries(list.map((u) => [u.name, u.id]));
+  });
+  after(() => server.close());
+
+  test('a bird can be sent to one person, several people, or everyone, and the sender is never revealed', async () => {
+    assert.equal((await call('POST', '/api/birds', ann, { to: [ids['Bo Receiver']], text: 'You are doing great!' })).status, 201);
+    assert.equal((await call('POST', '/api/birds', ann, { to: 'all', text: 'Coffee at 4?' })).status, 201);
+    const inbox = await call('GET', '/api/birds/inbox', bo);
+    assert.equal(inbox.body.length, 2);
+    for (const forbidden of ['Ann Sender', 'ann@example.com', 'from_user_id']) assert.ok(!inbox.text.includes(forbidden), `inbox leaks ${forbidden}`);
+    assert.ok(inbox.body.every((b) => b.opened === false && b.text === undefined)); // sealed until opened
+    const bird = inbox.body[0];
+    assert.ok(['robin', 'bluebird', 'parrot', 'pigeon', 'toucan', 'canary'].includes(bird.bird));
+    assert.equal((await call('GET', '/api/birds/inbox', ann)).body.length, 0); // the sender gets nothing back, and everyone-excludes-self
+    assert.equal((await call('GET', '/api/birds/inbox', cy)).body.length, 1);
+  });
+
+  test('the generic entity API cannot read or write birds', async () => {
+    assert.equal((await call('GET', '/api/entities/BirdMessage', admin)).status, 404);
+    assert.equal((await call('POST', '/api/entities/BirdMessage', ann, { to_user_id: 'x', from_user_id: 'y', text: 'hi' })).status, 404);
+  });
+
+  test('opening reveals the text and the bird flies away five minutes later', async () => {
+    const id = (await call('GET', '/api/birds/inbox', bo)).body[0].id;
+    assert.equal((await call('POST', `/api/birds/${id}/open`, cy)).status, 404); // not yours
+    const opened = (await call('POST', `/api/birds/${id}/open`, bo)).body;
+    assert.ok(opened.text);
+    assert.equal(opened.expires_at - opened.opened_at, 5 * 60 * 1000);
+    now += 4 * 60 * 1000;
+    assert.equal((await call('POST', `/api/birds/${id}/open`, bo)).body.expires_at, opened.expires_at); // reopening does not extend it
+    now += 61 * 1000;
+    const after = (await call('GET', '/api/birds/inbox', bo)).body;
+    assert.ok(!after.some((b) => b.id === id)); // gone
+    assert.equal((await call('POST', `/api/birds/${id}/open`, bo)).status, 404);
+    assert.equal(after.length, 1); // the unopened one is still waiting
+  });
+
+  test('muted people silently receive nothing, and the sender cannot tell', async () => {
+    assert.equal((await call('PATCH', '/api/auth/me', cy, { birds_muted: true })).status, 200);
+    const r = await call('POST', '/api/birds', ann, { to: [ids['Cy Receiver']], text: 'Hello?' });
+    assert.equal(r.status, 201);
+    assert.equal(r.body.sent, 1);
+    assert.equal((await call('GET', '/api/birds/inbox', cy)).body.filter((b) => b.opened === false).length, 1); // only the earlier one
+    await call('PATCH', '/api/auth/me', cy, { birds_muted: false });
+  });
+
+  test('validation, limits and unopened-pile protection', async () => {
+    assert.equal((await call('POST', '/api/birds', ann, { to: 'all', text: '   ' })).status, 400);
+    assert.equal((await call('POST', '/api/birds', ann, { to: 'all', text: 'x'.repeat(281) })).status, 400);
+    assert.equal((await call('POST', '/api/birds', ann, { to: ['nobody'], text: 'hi' })).status, 400);
+    assert.equal((await call('POST', '/api/birds', ann, { text: 'hi' })).status, 400);
+    for (let i = 0; i < 5; i += 1) await call('POST', '/api/birds', bo, { to: [ids['Ann Sender']], text: `flood ${i}` });
+    assert.ok((await call('GET', '/api/birds/inbox', ann)).body.length <= 3); // at most 3 unopened birds from one sender
+    let last;
+    for (let i = 0; i < 70; i += 1) last = await call('POST', '/api/birds', cy, { to: 'all', text: `bulk ${i}` });
+    assert.equal(last.status, 429); // hourly limit
+  });
+});

@@ -31,6 +31,7 @@ export function NotificationProvider({ children }) {
   const dismissToast = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
   const handleIncoming = useCallback((n) => {
+    if (n.__bird) { emitFun({ type: 'bird' }); return; } // anonymous bird signal: nothing is stored or shown as a notification
     if (seen.current.has(n.id)) return;
     seen.current.add(n.id);
     setItems((prev) => [n, ...prev].slice(0, 100));

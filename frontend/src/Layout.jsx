@@ -6,6 +6,7 @@ import NotificationBell from "@/notifications/NotificationBell";
 import ProgressChip from "@/fun/ProgressChip";
 import ThemeControls from "@/themes/ThemeControls";
 import { LunchButton } from './fun/LunchBreak';
+import { BirdButton } from './fun/BirdPost';
 import MotionToggle from "@/fun/MotionToggle";
 import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
 
@@ -288,6 +289,7 @@ export default function Layout({ children, currentPageName }) {
               <ProgressChip />
               <MotionToggle />
             <LunchButton />
+              <BirdButton />
               <ThemeControls />
               <NotificationBell />
               <button

@@ -9,6 +9,7 @@ import { parseTable } from './extract.js';
 import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { validateThemePrefs } from './theme.js';
+import { registerBirds } from './birds.js';
 import { buddyStatus, hatchEgg, parade, validateBuddyPrefs } from './buddies.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
@@ -39,7 +40,7 @@ export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
 }
 
 /** Builds the Express app around an initialised store. */
-export function createApp({ store, jwtSecret, staticDir, llm, random = Math.random } = {}) {
+export function createApp({ store, jwtSecret, staticDir, llm, random = Math.random, clock = Date.now } = {}) {
   // AI parsing needs ANTHROPIC_API_KEY (or an injected function in tests); otherwise voice falls back to simple rules.
   const voiceLlm = llm || (process.env.ANTHROPIC_API_KEY ? invokeLLM : null);
   const voiceLimit = createLimiter({ max: 60, windowMs: 60 * 60 * 1000 });
@@ -99,7 +100,7 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   app.patch('/api/auth/me', wrap(async (req, res) => {
     // Self-service profile edits only: no role/email/status changes.
-    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at', 'buddy', 'equipped'];
+    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at', 'buddy', 'equipped', 'birds_muted'];
     const body = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
     const themeError = validateThemePrefs(body);
     if (themeError) return res.status(400).json({ error: themeError });
@@ -140,11 +141,13 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
   });
 
   registerWeekly(app, { store, notifier, wrap });
+  registerBirds(app, { store, notifier, wrap, clock });
 
   // Weekly plans and notifications are written only through the endpoints above.
   const READ_ONLY_ENTITIES = new Set(['WeeklyTask', 'WeeklyAssignment', 'Achievement', 'Kudos']);
   app.use('/api/entities/:entity', (req, res, next) => {
     const { entity: name } = req.params;
+    if (name === 'BirdMessage') return res.status(404).json({ error: 'Unknown entity BirdMessage' }); // private: only the bird endpoints may touch it
     if (name === 'Notification' || (READ_ONLY_ENTITIES.has(name) && req.method !== 'GET')) {
       return res.status(403).json({ error: `${name} cannot be changed directly` });
     }

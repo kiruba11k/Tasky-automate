@@ -4,6 +4,8 @@ import { useState } from 'react';
 import TrophyShelf from './TrophyShelf';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFun } from './FunProvider';
+import { request } from '@/api/client';
+import { useAuth } from '@/auth/AuthContext';
 import { emitFun } from './bus';
 import { ArcadeDialog } from './Arcade';
 import { Emoji, Rich } from '@/icons/Emoji';
@@ -21,6 +23,9 @@ const Toggle = ({ label, on, onChange, hint }) => (
 export default function ProgressChip() {
   const { stats, settings, setSettings } = useFun();
   const [shelf, setShelf] = useState(false);
+  const { user } = useAuth();
+  const [muted, setMuted] = useState(Boolean(user?.birds_muted));
+  const setBirds = async (v) => { setMuted(v); try { await request('PATCH', '/api/auth/me', { birds_muted: v }); } catch { setMuted(!v); } };
   const [arcade, setArcade] = useState(false);
   const span = stats ? Math.max(1, stats.next_level_xp - stats.level_start_xp) : 1;
   const pct = stats ? Math.min(100, Math.round(((stats.xp - stats.level_start_xp) / span) * 100)) : 0;
@@ -66,6 +71,7 @@ export default function ProgressChip() {
         <Toggle label="3D characters" hint="Buddies and the chase are drawn in 3D (turn off on slow devices)" on={settings.view3d} onChange={(v) => setSettings({ view3d: v })} />
         <Link to="/Cast" className="block text-center rounded-lg border-2 border-slate-900 bg-slate-800 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700">Meet the cast and pick your buddy</Link>
         <Toggle label="Page scenes" hint="A themed 3D banner with a different buddy on each page" on={settings.heroes} onChange={(v) => setSettings({ heroes: v })} />
+        <Toggle label="Pause anonymous birds" hint="While on, nobody can send you bird messages (senders cannot tell)" on={muted} onChange={setBirds} />
         <Toggle label="Click sparkles" hint="Stars pop when you press buttons" on={settings.sparkles} onChange={(v) => setSettings({ sparkles: v })} />
         <Toggle label="Cursor pal" hint="A tiny buddy trails your mouse pointer (desktop)" on={settings.pal} onChange={(v) => setSettings({ pal: v })} />
         <Toggle label="Screensaver" hint="After 5 idle minutes the cast bounces around" on={settings.saver} onChange={(v) => setSettings({ saver: v })} />

@@ -460,3 +460,14 @@ body.calm .levelup-rays, body.calm .levelup-num, body.calm .levelup-card { anima
 .memory-face.front { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
 .memory-face.back { background: #f8fafc; transform: rotateY(180deg); }
 body.calm .memory-card { transition: none; }
+
+/* bird post */
+.bird-tray { position: fixed; right: 1rem; z-index: 106; display: flex; flex-direction: column; align-items: flex-end; gap: .4rem; max-width: calc(100vw - 1rem); }
+.bird-perch { position: relative; padding: 0; border-radius: 1rem; border: 3px solid #0b1220; background: linear-gradient(to bottom, rgba(56, 189, 248, .35), rgba(15, 23, 42, .6)); cursor: pointer; overflow: hidden; box-shadow: 3px 4px 0 rgba(0,0,0,.5); animation: pop-in .4s cubic-bezier(.34, 1.56, .64, 1) both; line-height: 0; }
+.bird-perch-badge { position: absolute; top: 4px; right: 6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #0ea5e9; color: #fff; font-size: 11px; font-weight: 900; line-height: 20px; border: 2px solid #0b1220; animation: pop-in .4s both, egg-wiggle 2s ease-in-out 1s infinite; }
+.bird-panel { width: 19rem; max-width: calc(100vw - 2rem); display: flex; flex-direction: column; gap: .35rem; padding: .55rem; border-radius: 1rem; border: 3px solid #0b1220; background: rgb(var(--slate-900)); box-shadow: 4px 5px 0 rgba(0,0,0,.5); animation: pop-in .25s ease both; transform-origin: bottom right; }
+.bird-letter { position: relative; padding: 1.6rem 1.3rem 1.1rem; border-radius: 8px; background: repeating-linear-gradient(to bottom, transparent 0 27px, rgba(180, 120, 40, .13) 27px 28px), linear-gradient(#fffaf0, #fdecc8); box-shadow: 6px 8px 0 rgba(0,0,0,.45); transform-origin: top center; animation: letter-unfold .7s cubic-bezier(.3, 1.3, .5, 1) both; }
+@keyframes letter-unfold { from { transform: perspective(700px) rotateX(-80deg) scaleY(.3); opacity: 0; } }
+.bird-letter-seal { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fb7185, #be123c); border: 3px solid #7f1d1d; animation: pop-in .5s .5s cubic-bezier(.34, 1.8, .5, 1) both; }
+@media (max-width: 640px) { .bird-perch { transform: scale(.85); transform-origin: bottom right; } }
+body.calm .bird-perch, body.calm .bird-letter, body.calm .bird-panel, body.calm .bird-perch-badge, body.calm .bird-letter-seal { animation: none; }

@@ -31,6 +31,7 @@ schemas.User = {
     theme_custom: { type: 'string' },
     theme_at: { type: 'number' },
     buddy: { type: 'string' },
+    birds_muted: { type: 'boolean' },
     equipped: { type: 'object' },
   },
   required: ['full_name', 'email'],

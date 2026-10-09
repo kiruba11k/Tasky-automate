@@ -1,0 +1,13 @@
+{
+  "name": "BirdMessage",
+  "type": "object",
+  "properties": {
+    "to_user_id": { "type": "string" },
+    "from_user_id": { "type": "string", "description": "Kept only for rate limiting. Never returned by any endpoint." },
+    "text": { "type": "string" },
+    "bird": { "type": "string" },
+    "opened_at": { "type": "number" },
+    "expires_at": { "type": "number" }
+  },
+  "required": ["to_user_id", "from_user_id", "text"]
+}

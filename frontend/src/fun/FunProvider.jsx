@@ -14,6 +14,7 @@ import BusyRunner from './BusyRunner';
 import RocketTop from './RocketTop';
 import IdleSaver from './IdleSaver';
 import LevelUp from './LevelUp';
+import BirdPost from './BirdPost';
 import CursorPal from './CursorPal';
 import BadgeUnlock from './BadgeUnlock';
 import ChaseCutscene from './chase/ChaseCutscene';
@@ -364,6 +365,7 @@ export function FunProvider({ children }) {
       )}
       <BusyRunner />
       <LevelUp />
+      <BirdPost />
       <CursorPal />
       <RocketTop />
       <IdleSaver />
