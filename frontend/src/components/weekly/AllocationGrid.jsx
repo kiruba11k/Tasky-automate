@@ -10,6 +10,7 @@ import { WeeklyTask } from '@/entities/WeeklyTask';
 import { saveWeek } from '@/api/weekly';
 import { downloadText, exportSheet } from '@/lib/sheet';
 import { shiftDate, shiftWeek, weekDates } from '@/lib/week';
+import { spreadDays } from '@/lib/spread';
 import DaysDialog from './DaysDialog';
 import ImportDialog from './ImportDialog';
 import VoiceTaskDialog from '@/components/voice/VoiceTaskDialog';
@@ -41,6 +42,8 @@ function buildRows(tasks, assignments, { fresh = false, shiftDays = 0 } = {}) {
 export default function AllocationGrid({ week, users, projects, tasks, assignments, pendingImport, onPendingApplied, onJumpWeek, onSaved }) {
   const [rows, setRows] = useState([]);
   const [defaultDays, setDefaultDays] = useState([0, 1, 2, 3, 4]);
+  const [placement, setPlacementState] = useState(() => { try { return localStorage.getItem('tasky_placement') === 'every' ? 'every' : 'spread'; } catch { return 'spread'; } });
+  const setPlacement = (v) => { setPlacementState(v); try { localStorage.setItem('tasky_placement', v); } catch { /* ignore */ } };
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null); // { type: 'error' | 'ok', text }
@@ -139,6 +142,8 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
   const save = async (rowsToSave = rows) => {
     if (!defaultDays.length) return setMessage({ type: 'error', text: 'Pick at least one working day.' });
     const planDays = defaultDays.map((i) => dates[i]);
+    const live = rowsToSave.filter((r) => r.title.trim() || Object.keys(r.assign).length);
+    const placed = placement === 'spread' ? spreadDays(live, planDays) : {};
     const payload = {
       week_start: week,
       tasks: rowsToSave.filter((r) => r.title.trim() || Object.keys(r.assign).length).map((r) => ({
@@ -148,7 +153,7 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
         expected_result: r.expected_result,
         estimated_hours: r.estimated_hours,
         priority: r.priority,
-        assignments: Object.entries(r.assign).map(([user_id, c]) => ({ user_id, days: c.days || planDays })),
+        assignments: Object.entries(r.assign).map(([user_id, c]) => ({ user_id, days: c.days || placed[r.key]?.[user_id] || planDays })),
       })),
     };
     setSaving(true);
@@ -187,7 +192,12 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
           <Button onClick={() => setShowImport(true)} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><ClipboardPaste className="w-4 h-4 mr-1" />Import from sheet</Button>
           <Button onClick={() => setShowVoice(true)} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><Mic className="w-4 h-4 mr-1" />Dictate</Button>
           <Button onClick={exportCsv} disabled={!tasks.length} variant="outline" className="bg-transparent border-slate-600 text-slate-200"><Download className="w-4 h-4 mr-1" />Export CSV</Button>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400" title="Default days for newly assigned people">
+          <div className="flex items-center rounded-md border border-slate-700 overflow-hidden text-xs" role="radiogroup" aria-label="How new tasks are placed on days" title="Spread: each task lands on the least busy day. Every day: each task repeats on every working day.">
+            {[['spread', 'Spread across week'], ['every', 'Repeat every day']].map(([v, l]) => (
+              <button key={v} type="button" role="radio" aria-checked={placement === v} onClick={() => setPlacement(v)} className={`px-2.5 py-1.5 ${placement === v ? 'bg-blue-600/40 text-white' : 'text-slate-400 hover:text-white'}`}>{l}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-400" title="Working days used for new tasks">
             <CalendarDays className="w-4 h-4" />
             {DAY_NAMES.map((n, i) => (
               <button
@@ -280,7 +290,7 @@ export default function AllocationGrid({ week, users, projects, tasks, assignmen
           </table>
         </CardContent>
       </Card>
-      <p className="text-xs text-slate-500">Same columns as your weekly sheet. Assign one or more people to a task; the estimated hours are shared between them and spread over their days. Saving creates their daily tasks (leaders and project managers included) and notifies everyone affected immediately. Status turns TRUE once every assignee's work is approved.</p>
+      <p className="text-xs text-slate-500">Same columns as your weekly sheet. Assign one or more people to a task; the estimated hours are shared between them and spread over their days. With &ldquo;Spread across week&rdquo; each new task is placed on the least busy day (long tasks take one day per ~4 hours); &ldquo;Repeat every day&rdquo; puts every task on every working day. Saving creates their daily tasks (leaders and project managers included) and notifies everyone affected immediately. Status turns TRUE once every assignee's work is approved.</p>
 
       <VoiceTaskDialog open={showVoice} onOpenChange={setShowVoice} mode="weekly" week={week} onApplyWeekly={addVoice} />
       <ImportDialog open={showImport} onOpenChange={setShowImport} users={users} onImport={addImported} />

@@ -291,6 +291,21 @@ for (const [name, makeStore] of backends) {
       assert.match(chunk, /"title":"New task assigned"/);
       ctl.abort();
     });
+
+    test('moving or deleting a daily task keeps the weekly assignment days in step', async () => {
+      const W2 = '2026-11-02';
+      const save = await api('POST', '/api/weekly/save', { token: lena, body: { week_start: W2, tasks: [{ title: 'Sync check', estimated_hours: 4, assignments: [{ user_id: ids.mo, days: ['2026-11-02', '2026-11-03', '2026-11-04'] }] }] } });
+      assert.equal(save.status, 200, JSON.stringify(save.body));
+      const asgId = save.body.assignments[0].id;
+      const dailies = () => api('GET', `/api/entities/DailyTask?weekly_assignment_id=${asgId}`, { token: mo }).then((r) => r.body.sort((a, b) => a.date.localeCompare(b.date)));
+      let ds = await dailies();
+      assert.equal(ds.length, 3);
+      assert.equal((await api('PUT', `/api/entities/DailyTask/${ds[0].id}`, { token: mo, body: { date: '2026-11-05' } })).status, 200);
+      assert.deepEqual((await api('GET', `/api/entities/WeeklyAssignment/${asgId}`, { token: mo })).body.days, ['2026-11-03', '2026-11-04', '2026-11-05']);
+      ds = await dailies();
+      assert.equal((await api('DELETE', `/api/entities/DailyTask/${ds[0].id}`, { token: mo })).status, 200);
+      assert.deepEqual((await api('GET', `/api/entities/WeeklyAssignment/${asgId}`, { token: mo })).body.days, ['2026-11-04', '2026-11-05']);
+    });
   });
 }
 
@@ -789,6 +804,7 @@ describe('anonymous bird post', () => {
     let last;
     for (let i = 0; i < 70; i += 1) last = await call('POST', '/api/birds', cy, { to: 'all', text: `bulk ${i}` });
     assert.equal(last.status, 429); // hourly limit
+
   });
 });
 

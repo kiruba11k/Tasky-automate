@@ -333,6 +333,15 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     res.status(201).json(created);
   }));
 
+  /** A daily task moved or removed by hand keeps its weekly assignment's days in step, so the weekly view and daily view agree. */
+  const syncAssignmentDays = async (asgId) => {
+    if (!asgId) return;
+    const asg = await store.get('WeeklyAssignment', asgId);
+    if (!asg) return;
+    const dates = [...new Set((await store.list('DailyTask', { query: { weekly_assignment_id: asgId } })).map((d) => d.date).filter(Boolean))].sort();
+    if (dates.length && JSON.stringify(dates) !== JSON.stringify([...(asg.days || [])].sort())) await store.update('WeeklyAssignment', asgId, { days: dates });
+  };
+
   app.put('/api/entities/:entity/:id', entity, wrap(async (req, res) => {
     const { data, errors } = validate(req.schema, req.body || {}, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
@@ -340,6 +349,7 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     const rec = prev && (await store.update(req.params.entity, req.params.id, data));
     if (!rec) return res.status(404).json({ error: 'Not found' });
     await afterWrite({ entity: req.params.entity, action: 'update', rec, prev, actor: req.user });
+    if (req.params.entity === 'DailyTask' && rec.date !== prev.date) await syncAssignmentDays(rec.weekly_assignment_id);
     res.json(rec);
   }));
 
@@ -347,6 +357,7 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     const prev = await store.get(req.params.entity, req.params.id);
     if (!prev || !(await store.remove(req.params.entity, req.params.id))) return res.status(404).json({ error: 'Not found' });
     await afterWrite({ entity: req.params.entity, action: 'delete', rec: null, prev, actor: req.user });
+    if (req.params.entity === 'DailyTask') await syncAssignmentDays(prev.weekly_assignment_id);
     res.json({ success: true });
   }));
 
