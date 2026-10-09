@@ -41,7 +41,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
   const filteredUsers = users.filter(user => {
     const nameMatch = user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
     const statusMatch = statusFilter === 'all' || user.status === statusFilter;
-    const roleMatch = roleFilter === 'all' || user.role === roleFilter;
+    const roleMatch = roleFilter === 'all' || (roleFilter === 'founder' ? user.founder : user.role === roleFilter);
     return nameMatch && statusMatch && roleMatch;
   });
 
@@ -51,7 +51,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
       setFormData({
         full_name: user.full_name || '',
         email: user.email || '',
-        role: user.role || 'team_member',
+        role: user.founder ? 'founder' : (user.role || 'team_member'),
         designation: user.designation || '',
         status: user.status || 'Active',
         contact: user.contact || '',
@@ -83,14 +83,18 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
     
     try {
       let result;
+      const isFounder = formData.role === 'founder';
+      const body = { ...formData, role: isFounder ? 'admin' : formData.role };
+      if (isFounder) body.founder = true;
+      else if (currentUser?.role === 'admin') body.founder = false;
       if (editingUser) {
-        result = await User.update(editingUser.id, formData);
+        result = await User.update(editingUser.id, body);
         await onLogActivity('Update', 'Team Member', editingUser.id, formData.full_name, {
           before: editingUser,
           after: formData
         });
       } else {
-        result = await User.create(formData);
+        result = await User.create(body);
         await onLogActivity('Create', 'Team Member', result.id, formData.full_name);
       }
       
@@ -172,6 +176,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
               <SelectContent className="bg-slate-700 border-slate-600 text-white">
                 <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="founder">Founder</SelectItem>
                 <SelectItem value="team_leader">Team Leader</SelectItem>
                 <SelectItem value="team_member">Team Member</SelectItem>
               </SelectContent>
@@ -210,11 +215,11 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
                     {user.status}
                   </Badge>
                   <Badge className={`${
-                    user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                    (user.role === 'admin' || user.founder) ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
                     user.role === 'team_leader' ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' :
                     'bg-slate-500/20 text-slate-300 border-slate-500/40'
                   } border text-xs`}>
-                    {user.role.replace('_', ' ')}
+                    {user.founder ? 'founder' : user.role.replace('_', ' ')}
                   </Badge>
                 </div>
               </div>
@@ -324,6 +329,7 @@ export default function TeamMembersCRUD({ users = [], projects = [], currentUser
                     <SelectItem value="team_member">Team Member</SelectItem>
                     <SelectItem value="team_leader">Team Leader</SelectItem>
                     {currentUser?.role === 'admin' && <SelectItem value="admin">Admin</SelectItem>}
+                    {currentUser?.role === 'admin' && <SelectItem value="founder">Founder (admin, plain professional view)</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>

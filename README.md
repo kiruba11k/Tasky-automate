@@ -115,6 +115,10 @@ The **Team Hub** page (`/Hub`) gathers the social and playful features, availabl
 
 Privacy: authors of ideas, retro notes, votes and mood answers are never returned by the API; there are no leaderboards; everything social is opt-in; streaks are forgiving. Profile fields (birthday, fun fact) are optional and edited in the level chip's panel. Backend code is in `backend/src/social.js`.
 
+## Founder view
+
+An admin can add a person as **Founder** (Management > Team members > Role > Founder). A founder has exactly the admin permissions but sees a plain, professional app: no mascot, 3D scenes, birds, games, sounds, confetti, animated backgrounds, level chip or Team Hub. It is stored as `founder: true` on the user (always with `role: admin`); only admins can set it.
+
 ## Themes
 
 Eight built-in themes — **light:** Sunny Day, Bubblegum Pop, Mint Fresh, Sky Pop; **dark:** Midnight (the original), Neon Arcade, Forest Night, Cherry Cola — each with its own background pattern and a mascot tinted to match. Switch from the header: ☀/🌙 quick toggle, or the palette button for the gallery (live mini-previews). Also: **Match my device** (follows the system light/dark setting live), a **Cartoon style** switch (outlined stickers, bouncy buttons, hard shadows), and **Make your own theme** (pick a mode, two colours and a background tint; export/import as JSON to share with teammates).

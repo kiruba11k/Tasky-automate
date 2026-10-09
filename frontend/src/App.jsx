@@ -39,19 +39,21 @@ function Protected() {
     );
   }
   if (!user) return <Login />;
+  const pro = Boolean(user.founder);
+  const routes = Object.entries(pages).filter(([name]) => !pro || !['Hub', 'Cast'].includes(name));
 
   return (
     <NotificationProvider>
     <BuddyProvider>
     <FunProvider>
-    <FocusProvider>
+    <FocusProvider pro={pro}>
     <Layout currentPageName={currentPageName}>
-      <div key={location.pathname} className="page-enter">
-      <PageMotion />
-      <PageHero />
+      <div key={location.pathname} className={pro ? undefined : "page-enter"}>
+      {!pro && <PageMotion />}
+      {!pro && <PageHero />}
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        {Object.entries(pages).map(([name, Page]) => (
+        {routes.map(([name, Page]) => (
           <Route key={name} path={`/${name}`} element={<Page />} />
         ))}
         <Route path="*" element={<Navigate to="/" replace />} />

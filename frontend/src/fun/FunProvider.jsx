@@ -84,7 +84,7 @@ const JOKES = [
   'Stretch break? I will guard your tasks. 🧘',
 ];
 
-export function FunProvider({ children }) {
+function FunProviderFull({ children }) {
   const { user } = useAuth();
   const [settings, setSettingsState] = useState(loadSettings);
   const [mood, setMood] = useState('happy');
@@ -397,6 +397,25 @@ export function FunProvider({ children }) {
       <BadgeUnlock badge={badgeQueue[0]} onClose={() => setBadgeQueue((q) => q.slice(1))} />
     </FunContext.Provider>
   );
+}
+
+const PRO_SETTINGS = { sound: false, anim: 'calm', mascot: false, cartoon: false, progress: 'bar', critters: false, view3d: false, heroes: false, sparkles: false, saver: false, pal: false, flybys: false, season: false, rhythm: false, festival: false, wellness: false };
+const noop = () => {};
+const PRO_VALUE = { settings: PRO_SETTINGS, setSettings: noop, stats: null, celebrate: noop, say: noop, mood: 'happy', refreshStats: noop };
+
+/** Founder view: no mascot, 3D, sounds, effects or games. Same data and permissions as an admin, plain and professional. */
+function FunProviderPro({ children }) {
+  useEffect(() => {
+    document.body.classList.remove('fun', 'party');
+    document.body.classList.add('calm', 'pro');
+    return () => document.body.classList.remove('pro');
+  }, []);
+  return <FunContext.Provider value={PRO_VALUE}>{children}</FunContext.Provider>;
+}
+
+export function FunProvider({ children }) {
+  const { user } = useAuth();
+  return user?.founder ? <FunProviderPro>{children}</FunProviderPro> : <FunProviderFull>{children}</FunProviderFull>;
 }
 
 export function useFun() {

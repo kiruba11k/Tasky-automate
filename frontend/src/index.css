@@ -497,3 +497,8 @@ body.calm .eye-blink { animation: none; }
 .launch-rocket { display: inline-block; animation: launch-up 2.4s ease-in forwards; }
 @keyframes launch-up { 0% { transform: translateY(0) scale(1); } 100% { transform: translateY(-110vh) scale(.6) rotate(8deg); } }
 body.calm .launch-rocket { animation: none; }
+
+/* Founder view: plain and professional. No decorative motion, patterns or cartoon styling. */
+body.pro *:not(.animate-spin) { animation: none !important; }
+body.pro .theme-pattern, body.pro .season-layer { display: none !important; }
+body.pro .animated-gradient-bg-enhanced::before, body.pro .animated-gradient-bg-enhanced::after { display: none !important; }

@@ -818,6 +818,19 @@ describe('team spirit features', () => {
   });
   after(() => server.close());
 
+  test('founder: an admin who can only be created by admins and always has the admin role', async () => {
+    const made = await call('POST', '/api/entities/User', admin, { full_name: 'Fay Founder', email: 'fay@example.com', role: 'team_member', founder: true });
+    assert.equal(made.status, 201);
+    assert.equal(made.body.role, 'admin');
+    assert.equal(made.body.founder, true);
+    const fay = await login('fay@example.com');
+    assert.equal((await call('GET', '/api/auth/me', fay)).body.founder, true);
+    assert.equal((await call('POST', '/api/entities/User', fay, { full_name: 'Gus', email: 'gus@example.com', role: 'team_member' })).status, 201, 'founder has admin rights');
+    assert.equal((await call('PUT', `/api/entities/User/${u.ann.id}`, u.ann.token, { founder: true })).status, 403);
+    const down = await call('PUT', `/api/entities/User/${made.body.id}`, admin, { role: 'team_member' });
+    assert.equal(down.body.founder, false);
+  });
+
   test('private data cannot be read through the generic entity API', async () => {
     for (const e of ['Mood', 'ShoutOut', 'CoffeeEntry', 'WordGame', 'Standup', 'RetroNote', 'Idea']) assert.equal((await call('GET', `/api/entities/${e}`, admin)).status, 404, e);
   });

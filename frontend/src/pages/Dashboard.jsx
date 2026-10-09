@@ -13,6 +13,7 @@ import TeamRocket from '../fun/TeamRocket';
 import WinsFeed from '../fun/WinsFeed';
 import CountUp from '../fun/CountUp';
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/auth/AuthContext";
 import { TeamMember } from "@/entities/TeamMember";
 import { Task } from "@/entities/Task";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +45,7 @@ const GRAPH_PALETTE = {
 };
 
 export default function Dashboard() {
+  const { user: currentUser } = useAuth();
   const [teamMembers, setTeamMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -194,12 +196,12 @@ export default function Dashboard() {
   return (
     <div className="p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <Greeting />
+        {!currentUser?.founder && <Greeting />}
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {!currentUser?.founder && <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="space-y-6"><BossBattle /><QuestBoard /><DoneJar /><EggCard /><PetCard /></div>
           <div className="space-y-6"><TeamRocket /><MoodWeather /><Celebrations /><GardenCard /><RelayTrack /><WinsFeed /></div>
-        </div>
+        </div>}
 
         {/* Header */}
         <div>

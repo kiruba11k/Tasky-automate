@@ -10,7 +10,7 @@ import { BirdButton } from './fun/BirdPost';
 import MotionToggle from "@/fun/MotionToggle";
 import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase, PartyPopper } from "lucide-react";
 
-const navigationItems = [
+const ALL_NAV = [
   {
     name: "Dashboard",
     url: createPageUrl("Dashboard"),
@@ -56,10 +56,12 @@ const navigationItems = [
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const pro = Boolean(user?.founder);
+  const navigationItems = ALL_NAV.filter((i) => !pro || i.name !== 'Team Hub');
 
   return (
     <div className="min-h-[100dvh] animated-gradient-bg-enhanced">
-      <div className="theme-pattern" aria-hidden="true" />
+      {!pro && <div className="theme-pattern" aria-hidden="true" />}
       <style>
         {`
           :root {
@@ -291,10 +293,7 @@ export default function Layout({ children, currentPageName }) {
                 <div className="text-sm font-medium text-white">{user?.full_name}</div>
                 <div className="text-xs text-slate-400">{user?.role?.replace("_", " ")}</div>
               </div>
-              <ProgressChip />
-              <MotionToggle />
-            <LunchButton />
-              <BirdButton />
+              {!pro && <><ProgressChip /><MotionToggle /><LunchButton /><BirdButton /></>}
               <ThemeControls />
               <NotificationBell />
               <button

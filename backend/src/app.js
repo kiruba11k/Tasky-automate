@@ -228,6 +228,15 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     return target?.role !== 'admin' && target?.role !== 'team_leader' && (newRole === undefined || newRole === 'team_member');
   };
 
+  // A founder is an admin who gets the plain, professional view. Only admins can grant it, and it always implies the admin role.
+  const founderRules = (actor, data, target) => {
+    if (data.founder === undefined && data.role === undefined) return null;
+    if (data.founder !== undefined && actor.role !== 'admin') return 'Only admins can set the founder view';
+    if (data.founder === true) data.role = 'admin';
+    else if (data.role && data.role !== 'admin') data.founder = false;
+    return null;
+  };
+
   app.get('/api/entities/User', wrap(async (req, res) => {
     const rows = await store.list('User', { sort: req.query.sort || '-created_date', limit: parseInt(req.query.limit, 10) || undefined, skip: parseInt(req.query.skip, 10) || 0 });
     res.json(rows);
@@ -244,6 +253,8 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     body.email = normEmail(body.email);
     const { data, errors } = validate(schemas.User, body);
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
+    const fe = founderRules(req.user, data);
+    if (fe) return res.status(403).json({ error: fe });
     if (!isManager(req.user) || !canManageUser(req.user, null, data.role)) return res.status(403).json({ error: 'You cannot add users with this role' });
     if (await findByEmail(data.email)) return res.status(409).json({ error: 'A user with this email already exists' });
     res.status(201).json(await store.insert('User', data, req.user.email));
@@ -256,6 +267,8 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     if (body.email !== undefined) body.email = normEmail(body.email);
     const { data, errors } = validate(schemas.User, body, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
+    const fe = founderRules(req.user, data, target);
+    if (fe) return res.status(403).json({ error: fe });
     if (!canManageUser(req.user, target, data.role)) return res.status(403).json({ error: 'Not allowed' });
     if (data.email && data.email !== normEmail(target.email)) {
       const other = await findByEmail(data.email);

@@ -32,6 +32,7 @@ schemas.User = {
     theme_at: { type: 'number' },
     buddy: { type: 'string' },
     birds_muted: { type: 'boolean' },
+    founder: { type: 'boolean' },
     birthday: { type: 'string' },
     fun_fact: { type: 'string' },
     equipped: { type: 'object' },

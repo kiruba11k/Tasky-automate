@@ -21,7 +21,12 @@ const FocusContext = createContext(null);
 const fmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
 /** Pomodoro-style focus sessions tied to a task. Survives reloads; on finish it offers to log the time on the task. */
-export function FocusProvider({ children }) {
+export function FocusProvider({ children, pro = false }) {
+  if (pro) return children;
+  return <FocusProviderFull>{children}</FocusProviderFull>;
+}
+
+function FocusProviderFull({ children }) {
   const { settings } = useFun();
   const { pinned, equipped } = useBuddy();
   const loc = useLocation();
