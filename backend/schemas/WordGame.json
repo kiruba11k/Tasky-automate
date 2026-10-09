@@ -1,0 +1,24 @@
+{
+  "name": "WordGame",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    },
+    "guesses": {
+      "type": "array"
+    },
+    "solved": {
+      "type": "boolean"
+    },
+    "done": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

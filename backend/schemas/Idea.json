@@ -1,0 +1,24 @@
+{
+  "name": "Idea",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "anonymous": {
+      "type": "boolean"
+    },
+    "voters": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

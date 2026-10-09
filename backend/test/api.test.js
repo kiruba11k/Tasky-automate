@@ -791,3 +791,143 @@ describe('anonymous bird post', () => {
     assert.equal(last.status, 429); // hourly limit
   });
 });
+
+describe('team spirit features', () => {
+  let server, base, admin, u = {};
+  const TODAY = new Date().toISOString().slice(0, 10);
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, text, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+  const monday = (iso) => { const d = new Date(`${iso}T00:00:00Z`); const k = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); };
+
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    server = createApp({ store, jwtSecret: 's' }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    admin = await login('boss@example.com');
+    for (const n of ['ann', 'bo', 'cy', 'di']) await call('POST', '/api/entities/User', admin, { full_name: `${n[0].toUpperCase()}${n.slice(1)} Person`, email: `${n}@example.com`, role: 'team_member' });
+    for (const n of ['ann', 'bo', 'cy', 'di']) u[n] = { token: await login(`${n}@example.com`) };
+    const list = (await call('GET', '/api/birds/recipients', u.ann.token)).body;
+    for (const n of ['ann', 'bo', 'cy', 'di']) u[n].id = list.find((x) => x.name.toLowerCase().startsWith(n))?.id;
+    u.ann.id = (await call('GET', '/api/auth/me', u.ann.token)).body.id;
+  });
+  after(() => server.close());
+
+  test('private data cannot be read through the generic entity API', async () => {
+    for (const e of ['Mood', 'ShoutOut', 'CoffeeEntry', 'WordGame', 'Standup', 'RetroNote', 'Idea']) assert.equal((await call('GET', `/api/entities/${e}`, admin)).status, 404, e);
+  });
+
+  test('boss battle: finished tasks hurt the boss and the reward can be claimed once', async () => {
+    const ws = monday(TODAY);
+    let b = (await call('GET', `/api/team/boss?today=${TODAY}&week_start=${ws}`, u.ann.token)).body;
+    assert.equal(b.defeated, false);
+    assert.equal((await call('POST', '/api/me/boss-claim', u.ann.token, { today: TODAY })).status, 409);
+    for (let i = 0; i < 5; i += 1) await call('POST', '/api/entities/DailyTask', u.ann.token, { date: TODAY, user_id: u.ann.id, task: `t${i}`, expected_outcome: 'x', expected_time: 1, task_status: 'Completed', actual_time_taken: 1 });
+    b = (await call('GET', `/api/team/boss?today=${TODAY}&week_start=${ws}`, u.ann.token)).body;
+    assert.equal(b.defeated, true);
+    assert.ok(b.boss.name);
+    assert.equal((await call('POST', '/api/me/boss-claim', u.ann.token, { today: TODAY })).status, 200);
+    assert.equal((await call('POST', '/api/me/boss-claim', u.ann.token, { today: TODAY })).status, 409);
+    const eggs = (await call('GET', '/api/me/buddies', u.ann.token)).body.eggs;
+    assert.ok(eggs.earned >= 1);
+  });
+
+  test('celebrations: birthdays and anniversaries appear on the day', async () => {
+    const md = TODAY.slice(5);
+    assert.equal((await call('PATCH', '/api/auth/me', u.bo.token, { birthday: `1990-${md}` })).status, 200);
+    assert.equal((await call('PATCH', '/api/auth/me', u.bo.token, { birthday: 'nope' })).status, 400);
+    const users = (await call('GET', '/api/entities/User', admin)).body;
+    await call('PUT', `/api/entities/User/${users.find((x) => x.email === 'cy@example.com').id}`, admin, { hire_date: `${Number(TODAY.slice(0, 4)) - 3}-${md}` });
+    const c = (await call('GET', `/api/team/celebrations?today=${TODAY}`, u.ann.token)).body;
+    assert.ok(c.find((x) => x.kind === 'birthday' && x.name.startsWith('Bo') && x.days_until === 0));
+    assert.ok(c.find((x) => x.kind === 'anniversary' && x.years === 3));
+  });
+
+  test('mood weather only shows once three people have answered, and never who said what', async () => {
+    assert.equal((await call('POST', '/api/mood', u.ann.token, { mood: 'sunny' })).status, 201);
+    assert.equal((await call('POST', '/api/mood', u.ann.token, { mood: 'bogus' })).status, 400);
+    let m = (await call('GET', `/api/team/mood?today=${TODAY}`, u.ann.token)).body;
+    assert.equal(m.today.visible, false); assert.equal(m.today.counts, null); assert.equal(m.mine, 'sunny');
+    await call('POST', '/api/mood', u.bo.token, { mood: 'rainy' }); await call('POST', '/api/mood', u.cy.token, { mood: 'sunny' });
+    const r = await call('GET', `/api/team/mood?today=${TODAY}`, u.bo.token);
+    assert.equal(r.body.today.visible, true); assert.equal(r.body.today.counts.sunny, 2);
+    assert.ok(!r.text.includes('user_id'));
+  });
+
+  test('shout-outs are public, notify the receiver, and cannot be self-directed', async () => {
+    assert.equal((await call('POST', '/api/shoutouts', u.ann.token, { to_user_id: u.ann.id, text: 'me' })).status, 400);
+    assert.equal((await call('POST', '/api/shoutouts', u.ann.token, { to_user_id: u.bo.id, text: 'Thanks for covering my review!' })).status, 201);
+    const wall = (await call('GET', '/api/shoutouts', u.cy.token)).body;
+    assert.equal(wall.items[0].to, 'Bo Person'); assert.equal(wall.items[0].from, 'Ann Person'); assert.equal(wall.week_count, 1);
+    assert.ok(JSON.stringify((await call('GET', '/api/notifications', u.bo.token)).body).includes('shout-out'));
+  });
+
+  test('coffee roulette pairs up everyone who joined', async () => {
+    const ws = monday(TODAY);
+    for (const n of ['ann', 'bo', 'cy']) await call('POST', '/api/coffee', u[n].token, { week_start: ws });
+    const a = (await call('GET', `/api/coffee?week_start=${ws}`, u.ann.token)).body;
+    assert.equal(a.joined, true); assert.equal(a.pool, 3);
+    assert.ok(a.match.length >= 1);
+    assert.equal((await call('GET', `/api/coffee?week_start=${ws}`, u.di.token)).body.match, null);
+  });
+
+  test('daily word: six tries, the answer stays hidden until you finish', async () => {
+    let s = (await call('GET', `/api/word/today?today=${TODAY}`, u.di.token)).body;
+    assert.equal(s.answer, undefined);
+    assert.equal((await call('POST', '/api/word/guess', u.di.token, { word: 'ab' })).status, 400);
+    for (const w of ['zzzzz', 'qqqqq', 'xxxxx', 'jjjjj', 'vvvvv', 'kkkkk']) s = (await call('POST', '/api/word/guess', u.di.token, { word: w, today: TODAY })).body;
+    assert.equal(s.done, true); assert.match(s.answer, /^[a-z]{5}$/);
+    assert.equal((await call('POST', '/api/word/guess', u.di.token, { word: s.answer, today: TODAY })).status, 409);
+    assert.equal((await call('GET', `/api/word/today?today=${TODAY}`, u.ann.token)).body.answer, undefined);
+  });
+
+  test('guess the colleague: a signed token checks the answer without leaking it', async () => {
+    assert.equal((await call('GET', '/api/guess/round', u.ann.token)).body.available, false); // nobody shared a fact yet
+    await call('PATCH', '/api/auth/me', u.bo.token, { fun_fact: 'I once cycled across Kerala' });
+    const r = (await call('GET', '/api/guess/round', u.ann.token)).body;
+    assert.equal(r.available, true); assert.ok(r.token && r.fact);
+    assert.ok(!JSON.stringify(r).includes('correct'));
+    const ok = await call('POST', '/api/guess/answer', u.ann.token, { token: r.token, choice: u.bo.id, options: r.options.map((o) => o.id) });
+    assert.equal(ok.body.correct, true); assert.equal(ok.body.answer, 'Bo Person');
+    const wrong = await call('POST', '/api/guess/answer', u.ann.token, { token: r.token, choice: u.cy.id, options: r.options.map((o) => o.id) });
+    assert.equal(wrong.body.correct, false);
+  });
+
+  test('trivia can be answered once a day', async () => {
+    const q = (await call('GET', `/api/trivia/today?today=${TODAY}`, u.ann.token)).body;
+    assert.equal(q.answered, false); assert.equal(q.correct_index, undefined);
+    const a = await call('POST', '/api/trivia/answer', u.ann.token, { choice: 0, today: TODAY });
+    assert.equal(a.status, 200); assert.ok(Number.isInteger(a.body.correct_index));
+    assert.equal((await call('POST', '/api/trivia/answer', u.ann.token, { choice: 1, today: TODAY })).status, 409);
+  });
+
+  test('wrapped recap and the daily wheel', async () => {
+    const w = (await call('GET', `/api/me/wrapped?today=${TODAY}`, u.ann.token)).body;
+    assert.equal(w.done, 5); assert.ok(w.title);
+    assert.equal((await call('GET', `/api/me/wheel?today=${TODAY}`, u.ann.token)).body.available, true);
+    assert.equal((await call('POST', '/api/me/wheel', u.di.token, { today: TODAY })).status, 409); // nothing finished today
+    const spin = await call('POST', '/api/me/wheel', u.ann.token, { today: TODAY });
+    assert.equal(spin.status, 200); assert.ok(['sticker', 'rare', 'epic', 'egg', 'confetti'].includes(spin.body.kind));
+    assert.equal((await call('POST', '/api/me/wheel', u.ann.token, { today: TODAY })).status, 409);
+  });
+
+  test('standups reach the team; retro notes and ideas hide their authors and allow one vote each', async () => {
+    assert.equal((await call('POST', '/api/standups', u.ann.token, { yesterday: 'Shipped the tracker', today: 'Polish', blockers: '' })).status, 201);
+    assert.equal((await call('GET', `/api/standups?today=${TODAY}`, u.bo.token)).body[0].name, 'Ann Person');
+    const note = (await call('POST', '/api/retro', u.ann.token, { column: 'well', text: 'The new board is great' })).body;
+    assert.equal((await call('POST', `/api/retro/${note.id}/vote`, u.bo.token)).body.votes, 1);
+    assert.equal((await call('POST', `/api/retro/${note.id}/vote`, u.bo.token)).body.votes, 0); // toggles
+    const board = await call('GET', '/api/retro', u.cy.token);
+    assert.equal(board.body.columns.well[0].mine, false); assert.ok(!board.text.includes('user_id'));
+    assert.equal((await call('DELETE', `/api/retro/${note.id}`, u.bo.token)).status, 404); // only the author
+    const idea = (await call('POST', '/api/ideas', u.ann.token, { title: 'Friday demos', text: 'Show what we built', anonymous: true })).body;
+    await call('POST', `/api/ideas/${idea.id}/boost`, u.bo.token);
+    const ideas = (await call('GET', '/api/ideas', u.cy.token)).body;
+    assert.equal(ideas[0].votes, 2); assert.equal(ideas[0].author, null);
+  });
+});

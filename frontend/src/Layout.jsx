@@ -8,7 +8,7 @@ import ThemeControls from "@/themes/ThemeControls";
 import { LunchButton } from './fun/LunchBreak';
 import { BirdButton } from './fun/BirdPost';
 import MotionToggle from "@/fun/MotionToggle";
-import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase } from "lucide-react";
+import { LayoutDashboard, LogOut, CalendarRange, CheckSquare, Settings, Calendar, FolderKanban, BarChart3, Briefcase, PartyPopper } from "lucide-react";
 
 const navigationItems = [
   {
@@ -35,6 +35,11 @@ const navigationItems = [
     name: "Weekly Tasks",
     url: createPageUrl("WeeklyTasks"),
     icon: CalendarRange,
+  },
+  {
+    name: "Team Hub",
+    url: createPageUrl("Hub"),
+    icon: PartyPopper,
   },
   {
     name: "Analytics",

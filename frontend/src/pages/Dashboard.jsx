@@ -1,5 +1,9 @@
 
 import Greeting from '../fun/Greeting';
+import BossBattle from '../hub/BossBattle';
+import PetCard from '../hub/PetCard';
+import Celebrations from '../hub/Celebrations';
+import MoodWeather from '../hub/MoodWeather';
 import DoneJar from '../fun/DoneJar';
 import EggCard from '../fun/EggCard';
 import GardenCard from '../fun/GardenCard';
@@ -193,8 +197,8 @@ export default function Dashboard() {
         <Greeting />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="space-y-6"><QuestBoard /><DoneJar /><EggCard /></div>
-          <div className="space-y-6"><TeamRocket /><GardenCard /><RelayTrack /><WinsFeed /></div>
+          <div className="space-y-6"><BossBattle /><QuestBoard /><DoneJar /><EggCard /><PetCard /></div>
+          <div className="space-y-6"><TeamRocket /><MoodWeather /><Celebrations /><GardenCard /><RelayTrack /><WinsFeed /></div>
         </div>
 
         {/* Header */}

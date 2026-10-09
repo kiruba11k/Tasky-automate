@@ -16,6 +16,10 @@ import IdleSaver from './IdleSaver';
 import LevelUp from './LevelUp';
 import BirdPost from './BirdPost';
 import CursorPal from './CursorPal';
+import Festival from './Festival';
+import LaunchMoment from './LaunchMoment';
+import { CelebrationWatcher } from '@/hub/Celebrations';
+import { WellnessWatcher } from '@/hub/Wellness';
 import BadgeUnlock from './BadgeUnlock';
 import ChaseCutscene from './chase/ChaseCutscene';
 import { emitFun } from './bus';
@@ -366,6 +370,10 @@ export function FunProvider({ children }) {
       <BusyRunner />
       <LevelUp />
       <BirdPost />
+      <Festival />
+      <LaunchMoment />
+      <CelebrationWatcher />
+      <WellnessWatcher />
       <CursorPal />
       <RocketTop />
       <IdleSaver />

@@ -7,6 +7,7 @@ import Analytics from './pages/Analytics';
 import DailyTasks from './pages/DailyTasks';
 import Cast from './pages/Cast';
 import Dashboard from './pages/Dashboard';
+import Hub from './pages/Hub';
 import Login from './pages/Login';
 import Management from './pages/Management';
 import ProjectManagement from './pages/ProjectManagement';
@@ -23,7 +24,7 @@ import PageMotion from './fun/PageMotion';
 import PageHero from './fun/PageHero';
 import FunLoader from './fun/FunLoader';
 
-const pages = { AIAllocation, Analytics, Cast, DailyTasks, Dashboard, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
+const pages = { AIAllocation, Analytics, Cast, DailyTasks, Dashboard, Hub, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
 
 function Protected() {
   const { user, loading } = useAuth();

@@ -1,0 +1,15 @@
+{
+  "name": "CoffeeEntry",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "week_start": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

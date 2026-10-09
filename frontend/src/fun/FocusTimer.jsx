@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { BookOpen, Footprints, Pause, Timer } from 'lucide-react';
+import { BookOpen, Footprints, Pause, Sprout, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { DailyTask } from '@/entities/DailyTask';
@@ -12,6 +12,7 @@ import { useBuddy } from './BuddyContext';
 import { buddyFor, hasWebGL } from './three/species';
 
 const Buddy3D = lazy(() => import('./three/Buddy3D'));
+const TreeStage = lazy(() => import('./three/TreeStage'));
 const RaceStage = lazy(() => import('./three/FocusStage').then((m) => ({ default: m.RaceStage })));
 const CUES = ['Reach up high and breathe in', 'Roll your shoulders back', 'Look at something far away', 'Fold forward and let your arms hang', 'Shake out your hands'];
 
@@ -95,6 +96,8 @@ export function FocusProvider({ children }) {
             <Suspense fallback={<div style={{ width: 84, height: 100 }} />}>
               {!isBreak && mode === 'race'
                 ? <RaceStage species={species} equipped={equipped} pct={pct} calm={settings.anim === 'calm'} />
+                : !isBreak && mode === 'tree'
+                ? <TreeStage species={species} equipped={equipped} pct={pct} calm={settings.anim === 'calm'} />
                 : <Buddy3D species={species} pose={isBreak ? 'stretch' : 'study'} size={84} equipped={equipped} calm={settings.anim === 'calm'} />}
             </Suspense>
           ) : <Emoji e={isBreak ? '🧘' : '🍅'} size="1.6rem" />}
@@ -104,6 +107,7 @@ export function FocusProvider({ children }) {
             {!isBreak && (
               <div className="flex gap-1 mt-1" role="radiogroup" aria-label="Companion mode">
                 <button type="button" role="radio" aria-checked={mode === 'study'} onClick={() => setMode('study')} title="Study together" className={`p-1 rounded-md ${mode === 'study' ? 'bg-emerald-400 text-ink' : 'bg-slate-700 text-slate-300'}`}><BookOpen className="w-3.5 h-3.5" /></button>
+                <button type="button" role="radio" aria-checked={mode === 'tree'} onClick={() => setMode('tree')} title="Grow a tree together" className={`p-1 rounded-md ${mode === 'tree' ? 'bg-emerald-400 text-ink' : 'bg-slate-700 text-slate-300'}`}><Sprout className="w-3.5 h-3.5" /></button>
                 <button type="button" role="radio" aria-checked={mode === 'race'} onClick={() => setMode('race')} title="Race together" className={`p-1 rounded-md ${mode === 'race' ? 'bg-emerald-400 text-ink' : 'bg-slate-700 text-slate-300'}`}><Footprints className="w-3.5 h-3.5" /></button>
               </div>
             )}

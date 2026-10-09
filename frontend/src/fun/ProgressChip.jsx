@@ -27,6 +27,9 @@ export default function ProgressChip() {
   const [muted, setMuted] = useState(Boolean(user?.birds_muted));
   const setBirds = async (v) => { setMuted(v); try { await request('PATCH', '/api/auth/me', { birds_muted: v }); } catch { setMuted(!v); } };
   const [arcade, setArcade] = useState(false);
+  const [bday, setBday] = useState(user?.birthday || '');
+  const [fact, setFact] = useState(user?.fun_fact || '');
+  const saveProfile = async (body, set) => { if (set) set(Object.values(body)[0]); try { await request('PATCH', '/api/auth/me', body); } catch { /* optional */ } };
   const span = stats ? Math.max(1, stats.next_level_xp - stats.level_start_xp) : 1;
   const pct = stats ? Math.min(100, Math.round(((stats.xp - stats.level_start_xp) / span) * 100)) : 0;
 
@@ -79,6 +82,7 @@ export default function ProgressChip() {
         <Toggle label="Daily rhythm" hint="Morning wake-up, Friday party, end-of-day pack-up" on={settings.rhythm} onChange={(v) => setSettings({ rhythm: v })} />
         <Toggle label="Seasonal weather" hint="Leaves, snow, petals, sparkles" on={settings.season} onChange={(v) => setSettings({ season: v })} />
         <Toggle label="Wandering critters" hint="Now and then the cat chases the mouse across the screen" on={settings.critters} onChange={(v) => setSettings({ critters: v })} />
+        <Toggle label="Festival ribbon" hint="A greeting on festival days" on={settings.festival !== false} onChange={(v) => setSettings({ festival: v })} />
         <Toggle label="Cartoon look" on={settings.cartoon} onChange={(v) => setSettings({ cartoon: v })} />
         <Toggle label="Celebrations" hint="Confetti, comic bursts, stamps" on={settings.anim === 'full'} onChange={(v) => setSettings({ anim: v ? 'full' : 'calm' })} />
         <Toggle label="Sound effects" on={settings.sound} onChange={(v) => setSettings({ sound: v })} />
@@ -88,6 +92,11 @@ export default function ProgressChip() {
           <button type="button" onClick={() => emitFun({ type: 'parade' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200">Team parade</button>
           <button type="button" onClick={() => emitFun({ type: 'rhythm', which: 'pack' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200">End my day</button>
           <button type="button" onClick={() => setArcade(true)} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200 col-span-2">Arcade (2 games)</button>
+        </div>
+        <div className="mt-3 pt-3 border-t border-slate-700 space-y-1.5">
+          <div className="text-xs uppercase tracking-wide text-slate-500">About me (optional, shown to teammates)</div>
+          <label className="block text-[11px] text-slate-400">Birthday<input type="date" aria-label="Birthday" value={bday} onChange={(e) => saveProfile({ birthday: e.target.value }, setBday)} className="mt-0.5 w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-sm text-white" /></label>
+          <label className="block text-[11px] text-slate-400">A fun fact about me<input maxLength={140} aria-label="Fun fact" value={fact} onChange={(e) => setFact(e.target.value)} onBlur={() => saveProfile({ fun_fact: fact })} className="mt-0.5 w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-sm text-white" /></label>
         </div>
         <ArcadeDialog open={arcade} onOpenChange={setArcade} />
       </PopoverContent>

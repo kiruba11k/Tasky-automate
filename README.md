@@ -102,6 +102,19 @@ Designed from what research says works (streaks are the best-evidenced hook; rew
 
 API: `POST /api/me/sync` (evaluates and records quests/badges once), `GET /api/me/trophies`, `POST /api/me/daily-drop`, `GET /api/team/pulse`, `POST /api/kudos`. Achievements and kudos are written only by the server.
 
+## Team Hub (team spirit features)
+
+The **Team Hub** page (`/Hub`) gathers the social and playful features, available to every role:
+
+- **Team**: weekly boss battle (every finished task hurts the boss, beat it for a bonus egg), anonymous team weather (forecast only shows with 3+ answers), birthdays and work anniversaries, coffee roulette (opt-in weekly pairing), launch moment (countdown and rocket).
+- **Shout-outs and ideas**: thank-you wall, anonymous idea box with boosts.
+- **Standup and retro**: a standup bird delivers three-line updates; retro board with anonymous sticky notes and hearts.
+- **Wellness and focus**: water jar, calm sounds (synthesized, no files), 20-20-20 eye-break reminders; a focus tree in the focus timer.
+- **Games**: daily word, trivia, guess the colleague, work bingo, daily wheel, Flappy bird, Cheese Dash, Memory.
+- **My pet** and **My week, wrapped** (a positive-only story of your week). Festival ribbon on festival days.
+
+Privacy: authors of ideas, retro notes, votes and mood answers are never returned by the API; there are no leaderboards; everything social is opt-in; streaks are forgiving. Profile fields (birthday, fun fact) are optional and edited in the level chip's panel. Backend code is in `backend/src/social.js`.
+
 ## Themes
 
 Eight built-in themes — **light:** Sunny Day, Bubblegum Pop, Mint Fresh, Sky Pop; **dark:** Midnight (the original), Neon Arcade, Forest Night, Cherry Cola — each with its own background pattern and a mascot tinted to match. Switch from the header: ☀/🌙 quick toggle, or the palette button for the gallery (live mini-previews). Also: **Match my device** (follows the system light/dark setting live), a **Cartoon style** switch (outlined stickers, bouncy buttons, hard shadows), and **Make your own theme** (pick a mode, two colours and a background tint; export/import as JSON to share with teammates).

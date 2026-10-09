@@ -10,6 +10,7 @@ import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { validateThemePrefs } from './theme.js';
 import { registerBirds } from './birds.js';
+import { registerSocial } from './social.js';
 import { buddyStatus, hatchEgg, parade, validateBuddyPrefs } from './buddies.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
@@ -100,11 +101,13 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   app.patch('/api/auth/me', wrap(async (req, res) => {
     // Self-service profile edits only: no role/email/status changes.
-    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at', 'buddy', 'equipped', 'birds_muted'];
+    const allowed = ['full_name', 'google_sheet_id', 'contact', 'designation', 'skills', 'theme', 'theme_auto', 'theme_custom', 'theme_at', 'buddy', 'equipped', 'birds_muted', 'birthday', 'fun_fact'];
     const body = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
     const themeError = validateThemePrefs(body);
     if (themeError) return res.status(400).json({ error: themeError });
     if (body.theme_custom === '') body.theme_custom = null; // clearing a custom theme
+    if (body.birthday !== undefined && body.birthday !== '' && !/^(\d{4}-)?\d{2}-\d{2}$/.test(body.birthday)) return res.status(400).json({ error: 'Birthday must look like 1990-04-23 or 04-23' });
+    if (typeof body.fun_fact === 'string') body.fun_fact = body.fun_fact.trim().slice(0, 140);
     if (body.buddy !== undefined || body.equipped !== undefined) {
       const buddyError = validateBuddyPrefs(body, await buddyStatus(store, req.user));
       if (buddyError) return res.status(400).json({ error: buddyError });
@@ -142,12 +145,14 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   registerWeekly(app, { store, notifier, wrap });
   registerBirds(app, { store, notifier, wrap, clock });
+  registerSocial(app, { store, notifier, wrap, clock, secret: jwtSecret });
 
   // Weekly plans and notifications are written only through the endpoints above.
+  const PRIVATE_ENTITIES = new Set(['BirdMessage', 'Mood', 'ShoutOut', 'CoffeeEntry', 'WordGame', 'Standup', 'RetroNote', 'Idea']);
   const READ_ONLY_ENTITIES = new Set(['WeeklyTask', 'WeeklyAssignment', 'Achievement', 'Kudos']);
   app.use('/api/entities/:entity', (req, res, next) => {
     const { entity: name } = req.params;
-    if (name === 'BirdMessage') return res.status(404).json({ error: 'Unknown entity BirdMessage' }); // private: only the bird endpoints may touch it
+    if (PRIVATE_ENTITIES.has(name)) return res.status(404).json({ error: `Unknown entity ${name}` }); // private: only their own endpoints may touch these
     if (name === 'Notification' || (READ_ONLY_ENTITIES.has(name) && req.method !== 'GET')) {
       return res.status(403).json({ error: `${name} cannot be changed directly` });
     }

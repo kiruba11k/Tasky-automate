@@ -21,7 +21,8 @@ export async function buddyStatus(store, user) {
   ]);
   const keys = ach.map((a) => a.key);
   const hatched = keys.filter((k) => k.startsWith('egg:')).length;
-  const earned = eggsEarned(done.length, keys.filter((k) => k.startsWith('badge:')).length);
+  const bonusEggs = keys.filter((k) => k.startsWith('boss:') || k.startsWith('bonus_egg:')).length; // boss rewards and wheel prizes
+  const earned = eggsEarned(done.length, keys.filter((k) => k.startsWith('badge:')).length) + bonusEggs;
   const ownedBuddies = [...new Set([...STARTER_BUDDIES, ...keys.filter((k) => k.startsWith('buddy:')).map((k) => k.slice(6))])];
   const ownedAcc = keys.filter((k) => k.startsWith('acc:')).map((k) => k.slice(4));
   const next = done.length < 3 ? 3 : (Math.floor(done.length / 10) + 1) * 10;

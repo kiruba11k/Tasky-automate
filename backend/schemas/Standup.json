@@ -1,0 +1,24 @@
+{
+  "name": "Standup",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    },
+    "yesterday": {
+      "type": "string"
+    },
+    "today": {
+      "type": "string"
+    },
+    "blockers": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}
