@@ -12,6 +12,12 @@ export const SPECIES = {
   owl: { name: 'Hoot', body: '#9b7653', belly: '#f1dfc2', ear: 'tuft', tail: 'none', beak: '#fbbf24', wings: true, feet: '#fbbf24', disc: '#f1dfc2' },
   penguin: { name: 'Waddles', body: '#2f3a52', belly: '#ffffff', ear: 'none', tail: 'none', beak: '#fb923c', wings: true, feet: '#fb923c', disc: '#ffffff' },
   dino: { name: 'Rexy', body: '#5cc98a', belly: '#e9f9c8', ear: 'none', tail: 'dino', nose: '#2b6a4a', spikes: '#f59e0b', muzzle: '#5cc98a', feet: '#47ad74' },
+  frog: { name: 'Ribbit', body: '#6fcf7f', belly: '#e8f9c8', ear: 'none', tail: 'none', bulge: true, wide: true, feet: '#4fb866' },
+  elephant: { name: 'Peanut', body: '#a7b0c2', belly: '#d9dfeb', ear: 'fan', earColor: '#8f99ae', earIn: '#f9b8c8', tail: 'short', trunk: true, tusk: true, feet: '#8f99ae' },
+  unicorn: { name: 'Sparkle', body: '#fbeaff', belly: '#ffffff', ear: 'tri', earIn: '#f9a8c0', tail: 'rainbow', horn: true, mane: ['#f472b6', '#a78bfa', '#60a5fa'], nose: '#f48fb1', feet: '#f5d0fe' },
+  turtle: { name: 'Shelly', body: '#7bc47f', belly: '#f3e7b3', ear: 'none', tail: 'short', shell: true, nose: '#2b6a4a', feet: '#5aa860' },
+  octopus: { name: 'Inky', body: '#b58cf0', belly: '#e6d5ff', ear: 'none', tail: 'none', tentacles: true, feet: '#9b6fe0' },
+  lion: { name: 'Leo', body: '#f0b24b', belly: '#fff0cf', ear: 'round', earIn: '#e8a13a', tail: 'tuft', maneRing: '#b45309', nose: '#2b2321', muzzle: '#fff0cf', feet: '#d99a35' },
   robot: { name: 'Tasky', body: '#3b9cf5', belly: '#cfe9ff', ear: 'none', tail: 'none', robot: true, feet: '#0f766e' },
 };
 

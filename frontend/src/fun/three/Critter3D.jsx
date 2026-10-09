@@ -61,6 +61,17 @@ const TAILS = {
   ),
   puff: (c) => <Part color={c.belly} s={0.2} p={[0, 0, -0.1]} />,
   short: (c) => <Part g="cap" color={c.body} s={[0.1, 0.22, 0.1]} p={[0, 0.18, -0.05]} r={[-0.7, 0, 0]} />,
+  rainbow: () => (
+    <group>
+      {['#f472b6', '#a78bfa', '#60a5fa'].map((col, i) => <Part key={col} color={col} s={[0.12, 0.34, 0.12]} p={[(i - 1) * 0.1, 0.2 + i * 0.03, -0.18 - i * 0.04]} r={[0.7 + i * 0.12, 0, (i - 1) * 0.3]} />)}
+    </group>
+  ),
+  tuft: (c) => (
+    <group>
+      <Part g="cap" color={c.body} s={[0.06, 0.34, 0.06]} p={[0, 0.3, -0.12]} r={[-0.6, 0, 0]} />
+      <Part color={c.maneRing || '#b45309'} s={[0.14, 0.18, 0.14]} p={[0, 0.55, -0.4]} />
+    </group>
+  ),
   dino: (c) => (
     <group>
       <Part g="cone" args={[1, 2, 18]} color={c.body} s={[0.3, 0.55, 0.3]} p={[0, 0.0, -0.55]} r={[-1.75, 0, 0]} />
@@ -97,6 +108,12 @@ function Ears({ c, species }) {
       return [-1, 1].map((x) => (
         <Part key={x} color={col} s={[0.17, 0.4, 0.1]} p={[x * 0.62, 0.05, 0]} r={[0, 0, x * 0.22]} />
       ));
+    case 'fan':
+      return [-1, 1].map((x) => (
+        <Part key={x} color={col} s={[0.1, 0.5, 0.42]} p={[x * 0.82, 0.0, -0.05]} r={[0, x * -0.3, 0]}>
+          {c.earIn && <Part color={c.earIn} s={[0.06, 0.32, 0.28]} p={[x * -0.07, 0, 0.0]} outline={false} />}
+        </Part>
+      ));
     case 'tuft':
       return [-1, 1].map((x) => (
         <Part key={x} g="cone" args={[1, 2, 4]} color={c.body} s={[0.2, 0.22, 0.1]} p={[x * 0.42, 0.68, 0]} r={[0, 0, -x * 0.4]} />
@@ -113,7 +130,7 @@ function Face({ c }) {
       {robot ? (
         <Part color="#13203a" s={[0.64, 0.44, 0.14]} p={[0, 0.02, 0.58]} outline={false} />
       ) : null}
-      {[-1, 1].map((x) => (
+      {!c.bulge && [-1, 1].map((x) => (
         <group key={x} position={[x * (robot ? 0.24 : 0.27), robot ? 0.04 : 0.06, robot ? 0.7 : 0.62]} data-eye={x}>
           <group name="eye">
             {robot
@@ -126,6 +143,24 @@ function Face({ c }) {
           </group>
         </group>
       ))}
+      {c.bulge && [-1, 1].map((x) => (
+        <group key={`bg${x}`} position={[x * 0.3, 0.62, 0.3]}>
+          <Part color={c.body} s={0.24} />
+          <group name="eye" position={[0, 0, 0.16]}><Part color="#ffffff" s={[0.17, 0.17, 0.1]} outline={false}><Part color="#17142a" s={[0.08, 0.1, 0.05]} p={[0, 0, 0.08]} outline={false} /></Part></group>
+        </group>
+      ))}
+      {c.trunk && (
+        <group position={[0, -0.12, 0.7]}>
+          <Part g="cap" args={[1, 1, 4, 10]} color={c.body} s={[0.15, 0.28, 0.15]} p={[0, -0.12, 0.08]} r={[0.2, 0, 0]} />
+          <Part g="cap" args={[1, 1, 4, 10]} color={c.body} s={[0.13, 0.22, 0.13]} p={[0, -0.42, 0.2]} r={[0.5, 0, 0]} />
+          <Part color={c.body} s={0.12} p={[0, -0.6, 0.36]} />
+        </group>
+      )}
+      {c.tusk && [-1, 1].map((x) => <Part key={`t${x}`} g="cone" args={[1, 2, 10]} color="#fffdf5" s={[0.05, 0.12, 0.05]} p={[x * 0.22, -0.3, 0.68]} r={[2.4, 0, x * 0.2]} />)}
+      {c.horn && <Part g="cone" args={[1, 2, 14]} color="#fde047" s={[0.1, 0.34, 0.1]} p={[0, 0.86, 0.3]} r={[0.35, 0, 0]} />}
+      {c.mane && c.mane.map((col, i) => <Part key={col} color={col} s={0.22 - i * 0.02} p={[0, 0.62 - i * 0.28, -0.32 - i * 0.12]} />)}
+      {c.mane && <Part color={c.mane[0]} s={0.16} p={[0.12, 0.72, 0.42]} />}
+      {c.maneRing && Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * Math.PI * 2; return <Part key={`m${i}`} color={c.maneRing} s={0.28} p={[Math.cos(a) * 0.78, Math.sin(a) * 0.68, -0.18]} />; })}
       {!robot && [-1, 1].map((x) => <Part key={`b${x}`} color="#ff9db3" s={[0.11, 0.07, 0.03]} p={[x * 0.46, -0.17, 0.52]} outline={false} />)}
       {c.patches && [-1, 1].map((x) => <Part key={`p${x}`} color={c.patches} s={[0.17, 0.22, 0.06]} p={[x * 0.27, 0.06, 0.58]} r={[0, 0, x * 0.5]} outline={false} />)}
       {c.disc && [-1, 1].map((x) => <Part key={`d${x}`} color={c.disc} s={[0.24, 0.24, 0.05]} p={[x * 0.25, 0.06, 0.56]} outline={false} />)}
@@ -133,7 +168,7 @@ function Face({ c }) {
       {c.beak
         ? <Part g="cone" args={[1, 2, 4]} color={c.beak} s={[0.11, 0.11, 0.08]} p={[0, -0.1, 0.72]} r={[Math.PI / 2, 0, 0]} />
         : c.nose && <Part color={c.nose} s={[0.07, 0.05, 0.05]} p={[0, -0.08, 0.74]} outline={false} />}
-      {!robot && !c.beak && <Part g="torus" args={[0.09, 0.016, 6, 14, Math.PI]} color="#2b1b2b" p={[0, -0.17, 0.72]} r={[0, 0, Math.PI]} s={1} basic outline={false} />}
+      {!robot && !c.beak && <Part g="torus" args={c.wide ? [0.2, 0.02, 6, 14, Math.PI] : [0.09, 0.016, 6, 14, Math.PI]} color="#2b1b2b" p={[0, c.wide ? -0.12 : -0.17, 0.72]} r={[0, 0, Math.PI]} s={1} basic outline={false} />}
       {!robot && <group name="mouthO" position={[0, -0.2, 0.7]} scale={0.001}><Part color="#5b1226" s={[0.1, 0.12, 0.05]} outline={false} basic /></group>}
       {c.whisk && [-1, 1].flatMap((x) => [0.04, -0.05].map((y, i) => (
         <Part key={`w${x}${i}`} g="cap" args={[1, 1, 3, 6]} color="#f3f4f6" s={[0.012, 0.2, 0.012]} p={[x * 0.5, -0.13 + y, 0.6]} r={[0, 0, x * (1.45 + i * 0.25)]} outline={false} basic />
@@ -172,6 +207,11 @@ function DizzyStars() {
 function Held({ kind }) {
   return (
     <group position={[0, -0.5, 0.06]}>
+      {kind === 'can' && (<>
+        <Part g="cyl" args={[1, 1, 1, 14]} color="#34d399" s={[0.15, 0.17, 0.15]} p={[0, 0.2, 0.1]} />
+        <Part g="cyl" args={[1, 1, 1, 8]} color="#10b981" s={[0.03, 0.2, 0.03]} p={[0, 0.36, 0.34]} r={[1.0, 0, 0]} outline={false} />
+        <Part g="cyl" args={[1, 1, 1, 8]} color="#10b981" s={[0.07, 0.03, 0.07]} p={[0, 0.5, 0.46]} r={[1.0, 0, 0]} outline={false} />
+      </>)}
       {kind === 'wand' && (<>
         <Part g="cyl" args={[1, 1, 1, 8]} color="#7c3aed" s={[0.025, 0.42, 0.025]} p={[0, 0.2, 0]} r={[0.3, 0, 0]} basic outline={false} />
         <Part g="oct" color="#fde047" s={0.1} p={[0, 0.45, 0.12]} basic outline={false} />
@@ -239,6 +279,7 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
       case 'highfive2': Object.assign(o, { y: Math.abs(sn(t * 4)) * 0.18, aLx: -2.7, aLz: 0.15, hx: -0.1 }); break;
       case 'type': Object.assign(o, { y: sn(t * 2) * 0.01, hx: 0.38, hz: sn(t * 1.1) * 0.04, hy: 0, aLx: -1.15 + sn(t * 15) * 0.12, aRx: -1.15 - sn(t * 15) * 0.12, aLz: 0.12, aRz: -0.12, eye: (t % 4) < 0.14 ? 0.1 : 0.85 }); break;
       case 'listen': Object.assign(o, { hz: 0.28, hx: 0.05, hy: sn(t * 0.7) * 0.12, aRz: -2.15, aRx: -0.45, eye: 1.25 }); break;
+      case 'water': Object.assign(o, { rx: 0.05, hx: 0.2, aRx: -1.5, aRz: -0.3 + sn(t * 1.6) * 0.15, hy: 0.3 }); break;
       case 'present': Object.assign(o, { hy: 0.35, hz: sn(t * 1.4) * 0.05, aRx: -1.55 + sn(t * 2) * 0.12, aRz: -0.35 }); break;
       case 'cast': Object.assign(o, { y: sn(t * 2) * 0.03, hz: sn(t * 1.6) * 0.06, aRx: -0.5, aRz: -(1.9 + sn(t * 5) * 0.35), aLz: 0.5 }); break;
       case 'build': Object.assign(o, { y: Math.abs(sn(t * 4.5)) * 0.03, rx: 0.06, hx: 0.12, aRx: -1.3 + sn(t * 9) * 0.95, aRz: -0.2, aLx: -0.4 }); break;
@@ -247,6 +288,7 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
       case 'dance': Object.assign(o, { y: Math.abs(sn(t * 6)) * 0.2, rz: sn(t * 3) * 0.14, hz: sn(t * 3) * 0.2, aLz: 1.7 + sn(t * 6) * 0.8, aRz: -(1.7 + sn(t * 6 + Math.PI) * 0.8), lL: sn(t * 6) * 0.4, lR: -sn(t * 6) * 0.4, tail: sn(t * 9) * 0.6 }); break;
       default: break;
     }
+    if (c.tentacles) { o.lL += sn(t * 2.5) * 0.18; o.lR -= sn(t * 2.5 + 1) * 0.18; }
     if (lookRef?.current && (p === 'idle' || p === 'wave' || p === 'scared')) { const lk = lookRef.current; o.hy = lk.x * 0.85; o.hx = -lk.y * 0.5 + (p === 'scared' ? 0.15 : 0); }
     if (root.current) { root.current.position.set(o.x, o.y, 0); root.current.rotation.z = o.rz; root.current.rotation.x = o.rx; }
     if (body.current) body.current.scale.set(1, o.bsy, 1);
@@ -277,15 +319,24 @@ export default function Critter3D({ species = 'cat', pose = 'idle', calm = false
             <Part color={c.belly} s={[0.44, 0.48, 0.2]} p={[0, -0.04, 0.4]} outline={false} />
           </Part>
           {c.spikes && [0, 1, 2].map((i) => <Part key={i} g="cone" args={[1, 2, 4]} color={c.spikes} s={[0.1, 0.14, 0.08]} p={[0, 1.1 - i * 0.28, -0.5 + i * 0.02]} r={[-0.9, 0, 0]} />)}
+          {c.shell && (
+            <group position={[0, 0.76, -0.4]}>
+              <Part color="#a16c3a" s={[0.58, 0.52, 0.34]} />
+              {[[0, 0.12], [-0.22, -0.08], [0.22, -0.08], [0, -0.22]].map(([x, y]) => <Part key={`${x}${y}`} color="#c58a4d" s={[0.14, 0.14, 0.05]} p={[x, y, -0.3]} outline={false} />)}
+            </group>
+          )}
           {/* legs */}
           <group ref={legL} position={[0.27, 0.3, 0.04]}>
-            <Part g="cap" args={[1, 0.5, 4, 10]} color={limb} s={[0.15, 0.2, 0.15]} p={[0, -0.12, 0]} />
-            <Part color={c.feet || limb} s={[0.19, 0.11, 0.27]} p={[0, -0.3, 0.09]} />
+            {c.tentacles
+              ? <Part g="cap" args={[1, 1, 4, 10]} color={limb} s={[0.14, 0.34, 0.14]} p={[0.06, -0.14, 0.06]} r={[0.25, 0, -0.35]} />
+              : <><Part g="cap" args={[1, 0.5, 4, 10]} color={limb} s={[0.15, 0.2, 0.15]} p={[0, -0.12, 0]} /><Part color={c.feet || limb} s={[0.19, 0.11, 0.27]} p={[0, -0.3, 0.09]} /></>}
           </group>
           <group ref={legR} position={[-0.27, 0.3, 0.04]}>
-            <Part g="cap" args={[1, 0.5, 4, 10]} color={limb} s={[0.15, 0.2, 0.15]} p={[0, -0.12, 0]} />
-            <Part color={c.feet || limb} s={[0.19, 0.11, 0.27]} p={[0, -0.3, 0.09]} />
+            {c.tentacles
+              ? <Part g="cap" args={[1, 1, 4, 10]} color={limb} s={[0.14, 0.34, 0.14]} p={[-0.06, -0.14, 0.06]} r={[0.25, 0, 0.35]} />
+              : <><Part g="cap" args={[1, 0.5, 4, 10]} color={limb} s={[0.15, 0.2, 0.15]} p={[0, -0.12, 0]} /><Part color={c.feet || limb} s={[0.19, 0.11, 0.27]} p={[0, -0.3, 0.09]} /></>}
           </group>
+          {c.tentacles && [[-0.5, 0.2, 0.4], [0.5, 0.2, -0.4], [-0.15, -0.3, 0.25], [0.15, -0.3, -0.25]].map(([x, z, r], i) => <Part key={`tt${i}`} g="cap" args={[1, 1, 4, 10]} color={limb} s={[0.13, 0.3, 0.13]} p={[x, 0.18, z]} r={[0.2, 0, r]} />)}
           {/* arms */}
           <group ref={armL} position={[0.6, 0.98, 0.04]}>
             {wings

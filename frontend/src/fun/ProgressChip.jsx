@@ -5,7 +5,7 @@ import TrophyShelf from './TrophyShelf';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFun } from './FunProvider';
 import { emitFun } from './bus';
-import ArcadeGame from './ArcadeGame';
+import { ArcadeDialog } from './Arcade';
 import { Emoji, Rich } from '@/icons/Emoji';
 
 const Toggle = ({ label, on, onChange, hint }) => (
@@ -67,6 +67,7 @@ export default function ProgressChip() {
         <Link to="/Cast" className="block text-center rounded-lg border-2 border-slate-900 bg-slate-800 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700">Meet the cast and pick your buddy</Link>
         <Toggle label="Page scenes" hint="A themed 3D banner with a different buddy on each page" on={settings.heroes} onChange={(v) => setSettings({ heroes: v })} />
         <Toggle label="Click sparkles" hint="Stars pop when you press buttons" on={settings.sparkles} onChange={(v) => setSettings({ sparkles: v })} />
+        <Toggle label="Cursor pal" hint="A tiny buddy trails your mouse pointer (desktop)" on={settings.pal} onChange={(v) => setSettings({ pal: v })} />
         <Toggle label="Screensaver" hint="After 5 idle minutes the cast bounces around" on={settings.saver} onChange={(v) => setSettings({ saver: v })} />
         <Toggle label="Daily rhythm" hint="Morning wake-up, Friday party, end-of-day pack-up" on={settings.rhythm} onChange={(v) => setSettings({ rhythm: v })} />
         <Toggle label="Seasonal weather" hint="Leaves, snow, petals, sparkles" on={settings.season} onChange={(v) => setSettings({ season: v })} />
@@ -78,9 +79,9 @@ export default function ProgressChip() {
         <div className="grid grid-cols-2 gap-1 pt-2">
           <button type="button" onClick={() => emitFun({ type: 'parade' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200">Team parade</button>
           <button type="button" onClick={() => emitFun({ type: 'rhythm', which: 'pack' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200">End my day</button>
-          <button type="button" onClick={() => setArcade(true)} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200 col-span-2">Play Cheese Dash</button>
+          <button type="button" onClick={() => setArcade(true)} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200 col-span-2">Arcade (2 games)</button>
         </div>
-        {arcade && <div className="pt-2"><ArcadeGame onClose={() => setArcade(false)} /></div>}
+        <ArcadeDialog open={arcade} onOpenChange={setArcade} />
       </PopoverContent>
     </Popover>
     </>

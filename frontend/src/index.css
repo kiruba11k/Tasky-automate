@@ -438,3 +438,25 @@ nav.sticky { padding-top: env(safe-area-inset-top, 0px); padding-left: env(safe-
 @media (min-width: 2400px) { html { font-size: 22px; } }
 @media (min-width: 3200px) { html { font-size: 28px; } }
 @media (pointer: coarse) { button, [role='tab'], a.nav-pill, [role='checkbox'] { min-height: 36px; } }
+
+/* garden, level up, cursor pal */
+.garden-box { position: relative; height: 210px; border-radius: 1rem; overflow: hidden; border: 2px solid rgb(var(--slate-700) / .7); background: linear-gradient(to bottom, #7dd3fc, #e0f2fe 60%, #bbf7d0); }
+.levelup-overlay { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; background: rgba(2, 6, 23, .6); backdrop-filter: blur(3px); animation: lunch-in .4s ease both; cursor: pointer; }
+.levelup-card { position: relative; width: min(22rem, 92vw); padding: 1.2rem 1rem; border-radius: 1.6rem; border: 4px solid #0b1220; background: linear-gradient(to bottom, #4338ca, #1e1b4b); box-shadow: 6px 8px 0 rgba(0,0,0,.5); text-align: center; overflow: hidden; animation: levelup-pop .6s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes levelup-pop { from { transform: scale(.4) rotate(-6deg); opacity: 0; } }
+.levelup-rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg, rgba(253, 224, 71, .22) 0 10deg, transparent 10deg 20deg); animation: spin-slow 12s linear infinite; }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.levelup-num { font-size: 4.5rem; line-height: 1; font-weight: 900; color: #fde047; -webkit-text-stroke: 3px #141225; text-shadow: 4px 4px 0 #141225; animation: tasky-bob 1.2s ease-in-out infinite; }
+.cursor-pal { position: fixed; left: 0; top: 0; z-index: 44; pointer-events: none; will-change: transform; width: 72px; }
+body.calm .levelup-rays, body.calm .levelup-num, body.calm .levelup-card { animation: none; }
+
+/* memory match */
+.memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; max-width: 22rem; margin-inline: auto; perspective: 800px; }
+.memory-card { position: relative; aspect-ratio: 1; border: 0; background: transparent; padding: 0; transform-style: preserve-3d; transition: transform .45s cubic-bezier(.4, 1.4, .6, 1); cursor: pointer; }
+.memory-card.up { transform: rotateY(180deg); }
+.memory-card.done { animation: memory-bounce .5s ease both .1s; }
+@keyframes memory-bounce { 50% { transform: rotateY(180deg) scale(1.15); } }
+.memory-face { position: absolute; inset: 0; display: grid; place-items: center; border-radius: .8rem; border: 2px solid #0b1220; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.memory-face.front { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.memory-face.back { background: #f8fafc; transform: rotateY(180deg); }
+body.calm .memory-card { transition: none; }

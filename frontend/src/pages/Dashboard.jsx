@@ -2,6 +2,7 @@
 import Greeting from '../fun/Greeting';
 import DoneJar from '../fun/DoneJar';
 import EggCard from '../fun/EggCard';
+import GardenCard from '../fun/GardenCard';
 import RelayTrack from '../fun/RelayTrack';
 import QuestBoard from '../fun/QuestBoard';
 import TeamRocket from '../fun/TeamRocket';
@@ -193,7 +194,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="space-y-6"><QuestBoard /><DoneJar /><EggCard /></div>
-          <div className="space-y-6"><TeamRocket /><RelayTrack /><WinsFeed /></div>
+          <div className="space-y-6"><TeamRocket /><GardenCard /><RelayTrack /><WinsFeed /></div>
         </div>
 
         {/* Header */}

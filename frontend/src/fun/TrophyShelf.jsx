@@ -1,4 +1,10 @@
 import StickerBook from './StickerBook';
+import { Suspense, lazy } from 'react';
+import { useFun } from './FunProvider';
+import { useBuddy } from './BuddyContext';
+import { hasWebGL } from './three/species';
+
+const TrophyStage = lazy(() => import('./three/TrophyStage'));
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,6 +15,9 @@ import { Emoji, Rich } from '@/icons/Emoji';
 /** Badges (with progress toward the locked ones) and the sticker album. */
 export default function TrophyShelf({ open, onOpenChange }) {
   const [data, setData] = useState(null);
+  const { settings } = useFun();
+  const { pinned, equipped } = useBuddy();
+  const three = settings.view3d && hasWebGL();
   useEffect(() => {
     if (open) request('GET', `/api/me/trophies?today=${format(new Date(), 'yyyy-MM-dd')}`).then(setData).catch(() => setData(null));
   }, [open]);
@@ -20,6 +29,12 @@ export default function TrophyShelf({ open, onOpenChange }) {
         <DialogTitle className="text-2xl font-extrabold">Trophy shelf</DialogTitle>
         <DialogDescription className="text-slate-400">Everything here comes from real finished work.</DialogDescription>
         {!data ? <p className="text-slate-400 py-8 text-center">Polishing the trophies…</p> : (
+          <>
+          {three && (
+            <div className="relative h-[150px] rounded-xl overflow-hidden border-2 border-slate-900 bg-gradient-to-b from-indigo-950 to-slate-900">
+              <Suspense fallback={null}><TrophyStage earned={earned} total={data.badges.length} species={pinned === 'auto' ? 'cat' : pinned} equipped={equipped} calm={settings.anim === 'calm'} /></Suspense>
+            </div>
+          )}
           <Tabs defaultValue="badges">
             <TabsList className="bg-slate-800">
               <TabsTrigger value="badges">Badges {earned}/{data.badges.length}</TabsTrigger>
@@ -43,6 +58,7 @@ export default function TrophyShelf({ open, onOpenChange }) {
               <StickerBook stickers={data.stickers} />
             </TabsContent>
           </Tabs>
+          </>
         )}
       </DialogContent>
     </Dialog>

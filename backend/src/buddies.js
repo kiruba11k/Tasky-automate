@@ -2,7 +2,7 @@
 // rolled on the server so the roll cannot be steered. Ownership lives in the Achievement store as buddy:<id> / acc:<id> claims.
 import { addDays } from './weekly.js';
 
-export const BUDDY_IDS = ['cat', 'tabby', 'mouse', 'fox', 'panda', 'bunny', 'bear', 'dog', 'owl', 'penguin', 'dino', 'robot'];
+export const BUDDY_IDS = ['cat', 'tabby', 'mouse', 'fox', 'panda', 'bunny', 'bear', 'dog', 'owl', 'penguin', 'dino', 'robot', 'frog', 'elephant', 'unicorn', 'turtle', 'octopus', 'lion'];
 export const STARTER_BUDDIES = ['cat', 'mouse', 'bunny', 'robot'];
 export const ACCESSORIES = [
   { id: 'partyhat', slot: 'hat', name: 'Party hat' }, { id: 'tophat', slot: 'hat', name: 'Top hat' }, { id: 'crown', slot: 'hat', name: 'Crown' },

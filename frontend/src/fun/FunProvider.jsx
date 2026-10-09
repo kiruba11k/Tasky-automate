@@ -13,8 +13,11 @@ import TeamParade from './TeamParade';
 import BusyRunner from './BusyRunner';
 import RocketTop from './RocketTop';
 import IdleSaver from './IdleSaver';
+import LevelUp from './LevelUp';
+import CursorPal from './CursorPal';
 import BadgeUnlock from './BadgeUnlock';
 import ChaseCutscene from './chase/ChaseCutscene';
+import { emitFun } from './bus';
 import { effects } from './effects';
 import { play } from './sounds';
 import { Emoji, Rich } from '@/icons/Emoji';
@@ -27,7 +30,7 @@ const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
   const lowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2));
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, season: true, rhythm: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -206,7 +209,7 @@ export function FunProvider({ children }) {
       try { prevLevel = Number(localStorage.getItem(lvKey)) || null; prevStreak = Number(localStorage.getItem(stKey)) || 0; } catch { /* ignore */ }
       s.new_quests.forEach((id) => { const q = s.quests.find((x) => x.id === id); if (q) { celebrate('quest', { x: q.title }); floatXp(`+${q.xp} XP`); } });
       if (s.new_badges.length) { setBadgeQueue((q) => [...q, ...s.new_badges]); celebrate('badge', { x: s.new_badges[0].name }); }
-      if (prevLevel !== null && s.level > prevLevel) celebrate('levelUp', { x: s.title });
+      if (prevLevel !== null && s.level > prevLevel) { celebrate('levelUp', { x: s.title }); setTimeout(() => emitFun({ type: 'levelUpShow', level: s.level, title: s.title }), 700); }
       else if (s.streak > prevStreak && STREAK_MILESTONES.includes(s.streak)) celebrate('streak', { x: s.streak });
       if (s.drop_state === 'ready' && before?.drop_state !== 'ready') setTimeout(() => celebrate('chest'), 1800);
       try { localStorage.setItem(lvKey, String(s.level)); localStorage.setItem(stKey, String(s.streak)); } catch { /* ignore */ }
@@ -360,6 +363,8 @@ export function FunProvider({ children }) {
         </div>
       )}
       <BusyRunner />
+      <LevelUp />
+      <CursorPal />
       <RocketTop />
       <IdleSaver />
       <HighFive />

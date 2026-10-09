@@ -2,9 +2,11 @@ import React, { Suspense, lazy, useState } from 'react';
 import { SPECIES, SPECIES_IDS } from '@/fun/three/species';
 import { useFun } from '@/fun/FunProvider';
 import { useBuddy } from '@/fun/BuddyContext';
+import InView from '@/fun/InView';
 import FittingRoom from '@/fun/FittingRoom';
 import EggDialog from '@/fun/EggDialog';
 import ArcadeGame from '@/fun/ArcadeGame';
+import { MemoryGame } from '@/fun/Arcade';
 import { Emoji } from '@/icons/Emoji';
 
 const Buddy3D = lazy(() => import('@/fun/three/Buddy3D'));
@@ -69,16 +71,18 @@ export default function Cast() {
           const owned = ownedBuddies.includes(id);
           return (
             <div key={id} className={`glass-effect-enhanced rounded-2xl p-3 flex flex-col items-center ${owned ? '' : 'opacity-70'}`}>
-              <Suspense fallback={<div style={{ height: 160 }} />}>
-                <div className={owned ? '' : 'brightness-0 contrast-50'}><Buddy3D species={id} pose={pose} size={150} equipped={owned ? equipped : undefined} calm={settings.anim === 'calm'} /></div>
-              </Suspense>
+              <InView height={190} className="grid place-items-center">
+                <Suspense fallback={<div style={{ height: 160 }} />}>
+                  <div className={owned ? '' : 'brightness-0 contrast-50'}><Buddy3D species={id} pose={pose} size={150} equipped={owned ? equipped : undefined} calm={settings.anim === 'calm'} /></div>
+                </Suspense>
+              </InView>
               <div className="font-extrabold text-white">{owned ? SPECIES[id].name : '???'}</div>
               <button type="button" disabled={!owned} onClick={() => run(() => pin(id))} aria-pressed={pinned === id} className={`mt-1 rounded-lg border-2 border-slate-900 px-3 py-1 text-xs font-bold ${pinned === id ? 'bg-emerald-400 text-ink' : 'bg-slate-800 text-slate-200'} disabled:opacity-60`}>{pinned === id ? 'Your buddy' : owned ? 'Pick me' : 'Hatch to unlock'}</button>
             </div>
           );
         })}
       </div>
-      <div className="glass-effect-enhanced rounded-2xl p-4 max-w-[460px]"><ArcadeGame /></div>
+      <div className="grid md:grid-cols-2 gap-4"><div className="glass-effect-enhanced rounded-2xl p-4"><ArcadeGame /></div><div className="glass-effect-enhanced rounded-2xl p-4"><MemoryGame /></div></div>
       <EggDialog open={egg} onOpenChange={setEgg} />
     </div>
   );
