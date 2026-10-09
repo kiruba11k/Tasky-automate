@@ -55,7 +55,7 @@ function Beak({ b, jawRef }) {
   const w = t === 'big' ? 0.15 : t === 'long' ? 0.025 : t === 'hook' ? 0.11 : t === 'puffin' ? 0.12 : 0.08;
   // cones point along +y; rotated by PI/2 about x they point forward (+z). Scale order is [width, length, height].
   return (
-    <group position={[0, -0.05, 0.42]}>
+    <group position={[0, -0.04, 0.42]}>
       <Part g="cone" args={[1, 2, 14]} color={b.beak} s={[w, len / 2, w * (t === 'puffin' ? 0.8 : 1)]} p={[0, 0, len / 2]} r={[Math.PI / 2, 0, 0]} />
       {t === 'big' && <Part g="cone" args={[1, 2, 14]} color="#fde047" s={[w * 0.85, len * 0.3, w * 0.85]} p={[0, 0.02, len * 0.3]} r={[Math.PI / 2, 0, 0]} outline={false} />}
       {t === 'big' && <Part color="#ef4444" s={w * 0.4} p={[0, -0.01, len * 0.95]} outline={false} />}
@@ -75,7 +75,7 @@ function Beak({ b, jawRef }) {
 export default function Bird3D({ type = 'robin', pose = 'perch', envelope = false, calm = false, seed = 0, ...rest }) {
   const b = BIRDS[type] || BIRDS.robin;
   const poseRef = useRef(pose); poseRef.current = pose;
-  const root = useRef(); const body = useRef(); const head = useRef(); const jaw = useRef(); const eyes = useRef(); const env = useRef();
+  const root = useRef(); const body = useRef(); const head = useRef(); const jaw = useRef(); const eyes = useRef(); const happyEyes = useRef(); const env = useRef();
   const wingL = useRef(); const wingR = useRef(); const tail = useRef(); const legs = useRef(); const hearts = useRef(); const notes = useRef();
   const tailN = b.tail.length + 1;
   const feet = b.feet || '#f59e0b';
@@ -85,6 +85,9 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
     const p = poseRef.current; const sn = Math.sin;
     const o = { y: sn(t * 2) * 0.012, rx: 0, rz: 0, ry: 0, hx: 0, hy: sn(t * 0.7) * 0.5, hz: 0, jaw: 0, wl: -1.0, wr: 1.0, wy: 0, tl: 0, ts: sn(t * 1.6) * 0.06, eye: 1, puff: 1, tuck: 0, x: 0 };
     const flutter = (t % 7) < 0.5 ? sn(t * 40) * 0.25 : 0;
+    const happy = ['sing', 'love', 'dance', 'puff', 'stretch', 'hop', 'wave'].includes(p);
+    const chirp = (p === 'perch' || p === 'glide') && (t % 5.5) < 0.55;
+    if (chirp) { o.jaw = Math.abs(sn(t * 14)) * 0.5; o.hx = -0.18; o.y += Math.abs(sn(t * 14)) * 0.02; }
     o.wl += flutter; o.wr -= flutter;
     switch (p) {
       case 'sing': o.hx = -0.4; o.hy = sn(t * 1.3) * 0.15; o.jaw = Math.abs(sn(t * 9)) * 0.7; o.puff = 1.06 + sn(t * 9) * 0.03; o.ts = sn(t * 4.5) * 0.12; o.tl = 0.15; o.y = Math.abs(sn(t * 4.5)) * 0.02; break;
@@ -107,7 +110,8 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
     if (body.current) body.current.scale.setScalar(o.puff);
     if (head.current) head.current.rotation.set(o.hx, o.hy, o.hz);
     if (jaw.current) jaw.current.rotation.x = o.jaw;
-    if (eyes.current) eyes.current.scale.y = (t % 3.6) < 0.12 ? 0.08 : o.eye;
+    if (eyes.current) { eyes.current.visible = !happy; eyes.current.scale.y = (t % 3.6) < 0.12 ? 0.08 : o.eye; }
+    if (happyEyes.current) happyEyes.current.visible = happy;
     if (wingL.current) { wingL.current.rotation.z = o.wl; wingL.current.rotation.y = o.wl < -0.4 ? 0.25 : 0; }
     if (wingR.current) { wingR.current.rotation.z = o.wr; wingR.current.rotation.y = o.wr > 0.4 ? -0.25 : 0; }
     if (tail.current) { tail.current.rotation.y = o.ts; tail.current.rotation.x = -0.45 + o.tl; }
@@ -156,20 +160,27 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
         </group>
         <group ref={head} position={[0, 1.08, 0.2]}>
           <Part color={b.head} s={[0.5, 0.46, 0.46]} />
-          {[-1, 1].map((x) => <Part key={`ch${x}`} color={b.cheek} s={[0.1, 0.07, 0.04]} p={[x * 0.3, -0.12, 0.34]} outline={false} />)}
+          {[-1, 1].map((x) => <Part key={`ch${x}`} color={b.cheek} s={[0.125, 0.085, 0.04]} p={[x * 0.31, -0.1, 0.33]} outline={false} />)}
           <group ref={eyes}>
             {[-1, 1].map((x) => (
-              <group key={x} position={[x * 0.2, 0.06, 0.37]}>
-                <Part color="#ffffff" s={[0.15, 0.17, 0.08]} outline={false}>
-                  <Part color={b.eye} s={[0.105, 0.125, 0.05]} p={[0, 0, 0.05]} outline={false} />
-                  <Part color="#17142a" s={[0.06, 0.082, 0.04]} p={[0, 0, 0.075]} outline={false} />
-                  <Part color="#ffffff" s={[0.034, 0.038, 0.02]} p={[0.04, 0.045, 0.105]} outline={false} basic />
-                  <Part color="#ffffff" s={[0.017, 0.019, 0.012]} p={[-0.035, -0.04, 0.105]} outline={false} basic />
+              <group key={x} position={[x * 0.2, 0.1, 0.37]}>
+                <Part color="#ffffff" s={[0.17, 0.19, 0.08]} outline={false}>
+                  <Part color={b.eye} s={[0.12, 0.14, 0.05]} p={[0, 0.012, 0.05]} outline={false} />
+                  <Part color="#17142a" s={[0.07, 0.095, 0.04]} p={[0, 0.014, 0.078]} outline={false} />
+                  <Part color="#ffffff" s={[0.04, 0.045, 0.02]} p={[0.045, 0.055, 0.108]} outline={false} basic />
+                  <Part color="#ffffff" s={[0.02, 0.022, 0.012]} p={[-0.04, -0.045, 0.108]} outline={false} basic />
+                  <Part color="#ffffff" s={[0.012, 0.012, 0.01]} p={[0.0, 0.0, 0.112]} outline={false} basic />
                 </Part>
-                <Part g="box" color="#3b2a22" s={[0.1, 0.022, 0.03]} p={[x * 0.01, 0.2, 0.04]} r={[0, 0, x * -0.3]} outline={false} />
+                <Part g="torus" args={[1, 0.12, 6, 12, Math.PI]} color="#4a3126" s={[0.07, 0.045, 0.05]} p={[x * 0.01, 0.235, 0.05]} r={[0, 0, x * 0.18]} outline={false} basic />
               </group>
             ))}
           </group>
+          <group ref={happyEyes} visible={false}>
+            {[-1, 1].map((x) => (
+              <Part key={x} g="torus" args={[1, 0.15, 6, 14, Math.PI]} color="#17142a" s={[0.1, 0.09, 0.05]} p={[x * 0.2, 0.08, 0.42]} outline={false} basic />
+            ))}
+          </group>
+          <Part g="torus" args={[1, 0.12, 6, 14, Math.PI]} color="#7a2236" s={[0.075, 0.07, 0.04]} p={[0, -0.2, 0.43]} r={[0, 0, Math.PI]} outline={false} basic />
           <Beak b={b} jawRef={jaw} />
           <Crest b={b} />
         </group>
