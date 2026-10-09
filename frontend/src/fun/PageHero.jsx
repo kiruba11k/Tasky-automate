@@ -83,7 +83,8 @@ export default function PageHero() {
     Team: [`${data.members.length} teammates`],
   }[page] || [];
   return (
-    <div className="max-w-7xl mx-auto px-6 md:px-8 pt-4">
+    <div className="px-6 md:px-8 pt-4">
+      <div className="max-w-7xl mx-auto">
       <section className="page-hero" style={{ '--hero': cfg.hue, '--hero-h': `${Math.round(Math.max(118, Math.min(190, zoom * 3.07)))}px` }} aria-label={cfg.title}>
         <div className="relative z-10 min-w-0 pr-2">
           <h2 className="text-xl font-extrabold text-white">{cfg.title}</h2>
@@ -96,6 +97,7 @@ export default function PageHero() {
         {flash > 0 && <div key={flash} className="hero-flash" />}
         <button type="button" onClick={hide} aria-label="Hide this banner" className="absolute right-2 top-2 z-20 p-1 rounded-full bg-black/30 text-white/80 hover:text-white"><X className="w-3.5 h-3.5" /></button>
       </section>
+      </div>
     </div>
   );
 }
