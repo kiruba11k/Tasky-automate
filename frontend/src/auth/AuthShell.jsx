@@ -1,10 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React from 'react';
 import { CheckSquare } from 'lucide-react';
-import Mascot from '@/fun/Mascot';
-import { hasWebGL } from '@/fun/three/species';
-
-const PeekStage = lazy(() => import('@/fun/three/PeekStage'));
-const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default function AuthShell({ title, subtitle, children }) {
   return (
@@ -15,11 +10,6 @@ export default function AuthShell({ title, subtitle, children }) {
             <CheckSquare className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-xl font-bold text-white">TaskFlow</h1>
-        </div>
-        <div className="flex justify-center -mt-2 mb-2">
-          {hasWebGL()
-            ? <Suspense fallback={<div style={{ height: 190 }} />}><PeekStage size={200} calm={calm()} /></Suspense>
-            : <Mascot mood="wave" size={92} className="tasky-bob" />}
         </div>
         <h2 className="text-2xl font-semibold text-white">{title}</h2>
         {subtitle && <p className="text-slate-400 mt-1 mb-6">{subtitle}</p>}

@@ -22,7 +22,6 @@ import { ThemeProvider } from './themes/ThemeProvider';
 import { FocusProvider } from './fun/FocusTimer';
 import PageMotion from './fun/PageMotion';
 import PageHero from './fun/PageHero';
-import FunLoader from './fun/FunLoader';
 
 const pages = { AIAllocation, Analytics, Cast, DailyTasks, Dashboard, Hub, Management, ProjectManagement, SheetsSetup, Tasks, Team, WeeklyTasks };
 
@@ -34,7 +33,7 @@ function Protected() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <FunLoader label="Waking up Tasky…" />
+        <div className="flex flex-col items-center gap-2 text-slate-300" role="status"><span className="h-6 w-6 rounded-full border-2 border-slate-500 border-t-transparent animate-spin" /><span className="text-sm">Loading…</span></div>
       </div>
     );
   }
