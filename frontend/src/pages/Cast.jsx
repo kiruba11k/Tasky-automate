@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState } from 'react';
 import { SPECIES, SPECIES_IDS } from '@/fun/three/species';
 import { useFun } from '@/fun/FunProvider';
 import { useBuddy } from '@/fun/BuddyContext';
+import Aviary from '@/fun/Aviary';
 import InView from '@/fun/InView';
 import FittingRoom from '@/fun/FittingRoom';
 import EggDialog from '@/fun/EggDialog';
@@ -82,6 +83,7 @@ export default function Cast() {
           );
         })}
       </div>
+      <Aviary />
       <div className="grid md:grid-cols-2 gap-4"><div className="glass-effect-enhanced rounded-2xl p-4"><ArcadeGame /></div><div className="glass-effect-enhanced rounded-2xl p-4"><MemoryGame /></div></div>
       <EggDialog open={egg} onOpenChange={setEgg} />
     </div>

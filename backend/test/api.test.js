@@ -745,7 +745,7 @@ describe('anonymous bird post', () => {
     for (const forbidden of ['Ann Sender', 'ann@example.com', 'from_user_id']) assert.ok(!inbox.text.includes(forbidden), `inbox leaks ${forbidden}`);
     assert.ok(inbox.body.every((b) => b.opened === false && b.text === undefined)); // sealed until opened
     const bird = inbox.body[0];
-    assert.ok(['robin', 'bluebird', 'parrot', 'pigeon', 'toucan', 'canary'].includes(bird.bird));
+    assert.ok(['robin', 'bluebird', 'parrot', 'canary', 'pigeon', 'toucan', 'rosie', 'parakeet', 'plum', 'hummingbird', 'puffin', 'cockatiel'].includes(bird.bird));
     assert.equal((await call('GET', '/api/birds/inbox', ann)).body.length, 0); // the sender gets nothing back, and everyone-excludes-self
     assert.equal((await call('GET', '/api/birds/inbox', cy)).body.length, 1);
   });

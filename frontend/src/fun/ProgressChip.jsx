@@ -72,6 +72,7 @@ export default function ProgressChip() {
         <Link to="/Cast" className="block text-center rounded-lg border-2 border-slate-900 bg-slate-800 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700">Meet the cast and pick your buddy</Link>
         <Toggle label="Page scenes" hint="A themed 3D banner with a different buddy on each page" on={settings.heroes} onChange={(v) => setSettings({ heroes: v })} />
         <Toggle label="Pause anonymous birds" hint="While on, nobody can send you bird messages (senders cannot tell)" on={muted} onChange={setBirds} />
+        <Toggle label="Bird fly-bys" hint="Now and then a bird crosses the screen with a cheerful banner" on={settings.flybys} onChange={(v) => setSettings({ flybys: v })} />
         <Toggle label="Click sparkles" hint="Stars pop when you press buttons" on={settings.sparkles} onChange={(v) => setSettings({ sparkles: v })} />
         <Toggle label="Cursor pal" hint="A tiny buddy trails your mouse pointer (desktop)" on={settings.pal} onChange={(v) => setSettings({ pal: v })} />
         <Toggle label="Screensaver" hint="After 5 idle minutes the cast bounces around" on={settings.saver} onChange={(v) => setSettings({ saver: v })} />
@@ -83,6 +84,7 @@ export default function ProgressChip() {
         <Toggle label="Sound effects" on={settings.sound} onChange={(v) => setSettings({ sound: v })} />
         <Toggle label="Tasky the mascot" on={settings.mascot} onChange={(v) => setSettings({ mascot: v })} />
         <div className="grid grid-cols-2 gap-1 pt-2">
+          <button type="button" onClick={() => emitFun({ type: 'birdFlyby' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200 col-span-2">Call a bird</button>
           <button type="button" onClick={() => emitFun({ type: 'parade' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200">Team parade</button>
           <button type="button" onClick={() => emitFun({ type: 'rhythm', which: 'pack' })} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200">End my day</button>
           <button type="button" onClick={() => setArcade(true)} className="rounded-lg border-2 border-slate-900 bg-slate-800 hover:bg-slate-700 py-1 text-[11px] font-bold text-slate-200 col-span-2">Arcade (2 games)</button>

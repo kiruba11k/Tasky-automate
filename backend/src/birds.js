@@ -2,7 +2,7 @@
 // Recipients never learn who sent a bird (no endpoint returns the sender). A message stays sealed until it is opened and
 // then flies away 5 minutes later; unopened birds are dropped after a week. The sender id is stored only for rate limiting.
 
-export const BIRD_TYPES = ['robin', 'bluebird', 'parrot', 'pigeon', 'toucan', 'canary'];
+export const BIRD_TYPES = ['robin', 'bluebird', 'parrot', 'canary', 'pigeon', 'toucan', 'rosie', 'parakeet', 'plum', 'hummingbird', 'puffin', 'cockatiel'];
 export const OPEN_TTL_MS = 5 * 60 * 1000;
 export const UNOPENED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_TEXT = 280;

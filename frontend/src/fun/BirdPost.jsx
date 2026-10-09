@@ -15,6 +15,13 @@ import { Emoji } from '@/icons/Emoji';
 
 const BirdFlights = lazy(() => import('./three/BirdFlights'));
 const BirdPerch = lazy(() => import('./three/BirdPerch'));
+const BirdPreviewStage = lazy(() => import('./three/BirdPreviewStage'));
+const PREVIEW_POSES = ['perch', 'sing', 'dance', 'love', 'wave', 'puff', 'preen', 'hop'];
+const BANNERS = ['You are doing great!', 'Nice work, team!', 'Stretch break?', 'Hydrate!', 'Almost Friday!', 'Tiny steps count', 'Ship it!', 'Take a deep breath', 'You got this!', 'High five!', 'Snack time?', 'Proud of you!', 'Keep going!'];
+const CHEERS = ['Nice one!', 'Task done!', 'Boom!', 'Great job!', 'Crushed it!'];
+const PASTELS = ['#fde68a', '#bae6fd', '#fbcfe8', '#bbf7d0', '#ddd6fe', '#fed7aa'];
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pickOne = (l) => l[Math.floor(Math.random() * l.length)];
 const fmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const MAX = 280;
 
@@ -43,6 +50,11 @@ function Composer({ open, onOpenChange, onSent }) {
   const [bird, setBird] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [poseIdx, setPoseIdx] = useState(0);
+  const [shuffle, setShuffle] = useState(0);
+  const { settings: fun } = useFun();
+  useEffect(() => { if (bird) return undefined; const t = setInterval(() => setShuffle((x) => x + 1), 3500); return () => clearInterval(t); }, [bird]);
+  const previewType = bird || BIRD_IDS[shuffle % BIRD_IDS.length];
 
   useEffect(() => {
     if (!open) return;
@@ -97,6 +109,11 @@ function Composer({ open, onOpenChange, onSent }) {
           </div>
           <div>
             <div className="text-sm font-bold text-slate-200 mb-1">Messenger</div>
+            {fun.view3d && hasWebGL() && (
+              <button type="button" onClick={() => setPoseIdx((i) => i + 1)} aria-label="Make the bird strike another pose" title="Tap the bird!" className="mx-auto mb-1 block rounded-xl bg-gradient-to-b from-sky-900/40 to-slate-800/40 border-2 border-slate-900">
+                <Suspense fallback={<div style={{ width: 150, height: 130 }} />}><BirdPreviewStage type={previewType} pose={PREVIEW_POSES[poseIdx % PREVIEW_POSES.length]} calm={fun.anim === 'calm'} width={170} height={130} /></Suspense>
+              </button>
+            )}
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Messenger bird">
               <button type="button" role="radio" aria-checked={bird === ''} onClick={() => setBird('')} className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-bold ${bird === '' ? 'bg-yellow-300 text-ink' : 'bg-slate-800 text-slate-200'}`}>Surprise me</button>
               {BIRD_IDS.map((id) => (
@@ -163,6 +180,18 @@ export default function BirdPost() {
     setFlights((l) => [...l, { id, delay: 0, birds: [], ...f }]);
     setTimeout(() => setFlights((l) => l.filter((x) => x.id !== id)), ms);
   }, []);
+  const lastBy = useRef(0);
+  const flyby = useCallback((opts = {}) => {
+    if (!fancy()) return;
+    lastBy.current = Date.now();
+    const styles = ['cross', 'cross', 'loop', 'dive', 'flock', 'zigzag'];
+    const style = opts.style || pickOne(styles);
+    const n = style === 'flock' ? 5 : 1;
+    const banner = opts.banner === null ? null : (opts.banner || (style === 'flock' ? null : (Math.random() < 0.8 ? pickOne(BANNERS) : null)));
+    const type = pickOne(BIRD_IDS);
+    addFlight({ kind: 'by', n, style, dir: Math.random() < 0.5 ? 1 : -1, alt: rnd(0.14, 0.7), seed: rnd(0, 6), birds: n > 1 ? [type] : [type], banner, bannerColor: pickOne(PASTELS), delay: 0, dur: opts.dur || rnd(8, 10.5) }, 12500);
+    play('tweet', sRef.current.sound);
+  }, [addFlight]);
   const anchor = () => ({ x: window.innerWidth - 16 - 100, y: window.innerHeight - 140 - 56 });
 
   const load = useCallback(async () => {
@@ -186,12 +215,27 @@ export default function BirdPost() {
     known.current = null;
     load();
     const poll = setInterval(() => { if (!document.hidden) load(); }, 30000);
-    const onFun = (e) => { if (e.detail?.type === 'bird') load(); if (e.detail?.type === 'birdCompose') setComposer(true); };
+    const onFun = (e) => {
+      const d = e.detail || {};
+      if (d.type === 'bird') load();
+      else if (d.type === 'birdCompose') setComposer(true);
+      else if (d.type === 'birdFlyby') flyby(d);
+      else if (d.type === 'entity' && sRef.current.flybys !== false && (d.patch?.task_status === 'Completed' || d.patch?.status === 'Completed') && Date.now() - lastBy.current > 60000 && Math.random() < 0.4) setTimeout(() => flyby({ banner: pickOne(CHEERS), style: pickOne(['loop', 'cross', 'dive']) }), 900);
+    };
     const onVis = () => { if (!document.hidden) load(); };
     window.addEventListener('tasky:fun', onFun);
     document.addEventListener('visibilitychange', onVis);
     return () => { clearInterval(poll); window.removeEventListener('tasky:fun', onFun); document.removeEventListener('visibilitychange', onVis); };
-  }, [user?.id, load]);
+  }, [user?.id, load, flyby]);
+
+  // now and then a bird crosses the screen on whatever page you are on
+  useEffect(() => {
+    if (!user) return undefined;
+    let t;
+    const next = (first) => { t = setTimeout(() => { if (!document.hidden && sRef.current.flybys !== false && !document.querySelector('.lunch-screen, .idle-saver, .cast-party')) flyby(); next(false); }, (first ? rnd(25, 45) : rnd(110, 260)) * 1000); };
+    next(true);
+    return () => clearTimeout(t);
+  }, [user?.id, flyby]);
 
   // tick every second; birds whose letters ran out fly away
   useEffect(() => {

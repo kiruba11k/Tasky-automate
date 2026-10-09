@@ -31,7 +31,7 @@ const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
   const lowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2));
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, season: true, rhythm: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, flybys: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
