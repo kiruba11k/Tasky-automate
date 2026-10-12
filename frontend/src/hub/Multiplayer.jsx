@@ -1,7 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { useFun } from '@/fun/FunProvider';
+import { hasWebGL } from '@/fun/three/species';
 import { request, getToken } from '@/api/client';
 import { Panel, Err, primary, subtle } from './ui';
 
+const GameStage = lazy(() => import('@/fun/three/MultiStages'));
 const ICON = { ttt: '❌', c4: '🔴', rps: '✊', race: '⚡' };
 const BLURB = {
   ttt: 'Three in a row wins. Two players.',
@@ -135,16 +138,43 @@ function Race({ room, act }) {
 
 function Invite({ room, act }) {
   const [msg, setMsg] = useState('');
+  const [people, setPeople] = useState(null);
+  const [picked, setPicked] = useState([]);
+  const [q, setQ] = useState('');
+  useEffect(() => { request('GET', '/api/birds/recipients').then(setPeople).catch(() => setPeople([])); }, []);
+  const here = new Set(room.players.map((p) => p.id));
+  const list = (people || []).filter((p) => !here.has(p.id) && p.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const send = async (to) => { const r = await act(`/api/games/${room.id}/invite`, { to }); if (r) { setMsg(`Invited ${r.invited} teammate${r.invited === 1 ? '' : 's'}`); setPicked([]); } };
   return (
-    <div className="flex items-center gap-2">
-      <button type="button" className={subtle} onClick={async () => { const r = await act(`/api/games/${room.id}/invite`, { to: 'all' }); if (r) setMsg(`Invited ${r.invited} teammate${r.invited === 1 ? '' : 's'}`); }}>📣 Invite everyone</button>
-      {msg && <span className="text-sm text-slate-300">{msg}</span>}
+    <div className="space-y-2">
+      <p className="text-sm font-bold text-slate-200">Invite teammates</p>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search teammates…" aria-label="Search teammates to invite" className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-white placeholder:text-slate-500" />
+      <ul className="max-h-40 overflow-y-auto rounded-lg border border-slate-700">
+        {list.map((p) => (
+          <li key={p.id}>
+            <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+              <input type="checkbox" checked={picked.includes(p.id)} onChange={() => setPicked((x) => (x.includes(p.id) ? x.filter((i) => i !== p.id) : [...x, p.id]))} /> {p.name}
+            </label>
+          </li>
+        ))}
+        {people && list.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">Nobody to invite{q ? ' with that name' : ''}</li>}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className={primary} disabled={!picked.length} onClick={() => send(picked)}>Invite {picked.length || ''} selected</button>
+        <button type="button" className={subtle} onClick={() => send('all')}>📣 Invite everyone</button>
+        {msg && <span className="text-sm text-slate-300">{msg}</span>}
+      </div>
     </div>
   );
 }
 
 function Room({ room, act }) {
+  const { settings, celebrate } = useFun();
+  const three = settings.view3d && hasWebGL();
   const Board = { ttt: Ttt, c4: C4, rps: Rps, race: Race }[room.game];
+  const move = (m) => act(`/api/games/${room.id}/move`, m);
+  const won = room.status === 'done' && room.state?.winner === room.you && !room.state?.forfeit;
+  useEffect(() => { if (won) celebrate('party'); }, [won]); // eslint-disable-line react-hooks/exhaustive-deps
   const host = room.players[0] && room.hostId === room.players[room.you]?.id;
   return (
     <Panel title={`${ICON[room.game]} ${room.title}`} hint={room.players.map((p) => firstName(p.name)).join(' vs ')}
@@ -158,7 +188,12 @@ function Room({ room, act }) {
             {host && room.max > 2 && <button type="button" className={primary} disabled={room.players.length < room.min} onClick={() => act(`/api/games/${room.id}/start`)}>Start the race ({room.players.length} in)</button>}
           </div>
         )}
-        {room.status !== 'lobby' && Board && <Board room={room} act={act} />}
+        {room.status !== 'lobby' && three && (
+          <Suspense fallback={<div className="h-64 rounded-2xl bg-slate-800/60" />}>
+            <GameStage room={room} onMove={move} calm={settings.anim === 'calm'} />
+          </Suspense>
+        )}
+        {room.status !== 'lobby' && Board && !(three && (room.game === 'ttt' || room.game === 'c4')) && <Board room={room} act={act} />}
         {room.status === 'done' && <button type="button" className={primary} onClick={() => act(`/api/games/${room.id}/rematch`)}>Play again</button>}
       </div>
     </Panel>

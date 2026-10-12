@@ -98,7 +98,7 @@ export function createGames({ clock = Date.now, random = Math.random, onChange =
     if (!GAMES[game]) throw Object.assign(new Error('Unknown game'), { status: 400 });
     for (const r of rooms.values()) if (r.status !== 'done' && slot(r, user.id) >= 0) throw Object.assign(new Error('Finish or leave your current game first'), { status: 409 });
     seq += 1;
-    const room = { id: `g${seq}-${Math.floor(random() * 1e6).toString(36)}`, game, hostId: user.id, players: [{ id: user.id, name: user.name }], status: 'lobby', state: null, created: clock(), updated: clock() };
+    const room = { id: `g${seq}-${Math.floor(random() * 1e6).toString(36)}`, game, hostId: user.id, players: [{ id: user.id, name: user.name, buddy: user.buddy }], status: 'lobby', state: null, created: clock(), updated: clock() };
     rooms.set(room.id, room);
     touch(room);
     return room;
@@ -114,7 +114,7 @@ export function createGames({ clock = Date.now, random = Math.random, onChange =
     if (room.status !== 'lobby') throw Object.assign(new Error('That game already started'), { status: 409 });
     if (room.players.length >= GAMES[room.game].max) throw Object.assign(new Error('That game is full'), { status: 409 });
     for (const r of rooms.values()) if (r.status !== 'done' && slot(r, user.id) >= 0) throw Object.assign(new Error('Finish or leave your current game first'), { status: 409 });
-    room.players.push({ id: user.id, name: user.name });
+    room.players.push({ id: user.id, name: user.name, buddy: user.buddy });
     if (room.players.length === GAMES[room.game].max && GAMES[room.game].max === 2) begin(room);
     touch(room);
     return room;
@@ -218,7 +218,7 @@ export function registerGames(app, { store, notifier, wrap, clock = Date.now }) 
   const games = createGames({ clock, onChange: () => listeners.forEach(({ res }) => { try { res.write('data: changed\n\n'); } catch { /* closed */ } }) });
   const timer = setInterval(() => games.sweep(), 150);
   timer.unref?.();
-  const who = (req) => ({ id: req.user.id, name: req.user.full_name || req.user.email });
+  const who = (req) => ({ id: req.user.id, name: req.user.full_name || req.user.email, buddy: req.user.buddy || null });
   const fail = (res, e) => (e.status ? res.status(e.status).json({ error: e.message }) : (() => { throw e; })());
   const run = (fn) => wrap(async (req, res) => { try { await fn(req, res); } catch (e) { fail(res, e); } });
 

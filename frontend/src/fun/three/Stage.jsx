@@ -14,7 +14,7 @@ function Ticker({ fps }) {
  * A transparent WebGL canvas that only renders while it is on screen (and only once in calm mode),
  * so a page full of characters costs nothing when they are scrolled away.
  */
-export default function Stage({ children, calm = false, fps = 30, ortho = false, zoom = 40, camera, className = '', style }) {
+export default function Stage({ children, calm = false, fps = 30, ortho = false, zoom = 40, camera, lookAt, className = '', style }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(true);
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function Stage({ children, calm = false, fps = 30, ortho = false,
         frameloop={visible || calm ? 'demand' : 'never'}
         camera={camera || (ortho ? { zoom, position: [0, 0, 20], near: 0.1, far: 100 } : { fov: 28, position: [0, 1.3, 6.9], near: 0.1, far: 50 })}
         gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
-        onCreated={({ camera: cam }) => { if (!ortho) cam.lookAt(0, 1.3, 0); }}
+        onCreated={({ camera: cam }) => { if (!ortho) cam.lookAt(...(lookAt || [0, 1.3, 0])); }}
       >
         <ambientLight intensity={1.15} />
         <directionalLight position={[3, 5, 4]} intensity={1.6} />
