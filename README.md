@@ -5,6 +5,17 @@ Marketing team task, project and workload manager. Email-only login restricted t
 - `frontend/` — React 18 + Vite + Tailwind (shadcn-style UI components in `src/components/ui`)
 - `backend/` — Express API, entity schemas in `backend/schemas/`, Postgres via `pg`
 
+## UI: Lead Strategus Tracker (branch `ui-internal`)
+
+The app's pages are now the **Lead Strategus Tracker** UI, ported from the clickable prototype into clean source under `frontend/src/internal/`:
+Dashboard, Tasks update (plan the day, targets, end of day, weekly targets, end of week), Projects, Profile, and for managers Assign and People, with the "Viewing as" role switcher, theme dialog, anonymous chat and mascot.
+Each page was compared against the prototype in a browser (pixel diff of every page and role; only the animated mascot differs).
+
+- It runs on the prototype's **demo data** (state in `localStorage` key `ls-tracker-v2`, store in `src/internal/store.js`, logic in `src/internal/lib/`). It is **not wired to the backend or login yet**; that is the next step, page by page.
+- The previous TaskFlow UI is preserved in git: tag `old-ui-before-internal` (pages, layout, components).
+- The 3D, animation and employee-fun layer (`src/fun`, `src/hub`, `src/themes`, `src/icons`) is still in the repo but not mounted. It is the code to switch back on when asked.
+- `src/internal/min.js` is a generated barrel that maps the prototype's original minified names to the ported modules (see `MAP.tsv`, `lib/README.md`); it can be replaced by direct imports later.
+
 ## Run locally
 
 ```bash
