@@ -123,11 +123,11 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
   const size = b.size || 1;
   const tl = (b.tailLen || 0.38) + 0.14;
   return (
-    <group scale={[size * 0.74, size, size]} {...rest}>
+    <group scale={[size * 0.85, size, size]} {...rest}>
       <group ref={root}>
         <group ref={body}>
-          <Part color={b.body} s={[0.4, 0.43, 0.6]} p={[0, 0.58, -0.08]} r={[-0.55, 0, 0]} />
-          <Part color={b.chest} s={[0.31, 0.34, 0.3]} p={[0, 0.5, 0.2]} r={[-0.55, 0, 0]} outline={false} />
+          <Part color={b.body} s={[0.29, 0.36, 0.68]} p={[0, 0.58, -0.1]} r={[-0.55, 0, 0]} />
+          <Part color={b.chest} s={[0.21, 0.29, 0.34]} p={[0, 0.5, 0.2]} r={[-0.55, 0, 0]} outline={false} />
           {[[-0.26, 0.64, 0.5], [0, 0.72, 0.56], [0.26, 0.64, 0.5], [-0.15, 0.47, 0.6], [0.15, 0.47, 0.6], [0, 0.31, 0.57], [-0.32, 0.4, 0.44], [0.32, 0.4, 0.44]].map(([x, y, z], i) => (
             <Part key={i} color={i % 3 === 0 ? b.chest2 : b.chest} s={[0.09, 0.08, 0.05]} p={[x * 0.6, 0.45 + (y - 0.5) * 0.6, 0.1 + z * 0.42]} r={[0.5, x * 1.6, x * 0.6]} outline={false} />
           ))}
@@ -137,13 +137,13 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
             <Part color={b.tail[0]} s={[0.1, 0.03, tl]} p={[0, 0.005, -tl]} />
           </group>
           {[-1, 1].map((x) => (
-            <group key={x} ref={x > 0 ? wingL : wingR} position={[x * 0.32, 0.74, -0.02]} scale={0.82}>
+            <group key={x} ref={x > 0 ? wingL : wingR} position={[x * 0.23, 0.74, -0.04]} scale={0.8}>
               {b.wing.map((col, i) => <Part key={i} color={col} s={[0.5 - i * 0.04, 0.045, 0.2 - i * 0.015]} p={[x * (0.3 + i * 0.1), -i * 0.045, -0.04 - i * 0.07]} r={[0, 0, x * -0.1]} />)}
             </group>
           ))}
           <group ref={legs}>
             {[-1, 1].map((x) => (
-              <group key={x} position={[x * 0.11, 0.2, 0.0]}>
+              <group key={x} position={[x * 0.08, 0.2, 0.0]}>
                 <Part g="cyl" args={[1, 1, 1, 6]} color={b.feet || '#f59e0b'} s={[0.028, 0.14, 0.028]} p={[0, -0.1, 0]} outline={false} />
                 {[-0.07, 0, 0.07].map((tx) => <Part key={tx} g="cone" args={[1, 2, 5]} color={feet} s={[0.022, 0.07, 0.022]} p={[tx, -0.24, 0.08]} r={[1.4, 0, -tx * 3]} outline={false} />)}
               </group>
@@ -158,7 +158,7 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
             </group>
           )}
         </group>
-        <group ref={head} position={[0, 0.98, 0.22]} scale={0.74}>
+        <group ref={head} position={[0, 0.98, 0.22]} scale={0.62}>
           <Part color={b.head} s={[0.5, 0.46, 0.46]} />
           {[-1, 1].map((x) => <Part key={`ch${x}`} color={b.cheek} s={[0.125, 0.085, 0.04]} p={[x * 0.31, -0.1, 0.33]} outline={false} />)}
           <group ref={eyes}>
