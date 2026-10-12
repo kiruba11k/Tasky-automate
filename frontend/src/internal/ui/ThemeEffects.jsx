@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Se as useStore } from '@/internal/min';
-import { useTheme, hexToRgbChannels } from './theme';
+import { useTheme, hexToRgbChannels, THEMES } from './theme';
 import { resolveTheme } from '@/themes/engine';
 import { applyTheme } from '@/themes/apply';
 import { mix, triplet } from '@/themes/color';
@@ -23,6 +23,15 @@ function paintPack(root, def) {
   root.style.setProperty('--page-pattern', def.pattern || 'none');
   packKeys.push('--page-pattern');
 }
+/** The Team hub and the other playful pages follow the tracker's own theme: derive their palette from its colours. */
+function paintFun(root, theme) {
+  const base = THEMES[theme.theme] || THEMES.pro;
+  const accent = theme.theme === 'custom' ? theme.custom.accent : base.swatch[1];
+  applyTheme({ id: theme.theme, mode: theme.mode, neutral: { hue: 225, sat: theme.mode === 'dark' ? 28 : 18 }, primary: accent, secondary: base.swatch[2] || accent, accent, accent2: base.swatch[2] || accent, mascot: [accent, base.swatch[2] || accent] });
+  packKeys = Object.keys(resolveTheme({ id: theme.theme, mode: theme.mode, primary: accent, secondary: accent, accent }).vars);
+  packKeys.push('--page-pattern-size', '--page-pattern');
+  root.dataset.theme = theme.mode;
+}
 function clearPack(root) {
   packKeys.forEach((k) => root.style.removeProperty(k));
   packKeys = [];
@@ -36,6 +45,7 @@ export function ThemeEffects() {
     const root = document.documentElement;
     clearPack(root);
     if (theme.pack) paintPack(root, theme.pack);
+    else paintFun(root, theme);
     root.dataset.theme = theme.mode;
     root.dataset.accent = theme.fun ? 'brand' : (accent ?? 'brand');
     if (theme.fun) root.dataset.fun = theme.fun;
@@ -48,7 +58,7 @@ export function ThemeEffects() {
       root.style.setProperty('--custom-accent-soft', theme.mode === 'dark' ? '40 40 70' : '237 233 254');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme.theme, theme.mode, theme.bg, theme.font, theme.cards, theme.fun, JSON.stringify(theme.custom), accent]);
+  }, [theme.theme, theme.mode, theme.bg, theme.font, theme.cards, theme.fun, JSON.stringify(theme.custom), JSON.stringify(theme.pack), accent]);
   return null;
 }
 

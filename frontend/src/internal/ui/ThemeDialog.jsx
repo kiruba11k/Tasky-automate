@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import { Se as useStore, Ya as Modal } from '@/internal/min';
 import { cx } from './cx';
 import { Button } from './Button';
-import { THEMES, useTheme } from './theme';
+import { THEMES, MY_DEFAULT, useTheme } from './theme';
 
 const NOW_EMOJIS = ['🏃', '🚀', '🐢', '🦖', '⏰', '☕', '🦄', '🐝'];
 const ACCENT_SWATCHES = ['#7C3AED', '#DB2777', '#EA580C', '#059669', '#2563EB', '#DC2626'];
@@ -61,6 +61,9 @@ export function ThemeDialog({ open, onClose }) {
   const theme = useTheme();
   const [showCustom, setShowCustom] = useState(false);
   const custom = theme.custom;
+  const mine = { ...MY_DEFAULT, ...useStore((st) => st.profiles[st.me]?.myTheme) };
+  const cartoon = useStore((st) => Boolean(st.profiles[st.me]?.cartoon));
+  const updateMine = (patch) => setProfile(me, { theme: 'pack:mine', myTheme: { ...mine, ...patch, neutral: { ...mine.neutral, ...patch.neutral } } });
   const updateCustom = (patch) => setProfile(me, { theme: 'custom', custom: { ...custom, ...patch } });
 
   return (
@@ -103,6 +106,28 @@ export function ThemeDialog({ open, onClose }) {
           );
         })}
       </div>
+      {theme.theme === 'pack:mine' && (
+        <div className="mt-5 space-y-3 rounded-2xl border border-dashed border-line p-4 text-sm">
+          <p className="font-bold">Your colours</p>
+          <OptionRow label="Base">
+            {['light', 'dark'].map((m) => (
+              <button key={m} className={chipClass(mine.mode === m)} onClick={() => updateMine({ mode: m })}>{m === 'light' ? '☀️ Light' : '🌙 Dark'}</button>
+            ))}
+          </OptionRow>
+          <OptionRow label="Main colour">
+            <input aria-label="Main colour" type="color" value={mine.primary} onChange={(e) => updateMine({ primary: e.target.value })} className="h-8 w-14 cursor-pointer rounded-lg border border-line" />
+            {ACCENT_SWATCHES.map((c) => <button key={c} aria-label={`Main ${c}`} className="focus-ring h-7 w-7 rounded-full border-2 border-surface shadow" style={{ background: c }} onClick={() => updateMine({ primary: c })} />)}
+          </OptionRow>
+          <OptionRow label="Second colour">
+            <input aria-label="Second colour" type="color" value={mine.secondary} onChange={(e) => updateMine({ secondary: e.target.value })} className="h-8 w-14 cursor-pointer rounded-lg border border-line" />
+            {ACCENT_SWATCHES.map((c) => <button key={c} aria-label={`Second ${c}`} className="focus-ring h-7 w-7 rounded-full border-2 border-surface shadow" style={{ background: c }} onClick={() => updateMine({ secondary: c })} />)}
+          </OptionRow>
+          <OptionRow label="Tint of greys">
+            <input aria-label="Tint hue" type="range" min="0" max="360" value={mine.neutral.hue} onChange={(e) => updateMine({ neutral: { hue: Number(e.target.value) } })} />
+            <input aria-label="Tint strength" type="range" min="0" max="100" value={mine.neutral.sat} onChange={(e) => updateMine({ neutral: { sat: Number(e.target.value) } })} />
+          </OptionRow>
+        </div>
+      )}
       {(showCustom || theme.theme === 'custom') && (
         <div className="mt-5 space-y-3 rounded-2xl border border-dashed border-line p-4 text-sm">
           <p className="font-bold">Make your own</p>
@@ -159,6 +184,14 @@ export function ThemeDialog({ open, onClose }) {
         </div>
       )}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3 sm:col-span-2">
+          <span className="text-3xl">✏️</span>
+          <span className="flex-1">
+            <b className="block text-sm">Cartoon outlines</b>
+            <span className="text-xs text-muted">Thick outlines and rounded fonts on whichever theme you pick (the Team hub already has them)</span>
+          </span>
+          <input type="checkbox" aria-label="Cartoon outlines" checked={cartoon} onChange={(e) => setProfile(me, { cartoon: e.target.checked })} className="h-5 w-5" />
+        </label>
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3">
           <img src="/mascot.webp" alt="" className="h-12 w-12 object-contain" />
           <span className="flex-1">

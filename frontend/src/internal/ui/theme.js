@@ -1,6 +1,7 @@
 import { Se as useStore, eU as DEFAULT_CUSTOM_THEME } from '@/internal/min';
 import { listThemes } from '@/themes/registry';
 import { resolveTheme } from '@/themes/engine';
+import { buildCustomTheme, DEFAULT_SPEC } from '@/themes/custom';
 
 /** Accent palette (original: `Tr`). */
 export const ACCENT_COLORS = ['#1D3FA0', '#DC2626', '#0E9F6E', '#7C3AED', '#D97706', '#0891B2'];
@@ -106,6 +107,15 @@ for (const def of listThemes()) {
   };
 }
 
+/** "My colours": a theme the person builds from two colours, a tint and a light/dark base (saved on their profile). */
+THEMES['pack:mine'] = {
+  name: 'My colours',
+  blurb: 'Pick your own colours',
+  swatch: ['#0b1020', DEFAULT_SPEC.primary, DEFAULT_SPEC.secondary],
+  look: { mode: 'dark', fun: 'pack', bg: 'plain', font: 'fredoka', cards: 'cartoon', blocks: 'solid', floaters: [] },
+};
+export const MY_DEFAULT = DEFAULT_SPEC;
+
 /** "#RRGGBB" -> "r g b" channel string (original: `yU`). */
 export const hexToRgbChannels = (hex) => {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -119,7 +129,13 @@ export function useTheme() {
   const profile = useStore((s) => s.profiles[s.me]);
   const theme = profile?.theme ?? (profile?.dark ? 'dark' : 'pro');
   const custom = { ...DEFAULT_CUSTOM_THEME, ...profile?.custom };
-  const look = THEMES[theme]?.look ?? THEMES.pro.look;
+  let look = THEMES[theme]?.look ?? THEMES.pro.look;
+  if (theme === 'pack:mine') {
+    let pack;
+    try { pack = buildCustomTheme({ ...DEFAULT_SPEC, ...profile?.myTheme }); } catch { pack = buildCustomTheme(DEFAULT_SPEC); }
+    look = { ...look, mode: pack.mode, pack };
+  }
+  if (profile?.cartoon) look = { ...look, cards: 'cartoon', font: look.font === 'jakarta' ? 'fredoka' : look.font };
   return {
     ...(theme === 'custom'
       ? {

@@ -504,7 +504,7 @@ body.pro .theme-pattern, body.pro .season-layer { display: none !important; }
 body.pro .animated-gradient-bg-enhanced::before, body.pro .animated-gradient-bg-enhanced::after { display: none !important; }
 
 /* A page of the fun layer shown inside the light tracker UI: a dark stage so its white text and cards read properly. */
-.fun-scope.fun-page { background: #0b1220; color: #f8fafc; border-radius: 1.25rem; overflow: hidden; }
+.fun-scope.fun-page { background: rgb(var(--slate-950)); color: rgb(var(--c-white)); border-radius: 1.25rem; overflow: hidden; }
 
 /* The frosted cards the fun layer's pages are built from (these lived in the old layout). */
 .glass-effect-enhanced {

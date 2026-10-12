@@ -12,7 +12,8 @@ export default {
       includeFiles: [/fun\.css$/],
       transform(prefix, selector, prefixed) {
         if (selector.startsWith('.fun-scope')) return selector; // already scoped by hand
-        if (selector === ':root' || selector === 'html' || selector === 'body') return prefix;
+        if (selector === ':root') return selector; // palette variables stay on <html> so the active theme can override them for the fun pages too
+        if (selector === 'html' || selector === 'body') return prefix;
         if (selector.startsWith('body.')) return prefix + selector.slice(4); // body.fun x -> .fun-scope.fun x
         if (selector.startsWith('body ')) return prefix + selector.slice(4);
         if (selector.startsWith('html ')) return prefix + selector.slice(4);
