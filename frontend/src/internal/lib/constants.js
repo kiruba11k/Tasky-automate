@@ -184,3 +184,11 @@ export const DEFAULT_THEME = {
   nowEmoji: "🏃",
   blocks: "candy",
 };
+
+/** Approvers (flagged by the server): the only people who put projects live and approve or decline proposals. */
+export const isApprover = (personId) => !!PEOPLE.find((p) => p.id === personId)?.approver;
+/** First names of the approvers, e.g. "Komala and Kirubakaran". */
+export const approverNames = () => {
+  const names = PEOPLE.filter((p) => p.approver).map((p) => p.name.split(" ")[0]);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] || "a manager";
+};

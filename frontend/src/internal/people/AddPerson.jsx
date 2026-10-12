@@ -17,7 +17,7 @@ const ACCESS = { resource: 'team_member', pm: 'team_leader', manager: 'admin', f
 
 /** Adds a person by work email; only people added here can sign in. */
 export function AddPerson({ open, onClose }) {
-  const [form, setForm] = useState({ name: '', email: '', role: 'resource', title: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'resource', title: '', approver: false });
   const roles = ROLES; // every admin (manager, founder, project manager) can add anyone
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -34,11 +34,12 @@ export function AddPerson({ open, onClose }) {
         role: ACCESS[form.role],
         track_role: form.role === 'founder' ? undefined : form.role,
         founder: form.role === 'founder' ? true : undefined,
+        approver: form.approver && ['manager', 'pm'].includes(form.role) ? true : undefined,
         designation: form.title.trim() || undefined,
       });
       setPeople(await request('GET', '/api/tracker/people'));
       toast({ title: `${form.name.trim()} can now sign in`, tone: 'success' });
-      setForm({ name: '', email: '', role: 'resource', title: '' });
+      setForm({ name: '', email: '', role: 'resource', title: '', approver: false });
       onClose();
     } catch (err) {
       setError(err.message);
@@ -68,6 +69,12 @@ export function AddPerson({ open, onClose }) {
           Job title <span className="font-normal text-muted">(optional)</span>
           <input className={`${INPUT_CLASS} mt-1`} value={form.title} onChange={set('title')} />
         </label>
+        {['manager', 'pm'].includes(form.role) && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.approver} onChange={(e) => setForm((f) => ({ ...f, approver: e.target.checked }))} />
+            Can approve project proposals
+          </label>
+        )}
         {error && <p role="alert" className="text-sm text-coral-ink">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" tone="ghost" onClick={onClose}>Cancel</Button>

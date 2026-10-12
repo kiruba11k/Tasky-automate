@@ -26,10 +26,12 @@ import {
 } from '@/internal/min';
 import { WeekGlance } from './WeekGlance';
 import { AssignmentDifficulty } from './AssignmentDifficulty';
+import { isApprover, approverNames } from '../lib/constants';
 
 /** Manager / founder dashboard, route "/". (bundle: KU) */
 export function ManagerDashboard() {
-  const { projects, tasks, decideProject } = useStore();
+  const { me, projects, tasks, decideProject } = useStore();
+  const canDecide = isApprover(me);
   const pending = projects.filter((p) => p.status === 'pending');
   const active = projects.filter((p) => p.status === 'active');
   const today = dayKey(0);
@@ -66,6 +68,7 @@ export function ManagerDashboard() {
                     {formatDate(project.endDate)}
                   </p>
                 </div>
+                {canDecide ? (<>
                 <Button
                   onClick={() =>
                     runAction(() => {
@@ -83,6 +86,9 @@ export function ManagerDashboard() {
                 >
                   <X size={13} /> Decline
                 </Button>
+                </>) : (
+                  <span className="text-xs text-muted">Waiting for {approverNames()}</span>
+                )}
               </li>
             ))}
           </ul>

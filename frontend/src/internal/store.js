@@ -1,7 +1,7 @@
 // The persisted zustand store (localStorage key "ls-tracker-v2").
 import { create } from "zustand";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, LUNCH_BLOCK } from "./lib/dates.js";
-import { PEOPLE, TASK_TYPES, isAdminTier, roleOf } from "./lib/constants.js";
+import { PEOPLE, TASK_TYPES, isAdminTier, isApprover, approverNames, roleOf } from "./lib/constants.js";
 import {
   DEFAULT_METRICS,
   EMPTY_COUNTS,
@@ -107,6 +107,8 @@ export const useStore = create()(
           throw new Error("Only the project owner can do this.");
         return project;
       };
+      /** Ids of the other approvers: project proposals are sent only to them. */
+      const approverIds = () => PEOPLE.filter((p) => p.approver && p.id !== get().me).map((p) => p.id);
       /** `p` - ids of the other admins: managers, founders and project managers (they approve projects). */
       const leadershipIds = () => PEOPLE.filter((p) => isAdminTier(p.role) && p.id !== get().me).map((p) => p.id);
       /** `h` - validate an assignment draft and build the task record. */
@@ -592,7 +594,7 @@ export const useStore = create()(
               validateTargets(counts),
             ]),
           );
-          const autoApprove = isAdminTier(roleOf(me));
+          const autoApprove = isApprover(me); // only approvers put a project live; everyone else sends it for approval
           const id = newId();
           set((s) => ({
             projects: [
@@ -628,7 +630,7 @@ export const useStore = create()(
             ],
           }));
           if (!autoApprove)
-            leadershipIds().forEach((lid) =>
+            approverIds().forEach((lid) =>
               notify(
                 lid,
                 `${firstName(me)} proposed a new project: ${draft.name.trim()}, waiting for approval`,
@@ -644,6 +646,7 @@ export const useStore = create()(
         decideProject: (projectId, approved) => {
           const project = get().projects.find((p) => p.id === projectId);
           if (!project) throw new Error("Project not found.");
+          if (!isApprover(get().me)) throw new Error(`Only ${approverNames()} can approve or decline projects.`);
           if (approved) {
             patchProject(projectId, (p) => ({ ...p, status: "active" }));
             notify(

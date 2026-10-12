@@ -20,5 +20,7 @@ services:
         sync: false
       - key: ADMIN_EMAIL         # first admin's email, created on first start
         sync: false
+      - key: PROJECT_APPROVERS   # the managers who approve project proposals (comma separated emails)
+        value: komala.m@leadstrategus.com,kirubakaran.p@leadstrategus.com
       - key: ANTHROPIC_API_KEY   # optional: enables real AI task allocation
         sync: false

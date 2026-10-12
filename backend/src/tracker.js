@@ -15,6 +15,15 @@ const lead = (u) => leadership(u) || trackerRole(u) === 'pm';
 const COLORS = { founder: 'lavender', manager: 'peach', pm: 'sky', resource: 'mint' };
 const TITLES = { founder: 'Founder', manager: 'Manager', pm: 'Project Manager', resource: 'Resource' };
 
+// Who approves project proposals: people flagged `approver` and the emails in PROJECT_APPROVERS (comma separated). Nobody else.
+// If nobody qualifies yet, every manager can, so approvals never get stuck.
+const approverEmails = () => (process.env.PROJECT_APPROVERS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+const isNamedApprover = (u) => u.approver === true || approverEmails().includes(String(u.email || '').toLowerCase());
+export const approvers = (users) => {
+  const named = users.filter(isNamedApprover);
+  return named.length ? named : users.filter(leadership);
+};
+
 export const publicPerson = (u) => ({
   id: u.id,
   name: u.full_name || u.email,
@@ -23,6 +32,7 @@ export const publicPerson = (u) => ({
   color: COLORS[trackerRole(u)],
   history: [],
 });
+const withApprovers = (users) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id) })); };
 
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
 export function mergePatch(target, patch) {
@@ -65,7 +75,7 @@ export function registerTracker(app, { store, wrap }) {
   }
 
   /** May `u` write `data` to this document? `prev` is the stored data (undefined for a new document). */
-  async function canWrite(u, kind, key, data, prev, changed = []) {
+  async function canWrite(u, kind, key, data, prev, changed = [], deleting = false) {
     const mine = (id) => id === u.id;
     switch (kind) {
       case 'task': {
@@ -75,6 +85,10 @@ export function registerTracker(app, { store, wrap }) {
       }
       case 'project': {
         const p = prev || data;
+        const approves = (await live()).length ? approvers(await live()).some((a) => mine(a.id)) : false;
+        // Only approvers put a project live, decline a proposal, or approve one. Everyone else proposes (status pending).
+        if (!prev && data.status !== 'pending' && !approves) return false;
+        if (prev?.status === 'pending' && (changed.includes('status') || deleting) && !approves && !(deleting && mine(prev.pmId))) return false;
         if (lead(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true; // admins: managers, founders and PMs
         // everyone else on the team may only record that a day was finalized (when they send their end of day)
         return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
@@ -92,7 +106,7 @@ export function registerTracker(app, { store, wrap }) {
   const out = (doc) => ({ kind: doc.kind, key: doc.key, data: doc.deleted ? null : doc.data, deleted: !!doc.deleted, updated: new Date(doc.updated_date).toISOString() });
 
   app.get('/api/tracker/people', wrap(async (req, res) => {
-    res.json((await live()).map(publicPerson).sort((a, b) => a.name.localeCompare(b.name)));
+    res.json(withApprovers(await live()).sort((a, b) => a.name.localeCompare(b.name)));
   }));
 
   // Everything this person may see; pass `since` (an ISO time from an earlier response's `now`) to get only changes.
@@ -126,7 +140,7 @@ export function registerTracker(app, { store, wrap }) {
       const prev = existing && !existing.deleted ? existing.data : undefined;
       if (it.del) {
         if (!existing || existing.deleted) { results.push({ ...id, ok: true }); continue; }
-        if (!(await canWrite(u, kind, key, prev, prev))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
+        if (!(await canWrite(u, kind, key, prev, prev, [], true))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
         await store.update('TrackerDoc', existing.id, { deleted: true, data: {}, owner_id: u.id });
         results.push({ ...id, ok: true });
         continue;

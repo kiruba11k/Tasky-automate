@@ -1,4 +1,4 @@
-import { isAdminTier } from '@/internal/lib/constants';
+import { isAdminTier, isApprover, approverNames } from '@/internal/lib/constants';
 import React, { useState, useEffect, useMemo } from 'react';
 import { CalendarRange, Crown, ArrowRightLeft, Plus, ShieldCheck, Trash, X } from 'lucide-react';
 import {
@@ -45,9 +45,10 @@ export function ProjectFormModal({ open, onClose, edit }) {
     removeProjectAdmin,
     transferProject,
   } = useStore();
-  const isManager = isAdminTier(roleOf(me)); // admins (managers, founders, project managers) create projects that go live at once
+  const isManager = isApprover(me); // only approvers put a project live; everyone else sends it for approval
+  const isAdmin = isAdminTier(roleOf(me));
   const ownerId = edit ? edit.pmId : me;
-  const canManageAdmins = !edit || edit.pmId === me || isManager;
+  const canManageAdmins = !edit || edit.pmId === me || isAdmin;
 
   const [description, setDescription] = useState('');
   const [name, setName] = useState('');
@@ -231,7 +232,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
       }, setError)
     ) {
       toast({
-        title: isManager ? `${name} is live 🎉` : `${name} sent to management for approval`,
+        title: isManager ? `${name} is live 🎉` : `${name} sent to ${approverNames()} for approval`,
         tone: 'success',
       });
       resetForm();
@@ -306,7 +307,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
           ? 'Changes apply to this project only.'
           : isManager
             ? undefined
-            : 'Once a manager or founder approves it, you own it and can assign tasks.'
+            : `Once ${approverNames()} approves it, you own it and can assign tasks.`
       }
       size="lg"
       footer={
@@ -766,7 +767,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
         )}
       </FormSection>
 
-      {edit && (edit.pmId === me || isManager) && (
+      {edit && (edit.pmId === me || isAdmin) && (
         <FormSection
           className="border-peach-strong/60 bg-peach/30"
           icon={<ArrowRightLeft size={15} className="text-peach-ink" />}

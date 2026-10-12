@@ -31,7 +31,7 @@ import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
 import { useNoticeToasts } from './useNoticeToasts';
 import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV } from './navItems';
-import { isAdminTier } from '@/internal/lib/constants';
+import { isAdminTier, isApprover } from '@/internal/lib/constants';
 
 const ROLE_GROUPS = [
   ['pm', 'Project managers'],
@@ -54,7 +54,7 @@ export function Shell() {
   const isManager = isManagerRole(person.role); // manager or founder: the main admins
   const isAdmin = isAdminTier(person.role); // main admins and project managers
   const isPm = projects.some((p) => isProjectPm(p, me) && p.status === 'active');
-  const pending = projects.filter((p) => p.status === 'pending').length; // projects waiting for an admin's approval
+  const pending = isApprover(me) ? projects.filter((p) => p.status === 'pending').length : 0; // projects waiting for this approver
   const baseItems = [
     ...(isManager
       ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV]
@@ -103,8 +103,8 @@ export function Shell() {
         <div className="mt-auto flex flex-col items-center gap-2">
           {isAdmin && (
             <button
-              aria-label="Onboard a new project"
-              title="Onboard a new project"
+              aria-label={isApprover(me) ? 'Onboard a new project' : 'Propose a new project'}
+              title={isApprover(me) ? 'Onboard a new project' : 'Propose a new project'}
               className={iconButton}
               onClick={() => setProjectDialogOpen(true)}
             >

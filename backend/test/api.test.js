@@ -965,7 +965,7 @@ describe('team spirit features', () => {
 });
 
 describe('tracker documents', () => {
-  let server, base, admin, pm, ann, bo;
+  let server, base, admin, pm, ann, bo, fay;
   const call = async (method, url, token, body) => {
     const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
     const text = await res.text();
@@ -981,10 +981,10 @@ describe('tracker documents', () => {
     server = createApp({ store, jwtSecret: 's' }).listen(0);
     base = `http://localhost:${server.address().port}`;
     admin = await login('boss@example.com');
-    for (const [n, role, extra] of [['pm', 'team_leader'], ['ann', 'team_member'], ['bo', 'team_member'], ['fay', 'team_member', { founder: true }]]) {
+    for (const [n, role, extra] of [['pm', 'team_leader'], ['ann', 'team_member'], ['bo', 'team_member'], ['fay', 'team_member', { founder: true, approver: true }]]) {
       ids[n] = (await call('POST', '/api/entities/User', admin, { full_name: n, email: `${n}@x.com`, role, ...extra })).body.id;
     }
-    pm = await login('pm@x.com'); ann = await login('ann@x.com'); bo = await login('bo@x.com');
+    pm = await login('pm@x.com'); ann = await login('ann@x.com'); bo = await login('bo@x.com'); fay = await login('fay@x.com');
   });
   after(() => server.close());
 
@@ -1007,14 +1007,14 @@ describe('tracker documents', () => {
 
   test('projects: only leadership or project admins write; daily updates belong to their owner', async () => {
     assert.equal((await put(ann, 'project', 'p1', { id: 'p1', name: 'P', admins: [] })).ok, false);
-    assert.equal((await put(admin, 'project', 'p1', { id: 'p1', name: 'P', admins: [ids.pm], pmId: ids.pm })).ok, true);
+    assert.equal((await put(fay, 'project', 'p1', { id: 'p1', name: 'P', status: 'active', admins: [ids.pm], pmId: ids.pm })).ok, true);
     assert.equal((await put(pm, 'project', 'p1', { id: 'p1', name: 'P2', admins: [ids.pm], pmId: ids.pm })).ok, true);
     assert.equal((await put(ann, 'daily', `${ids.ann}|2026-10-12`, { plan: [] })).ok, true);
     assert.equal((await put(bo, 'daily', `${ids.ann}|2026-10-12`, { plan: [1] })).ok, false);
   });
 
   test('patches merge field by field, and team members may only finalize days on a project', async () => {
-    await put(admin, 'project', 'p2', { id: 'p2', name: 'P2', pmId: ids.pm, admins: [], teamIds: [ids.ann], finalized: {}, week: { a: 1, b: 2 } });
+    await put(fay, 'project', 'p2', { id: 'p2', name: 'P2', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann], finalized: {}, week: { a: 1, b: 2 } });
     const patch = (token, p) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind: 'project', key: 'p2', patch: p }] }).then((r) => r.body.results[0]);
     assert.equal((await patch(ann, { finalized: { '2026-10-12': 'now' } })).ok, true);
     assert.equal((await patch(pm, { week: { a: 5 } })).ok, true);
@@ -1028,15 +1028,36 @@ describe('tracker documents', () => {
     assert.deepEqual((await call('GET', '/api/tracker/docs', bo)).body.docs.find((d) => d.key === 'p2').data.week, { a: 5 });
   });
 
-  test('project managers are admins too: they approve any project, resources cannot', async () => {
-    await put(admin, 'project', 'p3', { id: 'p3', name: 'P3', pmId: ids.fay, admins: [], status: 'pending', teamIds: [] });
+  test('project approvals go only to the approvers; project managers propose, they do not approve', async () => {
+    const people = (await call('GET', '/api/tracker/people', pm)).body;
+    assert.deepEqual(people.filter((p) => p.approver).map((p) => p.name), ['fay'], 'only the flagged person is an approver, even though other founders and managers exist');
     const patch = (token, p) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind: 'project', key: 'p3', patch: p }] }).then((r) => r.body.results[0]);
+    assert.equal((await patch(pm, { id: 'p3', name: 'P3', pmId: ids.pm, admins: [], status: 'active', teamIds: [] })).ok, false, 'a project manager cannot create a live project');
+    assert.equal((await patch(pm, { id: 'p3', name: 'P3', pmId: ids.pm, admins: [], status: 'pending', teamIds: [] })).ok, true, 'but can propose one');
+    assert.equal((await patch(pm, { status: 'active' })).ok, false, 'and cannot approve it');
+    assert.equal((await patch(admin, { status: 'active' })).ok, false, 'a manager who is not an approver cannot either');
     assert.equal((await patch(ann, { status: 'active' })).ok, false);
-    assert.equal((await patch(pm, { status: 'active' })).ok, true, 'a project manager approves a project they do not own');
+    assert.equal((await patch(fay, { status: 'active' })).ok, true);
     assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Res', email: 'newres@x.com', role: 'team_member' })).status, 201);
     assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Boss', email: 'newboss@x.com', role: 'admin' })).status, 201, 'a project manager can add managers too');
     assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Founder', email: 'newfounder@x.com', role: 'admin', founder: true })).status, 201);
     assert.equal((await call('PUT', `/api/entities/User/${ids.pm}`, pm, { full_name: 'renamed' })).status, 403, 'but cannot edit other admins');
+  });
+
+  test('PROJECT_APPROVERS names the approvers by email; a declined proposal is removed by an approver or its proposer', async () => {
+    process.env.PROJECT_APPROVERS = 'komala@x.com';
+    try {
+      await call('POST', '/api/entities/User', admin, { full_name: 'Komala', email: 'komala@x.com', role: 'admin' });
+      const komala = await login('komala@x.com');
+      const people = (await call('GET', '/api/tracker/people', pm)).body;
+      const named = people.filter((p) => p.approver).map((p) => p.name);
+      assert.ok(named.includes('Komala') && named.includes('fay'));
+      assert.ok(!named.includes('pm') && !named.includes('Admin'), 'project managers and other managers are not approvers once approvers are named');
+      await call('POST', '/api/tracker/docs/batch', pm, { patches: [{ kind: 'project', key: 'p4', patch: { id: 'p4', name: 'P4', pmId: ids.pm, admins: [], status: 'pending', teamIds: [] } }] });
+      const del = (token) => call('POST', '/api/tracker/docs/batch', token, { deletes: [{ kind: 'project', key: 'p4' }] }).then((r) => r.body.results[0]);
+      assert.equal((await del(ann)).ok, false);
+      assert.equal((await del(komala)).ok, true, 'an approver declines it');
+    } finally { delete process.env.PROJECT_APPROVERS; }
   });
 
   test('notices reach only their recipient; profiles belong to their owner', async () => {
