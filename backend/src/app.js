@@ -10,6 +10,7 @@ import { createLimiter, signToken, verifyToken } from './auth.js';
 import { createNotifier } from './notify.js';
 import { validateThemePrefs } from './theme.js';
 import { registerBirds } from './birds.js';
+import { registerGames } from './games.js';
 import { registerSocial } from './social.js';
 import { registerTracker } from './tracker.js';
 import { buddyStatus, hatchEgg, parade, validateBuddyPrefs } from './buddies.js';
@@ -153,6 +154,7 @@ export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = proce
 
   registerWeekly(app, { store, notifier, wrap });
   registerBirds(app, { store, notifier, wrap, clock });
+  registerGames(app, { store, notifier, wrap, clock });
   const tracker = registerTracker(app, { store, wrap, isOwner, clock });
   app.locals.tracker = tracker;
   registerSocial(app, { store, notifier, wrap, clock, secret: jwtSecret });

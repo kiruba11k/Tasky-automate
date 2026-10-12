@@ -47,7 +47,7 @@ export default function ProgressChip() {
           {stats?.streak > 0 && <span title={`${stats.streak}-day streak`} className="font-bold text-orange-300 inline-flex items-center"><Emoji e="🔥" />{stats.streak}</span>}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 bg-slate-900 border-slate-700 text-white">
+      <PopoverContent align="end" className="w-80 max-h-[min(80vh,var(--radix-popover-content-available-height,80vh))] overflow-y-auto overscroll-contain bg-slate-900 border-slate-700 text-white">
         {stats && (
           <div className="space-y-2 pb-3 mb-3 border-b border-slate-700">
             <div className="text-lg font-extrabold">Level {stats.level} · {stats.title}</div>

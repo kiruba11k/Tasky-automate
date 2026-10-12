@@ -20,6 +20,7 @@ import Wheel from '@/hub/Wheel';
 import Bingo from '@/hub/Bingo';
 import Flappy from '@/hub/Flappy';
 import Wrapped from '@/hub/Wrapped';
+import Multiplayer from '@/hub/Multiplayer';
 import QuestBoard from '@/fun/QuestBoard';
 import EggCard from '@/fun/EggCard';
 import GardenCard from '@/fun/GardenCard';
@@ -74,6 +75,7 @@ const TABS = [
   ['wall', 'Shout-outs & ideas', () => <div className="grid gap-4 lg:grid-cols-2"><ShoutWall /><Ideas /></div>],
   ['rituals', 'Standup & retro', () => <div className="grid gap-4"><Standup /><Retro /></div>],
   ['wellness', 'Wellness & focus', () => <Wellness />],
+  ['together', 'Play together', Multiplayer],
   ['games', 'Games', Games],
   ['pet', 'My pet', () => <div className="max-w-xl"><PetCard /></div>],
 ];
