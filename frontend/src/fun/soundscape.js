@@ -49,7 +49,7 @@ export function startSound(kind, volume = 0.5) {
   } else {
     const n = noise(c, 'brown'); const g = c.createGain(); g.gain.value = 0.45; chain(n, g, master); n.start();
   }
-  try { localStorage.setItem(KEY, JSON.stringify({ kind, volume })); } catch { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ kind, volume })); window.dispatchEvent(new Event('tasky:prefs')); } catch { /* ignore */ }
   return true;
 }
 export const setVolume = (v) => { if (master) master.gain.value = v; };

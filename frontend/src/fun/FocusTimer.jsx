@@ -31,7 +31,12 @@ function FocusProviderFull({ children }) {
   const { pinned, equipped } = useBuddy();
   const loc = useLocation();
   const [mode, setModeState] = useState(() => { try { return localStorage.getItem('tasky_focus_mode') || 'study'; } catch { return 'study'; } });
-  const setMode = (m) => { setModeState(m); try { localStorage.setItem('tasky_focus_mode', m); } catch { /* ignore */ } };
+  useEffect(() => {
+    const sync = () => { try { setModeState(localStorage.getItem('tasky_focus_mode') || 'study'); } catch { /* ignore */ } };
+    window.addEventListener('tasky:prefs-applied', sync);
+    return () => window.removeEventListener('tasky:prefs-applied', sync);
+  }, []);
+  const setMode = (m) => { setModeState(m); try { localStorage.setItem('tasky_focus_mode', m); window.dispatchEvent(new Event('tasky:prefs')); } catch { /* ignore */ } };
   const [session, setSession] = useState(() => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; } });
   const [now, setNow] = useState(Date.now());
   const [finished, setFinished] = useState(null);

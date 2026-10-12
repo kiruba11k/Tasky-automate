@@ -186,7 +186,7 @@ export function Shell() {
       </div>
       <ProjectDialog open={projectDialogOpen} onClose={() => setProjectDialogOpen(false)} />
       <ThemeDialog open={themeOpen} onClose={() => setThemeOpen(false)} />
-      <Mascot />
+      {!hasFun && <Mascot />}
       <Toaster />
     </div>
   );

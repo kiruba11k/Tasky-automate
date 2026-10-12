@@ -35,7 +35,7 @@ const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
   const lowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2));
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: false, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, flybys: true, season: true, rhythm: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, flybys: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -403,7 +403,7 @@ function FunProviderFull({ children }) {
   );
 }
 
-const PRO_SETTINGS = { sound: false, anim: 'calm', mascot: false, cartoon: false, progress: 'bar', critters: false, view3d: false, heroes: false, sparkles: false, saver: false, pal: false, flybys: false, season: false, rhythm: false, festival: false, wellness: false };
+const PRO_SETTINGS = { sound: false, anim: 'calm', mascot: true, cartoon: false, progress: 'bar', critters: false, view3d: false, heroes: false, sparkles: false, saver: false, pal: false, flybys: false, season: false, rhythm: false, festival: false, wellness: false };
 const noop = () => {};
 const PRO_VALUE = { settings: PRO_SETTINGS, setSettings: noop, stats: null, celebrate: noop, say: noop, mood: 'happy', refreshStats: noop };
 

@@ -63,7 +63,12 @@ export default function PageHero() {
   const box = useRef(null);
   const [zoom, setZoom] = useState(62);
   const [off, setOff] = useState(() => { try { return localStorage.getItem(`tasky_hero_off_${page}`) === '1'; } catch { return false; } });
-  useEffect(() => { try { setOff(localStorage.getItem(`tasky_hero_off_${page}`) === '1'); } catch { setOff(false); } }, [page]);
+  useEffect(() => {
+    const sync = () => { try { setOff(localStorage.getItem(`tasky_hero_off_${page}`) === '1'); } catch { setOff(false); } };
+    sync();
+    window.addEventListener('tasky:prefs-applied', sync);
+    return () => window.removeEventListener('tasky:prefs-applied', sync);
+  }, [page]);
   const shown = Boolean(cfg) && !off;
   useEffect(() => {
     const el = box.current;
@@ -73,7 +78,7 @@ export default function PageHero() {
     return () => ro.disconnect();
   }, [shown, page]);
   if (!cfg || off || !settings.heroes || !settings.view3d || !hasWebGL()) return null;
-  const hide = () => { setOff(true); try { localStorage.setItem(`tasky_hero_off_${page}`, '1'); } catch { /* ignore */ } };
+  const hide = () => { setOff(true); try { localStorage.setItem(`tasky_hero_off_${page}`, '1'); window.dispatchEvent(new Event('tasky:prefs')); } catch { /* ignore */ } };
   const day = new Date().getDay();
   const chips = {
     DailyTasks: [`${data.pending} to do today`],

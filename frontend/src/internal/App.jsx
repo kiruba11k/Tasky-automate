@@ -6,6 +6,7 @@ import { Login } from './auth/Login';
 import { startSync } from './sync';
 import { FunLayer } from './fun/FunLayer';
 import { FunBridge } from './fun/FunBridge';
+import { PrefsSync } from './fun/PrefsSync';
 
 /** Loads the signed-in person's data from the backend and keeps it in step; shows the app once the first load is done. */
 function Tracker({ user }) {
@@ -31,7 +32,7 @@ function Tracker({ user }) {
   if (!state.ready) return <div className="flex min-h-screen items-center justify-center bg-bg text-sm text-muted" role="status">Loading your tracker…</div>;
   return (
     <FunLayer>
-      {!user.founder && <FunBridge />}
+      {!user.founder && <><FunBridge /><PrefsSync /></>}
       <Shell />
     </FunLayer>
   );
