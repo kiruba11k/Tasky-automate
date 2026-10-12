@@ -36,6 +36,18 @@ export function mergePatch(target, patch) {
 }
 
 export function registerTracker(app, { store, wrap }) {
+  // Live updates: every connected tab is told when documents change, then asks for what it may see (/docs?since=).
+  const listeners = new Set();
+  const announce = () => listeners.forEach((res) => { try { res.write('data: changed\n\n'); } catch { listeners.delete(res); } });
+  app.get('/api/tracker/stream', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    res.flushHeaders();
+    res.write(': connected\n\n');
+    listeners.add(res);
+    const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => { clearInterval(heartbeat); listeners.delete(res); });
+  });
+
   const live = async () => (await store.list('User', { limit: 1000 })).filter((u) => u.status !== 'Inactive');
   const find = async (kind, key) => (await store.list('TrackerDoc', { query: { kind, key }, limit: 1 }))[0];
   const convMembers = async (convId) => (await find('conv', convId))?.data?.memberIds || [];
@@ -129,6 +141,7 @@ export function registerTracker(app, { store, wrap }) {
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false }, u.email);
       results.push({ ...id, ok: true });
     }
+    if (results.some((r) => r.ok)) announce();
     res.json({ results });
   }));
 }

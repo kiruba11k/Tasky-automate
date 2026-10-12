@@ -1,7 +1,7 @@
 // Keeps the tracker store in step with the backend (documents under /api/tracker).
 // The UI changes the store as before. This module (1) loads everything the signed-in person may see, (2) sends each local
 // change to the server as a JSON merge patch, and (3) polls for other people's changes.
-import { request } from "@/api/client";
+import { request, getToken } from "@/api/client";
 import { useStore, emptyState } from "./store.js";
 import { diffPatch } from "./lib/diffPatch.js";
 import { rollProjectPeriods } from "./lib/domain.js";
@@ -22,8 +22,8 @@ const COLLECTIONS = {
   aliases: { kind: "alias", shape: "map" },
 };
 const BY_KIND = Object.fromEntries(Object.entries(COLLECTIONS).map(([name, c]) => [c.kind, { name, ...c }]));
-const POLL_MS = 5000;
-const FLUSH_MS = 300;
+const POLL_MS = 30000; // safety net only; changes arrive instantly over the live stream
+const FLUSH_MS = 120;
 
 const docId = (kind, key) => `${kind}\u0000${key}`;
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -111,7 +111,12 @@ export async function startSync(user) {
     if (changed) useStore.setState({ projects: next });
   };
 
-  const pull = async () => {
+  let pulling = Promise.resolve();
+  const pull = () => {
+    pulling = pulling.then(pullOnce, pullOnce); // one at a time, so `since` only ever moves forward
+    return pulling;
+  };
+  const pullOnce = async () => {
     const res = await request("GET", `/api/tracker/docs${since ? `?since=${encodeURIComponent(since)}` : ""}`);
     apply(res.docs, { replace: !since });
     finalizeCompleteDays();
@@ -185,9 +190,39 @@ export async function startSync(user) {
     if (any) schedule();
   });
 
+  // Live stream: the server says "changed" whenever anyone saves, and we fetch right away.
+  const ctl = new AbortController();
+  let queued = false;
+  const pullSoon = () => {
+    if (queued || stopped) return;
+    queued = true;
+    setTimeout(() => { queued = false; pull().catch(() => {}); }, 80);
+  };
+  (async function listen() {
+    while (!stopped) {
+      try {
+        const res = await fetch("/api/tracker/stream", { headers: { authorization: `Bearer ${getToken()}` }, signal: ctl.signal });
+        if (!res.ok || !res.body) throw new Error("stream unavailable");
+        pullSoon(); // catch up on anything missed while disconnected
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop();
+          if (parts.some((p) => p.includes("data: changed"))) pullSoon();
+        }
+      } catch { /* reconnect below */ }
+      if (!stopped) await new Promise((r) => setTimeout(r, 2000));
+    }
+  })();
+
   const tick = async () => {
     if (stopped) return;
-    if (!document.hidden && !pending.size) {
+    if (!document.hidden) {
       try { await pull(); } catch { /* offline: try again next time */ }
     }
     timer = setTimeout(tick, POLL_MS);
@@ -201,6 +236,7 @@ export async function startSync(user) {
   session = {
     stop() {
       stopped = true;
+      ctl.abort();
       clearTimeout(timer);
       clearTimeout(flushTimer);
       unsubscribe();

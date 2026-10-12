@@ -1061,6 +1061,18 @@ describe('tracker documents', () => {
     assert.ok(!(await call('GET', '/api/tracker/docs', pm)).body.docs.some((d) => d.key === 'm1'));
   });
 
+  test('live stream announces changes to every connected tab', async () => {
+    const ctl = new AbortController();
+    const res = await fetch(`${base}/api/tracker/stream`, { headers: { authorization: `Bearer ${bo}` }, signal: ctl.signal });
+    assert.equal(res.status, 200);
+    const reader = res.body.getReader();
+    const next = (async () => { for (;;) { const { value } = await reader.read(); if (new TextDecoder().decode(value).includes('data: changed')) return true; } })();
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal((await put(pm, 'task', 'live1', { id: 'live1', title: 'x', assigneeId: ids.bo, assignedById: ids.pm, history: [] })).ok, true);
+    assert.equal(await Promise.race([next, new Promise((r) => setTimeout(() => r(false), 2000))]), true);
+    ctl.abort();
+  });
+
   test('incremental sync returns changes and tombstones', async () => {
     const first = (await call('GET', '/api/tracker/docs', ann)).body;
     await new Promise((r) => setTimeout(r, 5));
