@@ -1,5 +1,6 @@
-import React from 'react';
-import { vt as Avatar, nt as fullName, $e as dayKey } from '@/internal/min';
+import React, { useState } from 'react';
+import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { Se as useStore, ea as canEditProject, vt as Avatar, nt as fullName, $e as dayKey, lt as attempt, Ye as toast, Ge as INPUT_CLASS } from '@/internal/min';
 import { formatHours } from './projectHelpers';
 
 const shortDate = (value) =>
@@ -7,6 +8,9 @@ const shortDate = (value) =>
 
 /** Right-hand column of the Progress tab: team and hours, upcoming meetings, latest updates. */
 export function ProjectSidebar({ p }) {
+  const { me, editUpdate, removeUpdate } = useStore();
+  const canEdit = canEditProject(p, me);
+  const [editing, setEditing] = useState(null); // { id, text }
   const upcoming = p.meetings.filter((m) => m.date >= dayKey(0)).slice(0, 4);
   return (
     <div className="space-y-4 text-sm">
@@ -50,8 +54,30 @@ export function ProjectSidebar({ p }) {
           <ul className="space-y-1.5">
             {p.updates.slice(0, 3).map((u) => (
               <li key={u.id} className="text-xs">
-                <span className="text-ink">{u.text}</span>{' '}
-                <span className="text-muted">· {shortDate(u.at)}</span>
+                {editing?.id === u.id ? (
+                  <form
+                    className="flex items-center gap-1"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (attempt(() => editUpdate(p.id, u.id, editing.text))) { setEditing(null); toast({ title: 'Update saved', tone: 'success' }); }
+                    }}
+                  >
+                    <input aria-label="Update text" className={INPUT_CLASS} value={editing.text} onChange={(e) => setEditing({ id: u.id, text: e.target.value })} />
+                    <button type="submit" aria-label="Save update" className="focus-ring rounded p-1 text-muted hover:text-ink"><Check size={13} /></button>
+                    <button type="button" aria-label="Cancel" className="focus-ring rounded p-1 text-muted hover:text-ink" onClick={() => setEditing(null)}><X size={13} /></button>
+                  </form>
+                ) : (
+                  <>
+                    <span className="text-ink">{u.text}</span>{' '}
+                    <span className="text-muted">· {shortDate(u.at)}{u.editedAt ? ' · edited' : ''}</span>
+                    {canEdit && (
+                      <span className="ml-1 inline-flex gap-0.5 align-middle">
+                        <button type="button" aria-label="Edit update" className="focus-ring rounded p-1 text-muted hover:text-ink" onClick={() => setEditing({ id: u.id, text: u.text })}><Pencil size={12} /></button>
+                        <button type="button" aria-label="Delete update" className="focus-ring rounded p-1 text-muted hover:text-ink" onClick={() => attempt(() => removeUpdate(p.id, u.id)) && toast({ title: 'Update deleted', tone: 'info' })}><Trash2 size={12} /></button>
+                      </span>
+                    )}
+                  </>
+                )}
               </li>
             ))}
           </ul>

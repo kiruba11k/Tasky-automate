@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { CalendarPlus } from 'lucide-react';
+import { CalendarPlus, Pencil, Trash2, X } from 'lucide-react';
+import { ConfirmModal } from '../kit/ConfirmModal';
 import {
   Se as useStore,
   oe as clsx,
@@ -12,8 +13,11 @@ import {
 
 /** Meetings tab: scheduling form (editors only) and the list of booked meetings. */
 export function MeetingsPanel({ p, canEdit }) {
-  const { addMeeting } = useStore();
-  const [form, setForm] = useState({ company: '', contact: '', date: dayKey(1), time: '11:00' });
+  const { addMeeting, updateMeeting, removeMeeting } = useStore();
+  const blank = { company: '', contact: '', date: dayKey(1), time: '11:00' };
+  const [form, setForm] = useState(blank);
+  const [editingId, setEditingId] = useState(null);
+  const [removing, setRemoving] = useState(null);
   return (
     <>
       {canEdit && (
@@ -21,6 +25,11 @@ export function MeetingsPanel({ p, canEdit }) {
           className="grid gap-2 rounded-2xl bg-surface-2 p-3 sm:grid-cols-[1fr_1fr_auto_auto_auto]"
           onSubmit={(e) => {
             e.preventDefault();
+            if (editingId) {
+              attempt(() => updateMeeting(p.id, editingId, form)) &&
+                (toast({ title: `Meeting with ${form.company} updated`, tone: 'success' }), setEditingId(null), setForm(blank));
+              return;
+            }
             attempt(() => addMeeting(p.id, form)) &&
               (toast({ title: `Meeting with ${form.company} scheduled`, tone: 'success' }),
               setForm({ ...form, company: '', contact: '' }));
@@ -50,9 +59,16 @@ export function MeetingsPanel({ p, canEdit }) {
             value={form.time}
             onChange={(e) => setForm({ ...form, time: e.target.value })}
           />
-          <Button type="submit">
-            <CalendarPlus size={14} /> Schedule
-          </Button>
+          <div className="flex gap-1">
+            <Button type="submit">
+              <CalendarPlus size={14} /> {editingId ? 'Save' : 'Schedule'}
+            </Button>
+            {editingId && (
+              <Button type="button" tone="ghost" aria-label="Cancel editing" onClick={() => { setEditingId(null); setForm(blank); }}>
+                <X size={14} />
+              </Button>
+            )}
+          </div>
         </form>
       )}
       <div className="grid gap-2 sm:grid-cols-2">
@@ -71,9 +87,26 @@ export function MeetingsPanel({ p, canEdit }) {
                 {m.contact} · {m.time}
               </span>
             </span>
+            {canEdit && (
+              <span className="flex shrink-0 gap-1">
+                <Button tone="ghost" aria-label={`Edit meeting with ${m.company}`} onClick={() => { setEditingId(m.id); setForm({ company: m.company, contact: m.contact, date: m.date, time: m.time }); }}>
+                  <Pencil size={13} />
+                </Button>
+                <Button tone="ghost" aria-label={`Delete meeting with ${m.company}`} onClick={() => setRemoving(m)}>
+                  <Trash2 size={13} />
+                </Button>
+              </span>
+            )}
           </div>
         ))}
       </div>
+      <ConfirmModal
+        open={!!removing}
+        title="Delete this meeting?"
+        message={removing ? `The meeting with ${removing.company} will be removed.` : ''}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => attempt(() => removeMeeting(p.id, removing.id)) && toast({ title: 'Meeting deleted', tone: 'info' })}
+      />
     </>
   );
 }

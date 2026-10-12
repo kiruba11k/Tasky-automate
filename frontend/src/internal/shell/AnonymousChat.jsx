@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Users, VenetianMask } from 'lucide-react';
+import { LogOut, Plus, Trash2, Users, VenetianMask } from 'lucide-react';
+import { ConfirmModal } from '@/internal/kit/ConfirmModal';
 import { Se as useStore, Qe as PEOPLE, Ya as Modal, be as firstName, nt as fullName } from '@/internal/min';
 import { cx } from '@/internal/ui/cx';
 import { Button } from '@/internal/ui/Button';
@@ -8,7 +9,8 @@ import { INPUT_CLASS, timeAgo } from '@/internal/ui/format';
 
 /** Anonymous chat panel shown in the floating chat popup (original: `tue`). */
 export function AnonymousChat({ onClose }) {
-  const { me, convs, msgs, aliases, send, createConv } = useStore();
+  const { me, convs, msgs, aliases, send, createConv, deleteMessage, leaveConv } = useStore();
+  const [leaving, setLeaving] = useState(false);
   const myConvs = useMemo(() => convs.filter((c) => c.memberIds.includes(me)), [convs, me]);
   const [activeId, setActiveId] = useState(myConvs[0]?.id);
   const [draft, setDraft] = useState('');
@@ -71,6 +73,16 @@ export function AnonymousChat({ onClose }) {
         <header className="border-b border-line p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate font-bold">{active ? convTitle(active) : 'Chat'}</p>
+            {active && (
+              <button
+                aria-label="Leave chat"
+                title="Leave chat"
+                className="focus-ring ml-auto rounded-lg p-1.5 text-muted hover:bg-surface-2"
+                onClick={() => setLeaving(true)}
+              >
+                <LogOut size={15} />
+              </button>
+            )}
             {onClose && (
               <button
                 aria-label="Minimise chat"
@@ -93,8 +105,17 @@ export function AnonymousChat({ onClose }) {
             return (
               <div key={m.id} className={cx('flex', mine && 'justify-end')}>
                 <div className={cx('max-w-[75%] rounded-2xl px-3 py-2', mine ? 'bg-accent-soft' : 'bg-surface-2')}>
-                  <p className="text-xs font-semibold text-muted">
+                  <p className="flex items-center gap-1 text-xs font-semibold text-muted">
                     {m.alias} · {timeAgo(m.at)}
+                    {mine && (
+                      <button
+                        aria-label="Delete message"
+                        className="focus-ring ml-1 rounded p-0.5 text-muted hover:text-ink"
+                        onClick={() => deleteMessage(m.id)}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </p>
                   <p className="text-sm">{m.text}</p>
                 </div>
@@ -125,6 +146,14 @@ export function AnonymousChat({ onClose }) {
           </form>
         )}
       </section>
+      <ConfirmModal
+        open={leaving}
+        title="Leave this chat?"
+        message="You will no longer see it or its messages. The others keep the conversation."
+        confirmLabel="Leave"
+        onClose={() => setLeaving(false)}
+        onConfirm={() => active && leaveConv(active.id)}
+      />
       <Modal
         open={creating}
         onClose={() => setCreating(false)}

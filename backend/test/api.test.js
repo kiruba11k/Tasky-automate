@@ -71,24 +71,23 @@ for (const [name, makeStore] of backends) {
       assert.equal((await api('POST', '/api/auth/login', { body: { email: 'tmp@x.com' } })).status, 401);
     });
 
-    test('role rules', async () => {
+    test('role rules: only the main admin adds, edits and removes people', async () => {
       const lena = await login('lena@x.com');
-      const member = await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'Mo', email: 'mo@x.com' } });
+      assert.equal((await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'Mo', email: 'mo@x.com' } })).status, 403, 'a team leader cannot add people');
+      const member = await api('POST', '/api/entities/User', { token: admin, body: { full_name: 'Mo', email: 'mo@x.com' } });
       assert.equal(member.status, 201);
       assert.equal(member.body.role, 'team_member');
-      const added = await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'X', email: 'x@x.com', role: 'admin' } });
-      assert.equal(added.status, 201); // team leaders (project managers) can add people of any role
-      assert.equal((await api('DELETE', `/api/entities/User/${added.body.id}`, { token: lena })).status, 403, 'but not remove admins');
-      assert.equal((await api('DELETE', `/api/entities/User/${added.body.id}`, { token: admin })).status, 200);
       const mo = await login('mo@x.com');
       assert.equal((await api('POST', '/api/entities/User', { token: mo, body: { full_name: 'Y', email: 'y@x.com' } })).status, 403);
       const adminRec = (await api('GET', '/api/entities/User', { token: mo })).body.find((u) => u.role === 'admin');
       assert.equal((await api('PUT', `/api/entities/User/${adminRec.id}`, { token: lena, body: { role: 'team_member' } })).status, 403);
+      assert.equal((await api('PUT', `/api/entities/User/${member.body.id}`, { token: lena, body: { designation: 'x' } })).status, 403);
+      assert.equal((await api('DELETE', `/api/entities/User/${member.body.id}`, { token: lena })).status, 403);
       assert.equal((await api('PUT', `/api/entities/User/${adminRec.id}`, { token: admin, body: { role: 'team_member' } })).status, 400); // last admin
-      assert.equal((await api('DELETE', `/api/entities/User/${adminRec.id}`, { token: admin })).status, 400);
       assert.equal((await api('DELETE', `/api/entities/User/${adminRec.id}`, { token: admin })).status, 400);
       const put = await api('PUT', `/api/entities/User/${member.body.id}`, { token: admin, body: { designation: 'Dev', skills: 'a,b' } });
       assert.equal(put.body.designation, 'Dev');
+      assert.equal((await api('DELETE', `/api/entities/User/${member.body.id}`, { token: admin })).status, 200);
     });
 
     test('entity CRUD, defaults, validation, filter, sort', async () => {
@@ -1055,10 +1054,7 @@ describe('tracker documents', () => {
     assert.equal((await patch(admin, { status: 'active' })).ok, false, 'a manager who is not an approver cannot either');
     assert.equal((await patch(ann, { status: 'active' })).ok, false);
     assert.equal((await patch(fay, { status: 'active' })).ok, true);
-    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Res', email: 'newres@x.com', role: 'team_member' })).status, 201);
-    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Boss', email: 'newboss@x.com', role: 'admin' })).status, 201, 'a project manager can add managers too');
-    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Founder', email: 'newfounder@x.com', role: 'admin', founder: true })).status, 201);
-    assert.equal((await call('PUT', `/api/entities/User/${ids.pm}`, pm, { full_name: 'renamed' })).status, 403, 'but cannot edit other admins');
+    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Res', email: 'newres@x.com', role: 'team_member' })).status, 403, 'project managers do not add people');
   });
 
   test('PROJECT_APPROVERS names the approvers by email; a declined proposal is removed by an approver or its proposer', async () => {
@@ -1121,5 +1117,71 @@ describe('tracker documents', () => {
     const gone = (await call('GET', `/api/tracker/docs?since=${encodeURIComponent(delta.now)}`, ann)).body.docs;
     assert.equal(gone[0].deleted, true);
     assert.ok(!(await call('GET', '/api/tracker/docs', ann)).body.docs.some((d) => d.key === 't1'));
+  });
+});
+
+describe('main admin (ADMIN_EMAIL) and delete rules', () => {
+  let server, base, owner, admin2, pm, ann, bo, ids = {};
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+  const batch = (token, b) => call('POST', '/api/tracker/docs/batch', token, b).then((r) => r.body.results[0]);
+  const put = (token, kind, key, patch) => batch(token, { patches: [{ kind, key, patch }] });
+  const del = (token, kind, key) => batch(token, { deletes: [{ kind, key }] });
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'owner@x.com' });
+    server = createApp({ store, jwtSecret: 's', ownerEmail: 'owner@x.com' }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    owner = await login('owner@x.com');
+    for (const [n, role, extra] of [['boss2', 'admin'], ['pm', 'team_leader', { track_role: 'pm', approver: true }], ['ann', 'team_member'], ['bo', 'team_member']]) ids[n] = (await call('POST', '/api/entities/User', owner, { full_name: n, email: `${n}@x.com`, role, ...extra })).body.id;
+    admin2 = await login('boss2@x.com'); pm = await login('pm@x.com'); ann = await login('ann@x.com'); bo = await login('bo@x.com');
+  });
+  after(() => server.close());
+
+  test('only the account set in ADMIN_EMAIL manages people, and it cannot be removed', async () => {
+    const people = (await call('GET', '/api/tracker/people', ann)).body;
+    assert.deepEqual(people.filter((p) => p.owner).map((p) => p.name), ['Admin']);
+    assert.equal((await call('POST', '/api/entities/User', admin2, { full_name: 'X', email: 'x@x.com', role: 'team_member' })).status, 403, 'even another admin cannot');
+    assert.equal((await call('PUT', `/api/entities/User/${ids.ann}`, admin2, { designation: 'x' })).status, 403);
+    const ownerId = people.find((p) => p.owner).id;
+    assert.equal((await call('DELETE', `/api/entities/User/${ownerId}`, owner)).status, 400);
+    assert.equal((await call('PUT', `/api/entities/User/${ownerId}`, owner, { status: 'Inactive' })).status, 400);
+    assert.equal((await call('PUT', `/api/entities/User/${ownerId}`, owner, { designation: 'Chief' })).status, 200, 'but they can edit their own title');
+    assert.equal((await call('PUT', `/api/entities/User/${ids.bo}`, owner, { status: 'Inactive' })).status, 200);
+    assert.notEqual((await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'bo@x.com' }) })).status, 200, 'and cannot sign in');
+    assert.ok(!(await call('GET', '/api/tracker/people', ann)).body.some((p) => p.name === 'bo'), 'a deactivated person leaves the team list');
+  });
+
+  test('who may delete what', async () => {
+    await put(pm, 'project', 'dp', { id: 'dp', name: 'D', status: 'pending', pmId: ids.pm, admins: [], teamIds: [ids.ann] });
+    await put(pm, 'project', 'dp', { status: 'active' }); // pm is an approver here
+    const task = { id: 'dt', title: 't', projectId: 'dp', assigneeId: ids.ann, assignedById: ids.pm, status: 'todo', history: [] };
+    assert.equal((await put(pm, 'task', 'dt', task)).ok, true);
+    assert.equal((await del(ann, 'task', 'dt')).ok, false, 'the assignee cannot delete their task');
+    assert.equal((await del(pm, 'task', 'dt')).ok, true, 'the assigner can');
+    assert.equal((await del(ann, 'project', 'dp')).ok, false);
+    assert.equal((await del(pm, 'project', 'dp')).ok, true, 'the project manager can delete their project');
+    // chat: only the sender deletes their message; a member can leave; the last member removes the conversation
+    await put(ann, 'conv', 'dc', { id: 'dc', name: 'x', memberIds: [ids.ann, ids.pm] });
+    await put(ann, 'msg', 'dm', { id: 'dm', convId: 'dc', alias: 'Calm Koala', text: 'hi' });
+    assert.equal((await del(pm, 'msg', 'dm')).ok, false, 'the other member cannot delete it');
+    assert.equal((await del(ann, 'msg', 'dm')).ok, true, 'the sender can');
+    assert.equal((await del(pm, 'conv', 'dc')).ok, false, 'a member cannot delete a conversation that still has others');
+    assert.equal((await put(pm, 'msg', 'dm2', { id: 'dm2', convId: 'dc', alias: 'Other', text: 'bye' })).ok, true);
+    assert.equal((await put(pm, 'conv', 'dc', { memberIds: [ids.ann] })).ok, true, 'but can leave it');
+    assert.equal((await del(ann, 'conv', 'dc')).ok, true, 'the last member removes it');
+    assert.equal((await del(ann, 'msg', 'dm2')).ok, true, 'and the messages others left behind');
+    // people who could see a deleted document are told it is gone
+    const before = (await call('GET', '/api/tracker/docs', pm)).body.now;
+    await put(ann, 'conv', 'dc2', { id: 'dc2', name: 'y', memberIds: [ids.ann, ids.pm] });
+    const mid = (await call('GET', '/api/tracker/docs', pm)).body.now;
+    await del(ann, 'conv', 'dc2');
+    assert.equal((await call('GET', `/api/tracker/docs?since=${encodeURIComponent(mid)}`, pm)).body.docs.find((d) => d.key === 'dc2')?.deleted, true);
+    assert.ok(before);
   });
 });

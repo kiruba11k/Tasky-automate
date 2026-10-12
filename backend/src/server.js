@@ -32,5 +32,5 @@ if ((await store.list('User', { query: { role: 'admin' } })).length === 0) {
   console.warn('No admin exists, so nobody can sign in. Set ADMIN_EMAIL to create the first admin.');
 }
 
-const app = createApp({ store, jwtSecret, staticDir: path.join(root, '..', 'frontend', 'dist') });
+const app = createApp({ store, ownerEmail: process.env.ADMIN_EMAIL, jwtSecret, staticDir: path.join(root, '..', 'frontend', 'dist') });
 app.listen(port, () => console.log(`Tasky backend listening on ${baseUrl}`));

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Se as useStore } from '@/internal/min';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
   rt as Card,
@@ -32,8 +33,9 @@ import {
 } from '@/internal/min';
 import { TAG_ORDER, roleOf, titleOf, totalKpis } from './peopleUtils';
 import { PersonDetailModal } from './PersonDetail';
-import { AddPerson } from './AddPerson';
+import { ManagePeople } from './ManagePeople';
 import { Button } from '../ui/Button';
+import { PEOPLE } from '../lib/constants';
 
 const WHO_OPTIONS = [
   { id: 'all', label: 'Everyone' },
@@ -56,6 +58,8 @@ export function People() {
   const [sort, setSort] = useState({ col: 'name', dir: 'asc' });
   const [openPerson, setOpenPerson] = useState(null);
   const [adding, setAdding] = useState(false);
+  const me = useStore((s) => s.me);
+  const isMainAdmin = !!PEOPLE.find((p) => p.id === me)?.owner; // the account set in ADMIN_EMAIL
 
   const options = buildPeriodOptions(gran, calendar);
   const safeIndex = Math.min(index, options.length - 1);
@@ -152,9 +156,9 @@ export function People() {
             where the time goes.
           </p>
         </div>
-        <Button onClick={() => setAdding(true)}>Add person</Button>
+        {isMainAdmin && <Button onClick={() => setAdding(true)}>Manage people</Button>}
       </div>
-      <AddPerson open={adding} onClose={() => setAdding(false)} />
+      {isMainAdmin && <ManagePeople open={adding} onClose={() => setAdding(false)} />}
       <Card className="!py-4">
         <div
           className="flex flex-wrap items-center gap-x-3 gap-y-2"

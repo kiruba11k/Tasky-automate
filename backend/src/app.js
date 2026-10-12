@@ -20,7 +20,6 @@ import { openDailyDrop, syncProgress, teamPulse, trophies } from './gamify.js';
 const RESERVED_QUERY = new Set(['sort', 'limit', 'skip']);
 const SERVED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(csv|plain))$/;
 const normEmail = (e) => String(e || '').trim().toLowerCase();
-const isManager = (u) => u.role === 'admin' || u.role === 'team_leader';
 // Fields clients may never write on a user.
 const USER_PROTECTED = ['id', 'created_date', 'updated_date', 'created_by'];
 
@@ -42,7 +41,10 @@ export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
 }
 
 /** Builds the Express app around an initialised store. */
-export function createApp({ store, jwtSecret, staticDir, llm, random = Math.random, clock = Date.now } = {}) {
+export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = process.env.ADMIN_EMAIL, random = Math.random, clock = Date.now } = {}) {
+  // The main admin is the account whose email is ADMIN_EMAIL. Only they add, edit and remove people. (With no ADMIN_EMAIL, any admin.)
+  const isOwnerEmail = (email) => !!ownerEmail && normEmail(email) === normEmail(ownerEmail);
+  const isOwner = (u) => (ownerEmail ? isOwnerEmail(u.email) : u.role === 'admin');
   // AI parsing needs ANTHROPIC_API_KEY (or an injected function in tests); otherwise voice falls back to simple rules.
   const voiceLlm = llm || (process.env.ANTHROPIC_API_KEY ? invokeLLM : null);
   const voiceLimit = createLimiter({ max: 60, windowMs: 60 * 60 * 1000 });
@@ -146,7 +148,7 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   registerWeekly(app, { store, notifier, wrap });
   registerBirds(app, { store, notifier, wrap, clock });
-  registerTracker(app, { store, wrap });
+  const tracker = registerTracker(app, { store, wrap, isOwner });
   registerSocial(app, { store, notifier, wrap, clock, secret: jwtSecret });
 
   // Weekly plans and notifications are written only through the endpoints above.
@@ -223,22 +225,13 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     res.status(201).json(rec);
   }));
 
-  // ---- users: admins manage everyone. Team leaders (project managers) can add people of any role, but can only edit or
-  // remove team members. ----
-  const canManageUser = (actor, target, newRole) => {
-    if (actor.role === 'admin') return true;
-    if (actor.role !== 'team_leader') return false;
-    if (!target) return true; // adding someone
-    return target?.role !== 'admin' && target?.role !== 'team_leader' && (newRole === undefined || newRole === 'team_member');
-  };
+  // ---- users: only the main admin (ADMIN_EMAIL) adds, edits and removes people ----
+  const ownerOnly = (req, res, next) => (isOwner(req.user) ? next() : res.status(403).json({ error: 'Only the main admin can add, edit or remove people' }));
 
-  // A founder is an admin who gets the plain, professional view. Only admins can grant it, and it always implies the admin role.
-  const founderRules = (actor, data, target) => {
-    if (data.founder === undefined && data.role === undefined) return null;
-    if (data.founder !== undefined && actor.role !== 'admin' && actor.role !== 'team_leader') return 'Only admins can set the founder view';
+  // A founder is an admin with the founder label; the flag always implies the admin role.
+  const founderRules = (actor, data) => {
     if (data.founder === true) data.role = 'admin';
     else if (data.role && data.role !== 'admin') data.founder = false;
-    return null;
   };
 
   app.get('/api/entities/User', wrap(async (req, res) => {
@@ -252,28 +245,29 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     res.json(u);
   }));
 
-  app.post('/api/entities/User', wrap(async (req, res) => {
+  app.post('/api/entities/User', ownerOnly, wrap(async (req, res) => {
     const body = strip(req.body, USER_PROTECTED);
     body.email = normEmail(body.email);
     const { data, errors } = validate(schemas.User, body);
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-    const fe = founderRules(req.user, data);
-    if (fe) return res.status(403).json({ error: fe });
-    if (!isManager(req.user) || !canManageUser(req.user, null, data.role)) return res.status(403).json({ error: 'You cannot add users with this role' });
+    founderRules(req.user, data);
     if (await findByEmail(data.email)) return res.status(409).json({ error: 'A user with this email already exists' });
-    res.status(201).json(await store.insert('User', data, req.user.email));
+    const created = await store.insert('User', data, req.user.email);
+    tracker.announce('people');
+    res.status(201).json(created);
   }));
 
-  app.put('/api/entities/User/:id', wrap(async (req, res) => {
+  app.put('/api/entities/User/:id', ownerOnly, wrap(async (req, res) => {
     const target = await store.get('User', req.params.id);
     if (!target) return res.status(404).json({ error: 'Not found' });
     const body = strip(req.body, USER_PROTECTED);
     if (body.email !== undefined) body.email = normEmail(body.email);
     const { data, errors } = validate(schemas.User, body, { partial: true });
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
-    const fe = founderRules(req.user, data, target);
-    if (fe) return res.status(403).json({ error: fe });
-    if (!canManageUser(req.user, target, data.role)) return res.status(403).json({ error: 'Not allowed' });
+    founderRules(req.user, data, target);
+    if (isOwnerEmail(target.email) && ['role', 'status', 'email', 'founder', 'track_role'].some((k) => data[k] !== undefined && data[k] !== target[k])) {
+      return res.status(400).json({ error: 'The main admin account keeps its role, status and email' });
+    }
     if (data.email && data.email !== normEmail(target.email)) {
       const other = await findByEmail(data.email);
       if (other && other.id !== target.id) return res.status(409).json({ error: 'A user with this email already exists' });
@@ -282,18 +276,21 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     if (losesAdmin && (await store.list('User', { query: { role: 'admin' } })).filter((a) => a.status !== 'Inactive').length <= 1) {
       return res.status(400).json({ error: 'Cannot demote or deactivate the last admin' });
     }
-    res.json(await store.update('User', target.id, data));
+    const updated = await store.update('User', target.id, data);
+    tracker.announce('people');
+    res.json(updated);
   }));
 
-  app.delete('/api/entities/User/:id', wrap(async (req, res) => {
+  app.delete('/api/entities/User/:id', ownerOnly, wrap(async (req, res) => {
     const target = await store.get('User', req.params.id);
     if (!target) return res.status(404).json({ error: 'Not found' });
     if (target.id === req.user.id) return res.status(400).json({ error: 'You cannot delete your own account' });
-    if (!canManageUser(req.user, target)) return res.status(403).json({ error: 'Not allowed' });
+    if (isOwnerEmail(target.email)) return res.status(400).json({ error: 'The main admin account cannot be deleted' });
     if (target.role === 'admin' && (await store.list('User', { query: { role: 'admin' } })).length <= 1) {
       return res.status(400).json({ error: 'Cannot delete the last admin' });
     }
     await store.remove('User', target.id);
+    tracker.announce('people');
     res.json({ success: true });
   }));
 

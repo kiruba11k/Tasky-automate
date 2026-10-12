@@ -1,4 +1,4 @@
-// The persisted zustand store (localStorage key "ls-tracker-v2").
+// The tracker store. Its data lives on the server and is kept in step by sync.js.
 import { create } from "zustand";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, LUNCH_BLOCK } from "./lib/dates.js";
 import { PEOPLE, TASK_TYPES, isAdminTier, isApprover, approverNames, roleOf } from "./lib/constants.js";
@@ -264,6 +264,14 @@ export const useStore = create()(
             ],
           });
           notify(task.assigneeId, `${firstName(get().me)} left feedback on ${task.title}`);
+        },
+        deleteTask: (id) => {
+          const task = requireTask(id);
+          const me = get().me;
+          if (task.assignedById !== me && !isAdminTier(roleOf(me)))
+            throw new Error("Only the person who assigned a task, or an admin, can delete it.");
+          set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+          if (task.assigneeId !== me) notify(task.assigneeId, `${firstName(me)} removed the task ${task.title}`);
         },
         assign: (draft) => {
           const me = get().me;
@@ -575,6 +583,38 @@ export const useStore = create()(
             month: { ...p.month, meetings: (p.month.meetings ?? 0) + 1 },
           }));
         },
+        updateMeeting: (projectId, meetingId, patch) => {
+          requireManage(projectId);
+          if (!patch.company?.trim()) throw new Error("Add the company name.");
+          if (!patch.date) throw new Error("Pick a meeting date.");
+          patchProject(projectId, (p) => ({
+            ...p,
+            meetings: p.meetings
+              .map((m) => (m.id === meetingId ? { ...m, ...patch, company: patch.company.trim() } : m))
+              .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
+          }));
+        },
+        removeMeeting: (projectId, meetingId) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => ({
+            ...p,
+            meetings: p.meetings.filter((m) => m.id !== meetingId),
+            week: { ...p.week, meetings: Math.max(0, (p.week.meetings ?? 0) - 1) },
+            month: { ...p.month, meetings: Math.max(0, (p.month.meetings ?? 0) - 1) },
+          }));
+        },
+        editUpdate: (projectId, updateId, text) => {
+          requireManage(projectId);
+          if (!text.trim()) throw new Error("Write the update first.");
+          patchProject(projectId, (p) => ({
+            ...p,
+            updates: p.updates.map((u) => (u.id === updateId ? { ...u, text: text.trim(), editedAt: nowIso() } : u)),
+          }));
+        },
+        removeUpdate: (projectId, updateId) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => ({ ...p, updates: p.updates.filter((u) => u.id !== updateId) }));
+        },
         postUpdate: (projectId, text) => {
           const project = requireManage(projectId);
           if (!text.trim()) throw new Error("Write the update first.");
@@ -656,6 +696,17 @@ export const useStore = create()(
               notify(aid, `${firstName(me)} made you an admin of ${draft.name.trim()}`, "project"),
             );
           return id;
+        },
+        deleteProject: (projectId) => {
+          const project = requireProject(projectId);
+          const me = get().me;
+          if (!isApprover(me) && project.pmId !== me)
+            throw new Error("Only the project's manager or an approver can delete a project.");
+          set((s) => ({
+            projects: s.projects.filter((p) => p.id !== projectId),
+            tasks: s.tasks.filter((t) => t.projectId !== projectId),
+          }));
+          project.teamIds.filter((id) => id !== me).forEach((id) => notify(id, `${firstName(me)} deleted the project ${project.name}`, "project"));
         },
         decideProject: (projectId, approved) => {
           const project = get().projects.find((p) => p.id === projectId);
@@ -870,6 +921,28 @@ export const useStore = create()(
           const id = newId();
           set((s) => ({ convs: [...s.convs, { id, name, memberIds, group }] }));
           return id;
+        },
+        /** Delete one of my own messages. (My messages are the ones that carry my alias in that chat.) */
+        deleteMessage: (msgId) => {
+          const state = get();
+          const msg = state.msgs.find((m) => m.id === msgId);
+          if (!msg) return;
+          if (state.aliases[`${state.me}:${msg.convId}`] !== msg.alias) throw new Error("You can only delete your own messages.");
+          set((s) => ({ msgs: s.msgs.filter((m) => m.id !== msgId) }));
+        },
+        /** Leave a chat. When the last person leaves, the chat and its messages go. */
+        leaveConv: (convId) => {
+          const state = get();
+          const conv = state.convs.find((c) => c.id === convId);
+          if (!conv) return;
+          const rest = conv.memberIds.filter((id) => id !== state.me);
+          const aliases = { ...state.aliases };
+          delete aliases[`${state.me}:${convId}`];
+          set((s) =>
+            rest.length
+              ? { aliases, convs: s.convs.map((c) => (c.id === convId ? { ...c, memberIds: rest } : c)) }
+              : { aliases, convs: s.convs.filter((c) => c.id !== convId), msgs: s.msgs.filter((m) => m.convId !== convId) },
+          );
         },
         send: (convId, text) => {
           const state = get();

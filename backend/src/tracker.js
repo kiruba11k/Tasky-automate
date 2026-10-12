@@ -32,7 +32,7 @@ export const publicPerson = (u) => ({
   color: COLORS[trackerRole(u)],
   history: [],
 });
-const withApprovers = (users) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id) })); };
+const withApprovers = (users, isOwner) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id), owner: isOwner(u) })); };
 
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
 export function mergePatch(target, patch) {
@@ -45,10 +45,10 @@ export function mergePatch(target, patch) {
   return out;
 }
 
-export function registerTracker(app, { store, wrap }) {
+export function registerTracker(app, { store, wrap, isOwner = () => false }) {
   // Live updates: every connected tab is told when documents change, then asks for what it may see (/docs?since=).
   const listeners = new Set();
-  const announce = () => listeners.forEach((res) => { try { res.write('data: changed\n\n'); } catch { listeners.delete(res); } });
+  const announce = (what = 'changed') => listeners.forEach((res) => { try { res.write(`data: ${what}\n\n`); } catch { listeners.delete(res); } });
   app.get('/api/tracker/stream', (req, res) => {
     res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     res.flushHeaders();
@@ -60,7 +60,10 @@ export function registerTracker(app, { store, wrap }) {
 
   const live = async () => (await store.list('User', { limit: 1000 })).filter((u) => u.status !== 'Inactive');
   const find = async (kind, key) => (await store.list('TrackerDoc', { query: { kind, key }, limit: 1 }))[0];
-  const convMembers = async (convId) => (await find('conv', convId))?.data?.memberIds || [];
+  const convMembers = async (convId) => {
+    const conv = await find('conv', convId);
+    return conv && !conv.deleted ? conv.data?.memberIds || [] : [];
+  };
 
   /** May `u` see this document? */
   async function canRead(u, doc) {
@@ -75,12 +78,13 @@ export function registerTracker(app, { store, wrap }) {
   }
 
   /** May `u` write `data` to this document? `prev` is the stored data (undefined for a new document). */
-  async function canWrite(u, kind, key, data, prev, changed = [], deleting = false) {
+  async function canWrite(u, kind, key, data, prev, changed = [], deleting = false, existing = null) {
     const mine = (id) => id === u.id;
     switch (kind) {
       case 'task': {
         const t = prev || data;
         if (!prev) return lead(u) && (mine(data.assignedById) || leadership(u)); // only managers and PMs give out tasks
+        if (deleting) return lead(u) || mine(prev.assignedById); // the assignee cannot delete their own task
         // Review rules. A task is approved (done) or sent back (changes) only by its reviewer. Work by a resource is always
         // reviewed by the project manager of its project. Only the current reviewer can pass the review to someone else.
         if (['done', 'changes'].includes(data.status) && data.status !== prev.status && !mine(prev.reviewerId)) return false;
@@ -102,6 +106,7 @@ export function registerTracker(app, { store, wrap }) {
         const approves = (await live()).length ? approvers(await live()).some((a) => mine(a.id)) : false;
         // Only approvers put a project live, decline a proposal, or approve one. Everyone else proposes (status pending).
         if (!prev && data.status !== 'pending' && !approves) return false;
+        if (deleting && !approves && !mine(p.pmId)) return false; // only an approver or the project's manager deletes a project
         if (prev?.status === 'pending' && (changed.includes('status') || deleting) && !approves && !(deleting && mine(prev.pmId))) return false;
         if (lead(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true; // admins: managers, founders and PMs
         // everyone else on the team may only record that a day was finalized (when they send their end of day)
@@ -110,8 +115,12 @@ export function registerTracker(app, { store, wrap }) {
       case 'daily': case 'weekly': return key.startsWith(`${u.id}|`) || leadership(u);
       case 'profile': return mine(key) || leadership(u);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
-      case 'conv': return (data.memberIds || []).includes(u.id) || (prev?.memberIds || []).includes(u.id);
-      case 'msg': return !prev && (await convMembers(data.convId)).includes(u.id);
+      case 'conv':
+        if (deleting) return (prev.memberIds || []).includes(u.id) && ((prev.memberIds || []).every((m) => m === u.id) || existing?.owner_id === u.id);
+        return (data.memberIds || []).includes(u.id) || (prev?.memberIds || []).includes(u.id);
+      case 'msg':
+        if (deleting) return existing?.owner_id === u.id || (await convMembers(prev.convId)).every((m) => m === u.id); // the sender (never revealed), or the last person left in the chat
+        return !prev && (await convMembers(data.convId)).includes(u.id);
       case 'alias': return key.startsWith(`${u.id}:`);
       default: return false;
     }
@@ -120,7 +129,7 @@ export function registerTracker(app, { store, wrap }) {
   const out = (doc) => ({ kind: doc.kind, key: doc.key, data: doc.deleted ? null : doc.data, deleted: !!doc.deleted, updated: new Date(doc.updated_date).toISOString() });
 
   app.get('/api/tracker/people', wrap(async (req, res) => {
-    res.json(withApprovers(await live()).sort((a, b) => a.name.localeCompare(b.name)));
+    res.json(withApprovers(await live(), isOwner).sort((a, b) => a.name.localeCompare(b.name)));
   }));
 
   // Everything this person may see; pass `since` (an ISO time from an earlier response's `now`) to get only changes.
@@ -154,8 +163,9 @@ export function registerTracker(app, { store, wrap }) {
       const prev = existing && !existing.deleted ? existing.data : undefined;
       if (it.del) {
         if (!existing || existing.deleted) { results.push({ ...id, ok: true }); continue; }
-        if (!(await canWrite(u, kind, key, prev, prev, [], true))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
-        await store.update('TrackerDoc', existing.id, { deleted: true, data: {}, owner_id: u.id });
+        if (!(await canWrite(u, kind, key, prev, prev, [], true, existing))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
+        // the data stays (it is never served) so that people who could see the document are told it is gone
+        await store.update('TrackerDoc', existing.id, { deleted: true, data: prev, owner_id: u.id });
         results.push({ ...id, ok: true });
         continue;
       }
@@ -172,4 +182,5 @@ export function registerTracker(app, { store, wrap }) {
     if (results.some((r) => r.ok)) announce();
     res.json({ results });
   }));
+  return { announce };
 }

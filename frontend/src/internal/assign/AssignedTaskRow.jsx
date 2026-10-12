@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BellRing, Pencil, Star } from 'lucide-react';
+import { BellRing, Pencil, Star, Trash2 } from 'lucide-react';
+import { ConfirmModal } from '../kit/ConfirmModal';
 import {
   Se as useStore,
   vt as Avatar,
@@ -23,8 +24,9 @@ import {
 
 /** One still-open task the manager assigned: remind or edit. */
 export function AssignedTaskRow({ t: task }) {
-  const { projects, editTask, remind } = useStore();
+  const { projects, editTask, remind, deleteTask } = useStore();
   const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [qty, setQty] = useState(task.qty);
   const [targetMinutes, setTargetMinutes] = useState(task.targetMinutes);
@@ -87,7 +89,17 @@ export function AssignedTaskRow({ t: task }) {
             <Pencil size={13} /> Edit
           </Button>
         )}
+        <Button tone="ghost" className="border border-line" aria-label={`Delete ${task.title}`} onClick={() => setConfirmDelete(true)}>
+          <Trash2 size={13} /> Delete
+        </Button>
       </div>
+      <ConfirmModal
+        open={confirmDelete}
+        title="Delete this task?"
+        message={`"${task.title}" will be removed for ${personName(task.assigneeId)} as well. This cannot be undone.`}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => guard(() => { deleteTask(task.id); toast({ title: 'Task deleted', tone: 'info' }); })}
+      />
       {detailsOpen && <TaskDetails task={task} className="mt-2 sm:ml-10" />}
       {editing && (
         <form

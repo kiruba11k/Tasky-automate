@@ -22,31 +22,16 @@ export const JOKES = [
   'Meetings booked today: 0. Meetings about meetings: 3. 📅',
 ];
 
-const STORAGE_KEY = 'ls-qotd';
-
-/** Greeting header plus the quote / joke of the day card (toggle persisted in localStorage "ls-qotd"). */
+/** Greeting header plus the quote / joke of the day card (the quote / joke choice is saved in the profile). */
 export function QuoteOfTheDay({ extra }) {
   const me = useStore((s) => s.me);
   useStore((s) => s.profiles);
   const dayIndex = Math.floor(Date.now() / 864e5);
-  const [mode, setMode] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) || 'quote';
-    } catch {
-      return 'quote';
-    }
-  });
+  const setProfile = useStore((s) => s.setProfile);
+  const mode = useStore((s) => s.profiles[s.me]?.qotd) || 'quote'; // saved in the profile, so it follows the person to any device
   const [offset, setOffset] = useState(0);
 
-  const toggleMode = () => {
-    const next = mode === 'quote' ? 'joke' : 'quote';
-    setMode(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      /* storage unavailable */
-    }
-  };
+  const toggleMode = () => setProfile(me, { qotd: mode === 'quote' ? 'joke' : 'quote' });
 
   const quote = QUOTES[(dayIndex + offset) % QUOTES.length];
   const joke = JOKES[(dayIndex + offset) % JOKES.length];

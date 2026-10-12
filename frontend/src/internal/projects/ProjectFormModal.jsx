@@ -30,6 +30,7 @@ import {
   XU as newRowKey,
 } from '@/internal/min';
 import { FormSection } from './FormSection';
+import { ConfirmModal } from '../kit/ConfirmModal';
 import { PersonPicker } from './PersonPicker';
 
 const EMPTY_TASK = { name: '', unit: '', minutes: '' };
@@ -44,7 +45,9 @@ export function ProjectFormModal({ open, onClose, edit }) {
     setProjectAdmins,
     removeProjectAdmin,
     transferProject,
+    deleteProject,
   } = useStore();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const isManager = isApprover(me); // only approvers put a project live; everyone else sends it for approval
   const isAdmin = isAdminTier(roleOf(me));
   const ownerId = edit ? edit.pmId : me;
@@ -312,6 +315,11 @@ export function ProjectFormModal({ open, onClose, edit }) {
       size="lg"
       footer={
         <>
+          {edit && (isApprover(me) || edit.pmId === me) && (
+            <Button tone="ghost" className="border border-line !text-coral-ink" onClick={() => setConfirmDelete(true)}>
+              <Trash size={14} /> Delete project
+            </Button>
+          )}
           {error && (
             <p role="alert" className="mr-auto text-sm font-semibold text-coral-ink">
               {error}
@@ -843,6 +851,20 @@ export function ProjectFormModal({ open, onClose, edit }) {
             </div>
           )}
         </FormSection>
+      )}
+      {edit && (
+        <ConfirmModal
+          open={confirmDelete}
+          title={`Delete ${edit.name}?`}
+          message="The project and all of its tasks are removed for everyone. This cannot be undone."
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            if (attempt(() => deleteProject(edit.id), setError)) {
+              toast({ title: `${edit.name} deleted`, tone: 'info' });
+              onClose();
+            }
+          }}
+        />
       )}
     </Modal>
   );

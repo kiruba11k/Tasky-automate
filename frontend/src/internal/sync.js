@@ -19,7 +19,8 @@ const COLLECTIONS = {
   daily: { kind: "daily", shape: "map" },
   weekly: { kind: "weekly", shape: "map" },
   profiles: { kind: "profile", shape: "map" },
-  aliases: { kind: "alias", shape: "map" },
+  // an alias is a plain string in the store, a small document on the server
+  aliases: { kind: "alias", shape: "map", wrap: (alias) => ({ alias }), unwrap: (doc) => doc.alias },
 };
 const BY_KIND = Object.fromEntries(Object.entries(COLLECTIONS).map(([name, c]) => [c.kind, { name, ...c }]));
 const POLL_MS = 30000; // safety net only; changes arrive instantly over the live stream
@@ -34,7 +35,7 @@ function documents(state) {
   for (const [name, c] of Object.entries(COLLECTIONS)) {
     const value = state[name];
     if (c.shape === "list") for (const item of value) out.set(docId(c.kind, item.id), { kind: c.kind, key: item.id, data: item });
-    else for (const [key, data] of Object.entries(value)) out.set(docId(c.kind, key), { kind: c.kind, key, data });
+    else for (const [key, data] of Object.entries(value)) out.set(docId(c.kind, key), { kind: c.kind, key, data: c.wrap ? c.wrap(data) : data });
   }
   return out;
 }
@@ -78,10 +79,14 @@ export async function startSync(user) {
             if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll.splice(i, 1); } else delete coll[d.key];
           } else {
             synced.set(id, clone(d.data));
-            if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll[i] = d.data; else coll.push(d.data); } else coll[d.key] = d.data;
+            if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll[i] = d.data; else coll.push(d.data); } else coll[d.key] = c.unwrap ? c.unwrap(d.data) : d.data;
           }
         }
         Object.assign(next, draft);
+        if (draft.convs) { // a conversation that is gone takes its messages with it
+          const alive = new Set(draft.convs.map((c) => c.id));
+          next.msgs = (draft.msgs ?? next.msgs).filter((m) => alive.has(m.convId));
+        }
         return next;
       });
     } finally {
@@ -214,6 +219,7 @@ export async function startSync(user) {
           const parts = buffer.split("\n\n");
           buffer = parts.pop();
           if (parts.some((p) => p.includes("data: changed"))) pullSoon();
+          if (parts.some((p) => p.includes("data: people"))) request("GET", "/api/tracker/people").then((list) => { setPeople(list); useStore.setState((s) => ({ ...s })); }).catch(() => {});
         }
       } catch { /* reconnect below */ }
       if (!stopped) await new Promise((r) => setTimeout(r, 2000));
