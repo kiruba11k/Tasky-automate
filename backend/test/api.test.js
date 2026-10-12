@@ -76,7 +76,10 @@ for (const [name, makeStore] of backends) {
       const member = await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'Mo', email: 'mo@x.com' } });
       assert.equal(member.status, 201);
       assert.equal(member.body.role, 'team_member');
-      assert.equal((await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'X', email: 'x@x.com', role: 'admin' } })).status, 201); // team leaders (project managers) can add people of any role
+      const added = await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'X', email: 'x@x.com', role: 'admin' } });
+      assert.equal(added.status, 201); // team leaders (project managers) can add people of any role
+      assert.equal((await api('DELETE', `/api/entities/User/${added.body.id}`, { token: lena })).status, 403, 'but not remove admins');
+      assert.equal((await api('DELETE', `/api/entities/User/${added.body.id}`, { token: admin })).status, 200);
       const mo = await login('mo@x.com');
       assert.equal((await api('POST', '/api/entities/User', { token: mo, body: { full_name: 'Y', email: 'y@x.com' } })).status, 403);
       const adminRec = (await api('GET', '/api/entities/User', { token: mo })).body.find((u) => u.role === 'admin');
