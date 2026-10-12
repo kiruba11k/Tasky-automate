@@ -1,7 +1,7 @@
 import { MapPin, Rocket, Flag } from 'lucide-react';
 import { $e as dayKey, Mt as weekStart, Dw as weekRanges } from '@/internal/min';
 
-const formatShortDate = (iso) =>
+export const formatShortDate = (iso) =>
   new Date(iso + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
 /** Start-to-end progress bar for a project with a "today" pin. */
