@@ -126,10 +126,10 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
     <group scale={[size * 0.85, size, size]} {...rest}>
       <group ref={root}>
         <group ref={body}>
-          <Part color={b.body} s={[0.29, 0.36, 0.68]} p={[0, 0.58, -0.1]} r={[-0.55, 0, 0]} />
-          <Part color={b.chest} s={[0.21, 0.29, 0.34]} p={[0, 0.5, 0.2]} r={[-0.55, 0, 0]} outline={false} />
+          <Part color={b.body} s={[0.25, 0.29, 0.7]} p={[0, 0.6, -0.1]} r={[-0.55, 0, 0]} />
+          <Part color={b.chest} s={[0.15, 0.19, 0.3]} p={[0, 0.54, 0.19]} r={[-0.55, 0, 0]} outline={false} />
           {[[-0.26, 0.64, 0.5], [0, 0.72, 0.56], [0.26, 0.64, 0.5], [-0.15, 0.47, 0.6], [0.15, 0.47, 0.6], [0, 0.31, 0.57], [-0.32, 0.4, 0.44], [0.32, 0.4, 0.44]].map(([x, y, z], i) => (
-            <Part key={i} color={i % 3 === 0 ? b.chest2 : b.chest} s={[0.09, 0.08, 0.05]} p={[x * 0.6, 0.45 + (y - 0.5) * 0.6, 0.1 + z * 0.42]} r={[0.5, x * 1.6, x * 0.6]} outline={false} />
+            <Part key={i} color={i % 3 === 0 ? b.chest2 : b.chest} s={[0.09, 0.08, 0.05]} p={[x * 0.4, 0.5 + (y - 0.5) * 0.4, 0.08 + z * 0.36]} r={[0.5, x * 1.6, x * 0.6]} outline={false} />
           ))}
           {b.fluffy && [[-0.4, 0.9, 0.2], [0.4, 0.9, 0.2], [0.0, 1.02, -0.05]].map(([x, y, z], i) => <Part key={`f${i}`} color={b.chest} s={0.08} p={[x * 0.55, y - 0.3, z * 0.6]} outline={false} />)}
           <group ref={tail} position={[0, 0.42, -0.5]} rotation={[-0.45, 0, 0]}>
