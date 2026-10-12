@@ -1,4 +1,6 @@
 import { Se as useStore, eU as DEFAULT_CUSTOM_THEME } from '@/internal/min';
+import { listThemes } from '@/themes/registry';
+import { resolveTheme } from '@/themes/engine';
 
 /** Accent palette (original: `Tr`). */
 export const ACCENT_COLORS = ['#1D3FA0', '#DC2626', '#0E9F6E', '#7C3AED', '#D97706', '#0891B2'];
@@ -92,6 +94,17 @@ export const THEMES = {
     },
   },
 };
+
+/** The colour themes built for the earlier app (Midnight, Neon Arcade, Forest Night...), offered alongside the presets as `pack:<id>`. */
+for (const def of listThemes()) {
+  const { tokens } = resolveTheme(def);
+  THEMES[`pack:${def.id}`] = {
+    name: def.name,
+    blurb: def.tagline,
+    swatch: [tokens.page, tokens.primary, def.accent || tokens.secondary],
+    look: { mode: def.mode, fun: 'pack', pack: def, bg: 'plain', font: def.cartoon ? 'fredoka' : 'jakarta', cards: def.cartoon ? 'cartoon' : 'classic', blocks: 'solid', floaters: [] },
+  };
+}
 
 /** "#RRGGBB" -> "r g b" channel string (original: `yU`). */
 export const hexToRgbChannels = (hex) => {
