@@ -85,11 +85,11 @@ export function registerTracker(app, { store, wrap }) {
   // Everything this person may see; pass `since` (an ISO time from an earlier response's `now`) to get only changes.
   app.get('/api/tracker/docs', wrap(async (req, res) => {
     const since = typeof req.query.since === 'string' ? req.query.since : '';
+    if (since && Number.isNaN(Date.parse(since))) return res.status(400).json({ error: 'since must be a time' });
     const now = new Date().toISOString();
-    const rows = await store.list('TrackerDoc', { sort: 'updated_date', limit: 100000 });
+    const rows = await store.list('TrackerDoc', { sort: 'updated_date', limit: 100000, since: since || undefined });
     const docs = [];
     for (const r of rows) {
-      if (since && new Date(r.updated_date).toISOString() <= since) continue;
       if (!since && r.deleted) continue; // a first load has no use for tombstones
       if (await canRead(req.user, r)) docs.push(out(r));
     }

@@ -62,8 +62,9 @@ export class MemoryStore {
     return (this.data[entity] ||= []);
   }
 
-  async list(entity, { query = {}, sort = '-created_date', skip = 0, limit } = {}) {
-    const rows = sortRecords(this.rows(entity).filter((r) => matches(r, query)), sort);
+  async list(entity, { query = {}, sort = '-created_date', skip = 0, limit, since } = {}) {
+    const after = since ? new Date(since).getTime() : 0;
+    const rows = sortRecords(this.rows(entity).filter((r) => matches(r, query) && (!after || new Date(r.updated_date).getTime() > after)), sort);
     return paginate(rows, skip, limit).map((r) => ({ ...r }));
   }
 

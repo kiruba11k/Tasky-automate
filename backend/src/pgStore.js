@@ -46,10 +46,11 @@ export class PgStore {
     return { known, extra };
   }
 
-  async list(entity, { query = {}, sort = '-created_date', skip = 0, limit } = {}) {
+  async list(entity, { query = {}, sort = '-created_date', skip = 0, limit, since } = {}) {
     const { table, byName } = this.m(entity);
     const where = [];
     const params = [];
+    if (since) { params.push(since); where.push(`"updated_date" > $${params.length}`); }
     const jsQuery = {};
     for (const [k, v] of Object.entries(query)) {
       const col = byName[k];
