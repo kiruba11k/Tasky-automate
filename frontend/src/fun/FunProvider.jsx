@@ -108,6 +108,19 @@ function FunProviderFull({ children }) {
     });
   }, []);
 
+  const dragged = useRef(false);
+  const startDrag = (e) => {
+    const x0 = e.clientX; const y0 = e.clientY;
+    const move = (ev) => {
+      if (!dragged.current && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      dragged.current = true;
+      const x = Math.min(0.97, Math.max(0.03, ev.clientX / window.innerWidth));
+      const y = Math.min(0.95, Math.max(0.08, ev.clientY / window.innerHeight));
+      setSettings({ mascotPos: { x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 } });
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); setTimeout(() => { dragged.current = false; }, 0); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
   useEffect(() => { document.body.classList.toggle('fun', settings.cartoon); }, [settings.cartoon]);
   useEffect(() => { document.body.classList.toggle('calm', settings.anim === 'calm'); }, [settings.anim]);
 
@@ -359,8 +372,8 @@ function FunProviderFull({ children }) {
       <div id="fun-portal" className={scope} />
       <div className={scope}>
       {settings.mascot && (
-        <div className="mascot-corner fixed left-3 z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]" style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
-          <button type="button" onClick={poke} aria-label="Tap Tasky for a joke" className="pointer-events-auto shrink-0 focus:outline-none">
+        <div className="mascot-corner fixed z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]" style={settings.mascotPos ? { left: `${settings.mascotPos.x * 100}%`, top: `${settings.mascotPos.y * 100}%`, transform: 'translate(-50%, -50%)' } : { left: '0.75rem', bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+          <button type="button" onClick={(e) => { if (dragged.current) { dragged.current = false; e.preventDefault(); return; } poke(e); }} onPointerDown={startDrag} onDoubleClick={() => setSettings({ mascotPos: null })} title="Drag me anywhere (double-click to send me home)" aria-label="Tap Tasky for a joke, drag to move" className="pointer-events-auto shrink-0 focus:outline-none touch-none cursor-grab active:cursor-grabbing">
             <MascotAvatar mood={mood} settings={settings} />
           </button>
           {bubble && (

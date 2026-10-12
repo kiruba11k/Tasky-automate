@@ -20,6 +20,13 @@ import Wheel from '@/hub/Wheel';
 import Bingo from '@/hub/Bingo';
 import Flappy from '@/hub/Flappy';
 import Wrapped from '@/hub/Wrapped';
+import QuestBoard from '@/fun/QuestBoard';
+import EggCard from '@/fun/EggCard';
+import GardenCard from '@/fun/GardenCard';
+import RelayTrack from '@/fun/RelayTrack';
+import TeamRocket from '@/fun/TeamRocket';
+import WinsFeed from '@/fun/WinsFeed';
+import DoneJar from '@/fun/DoneJar';
 import { MemoryGame } from '@/fun/Arcade';
 import { FunScope } from '@/fun/FunProvider';
 import { Link } from 'react-router-dom';
@@ -57,6 +64,12 @@ function Games() {
 }
 
 const TABS = [
+  ['today', 'Today', () => (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="space-y-6"><QuestBoard /><DoneJar /><EggCard /><PetCard /></div>
+      <div className="space-y-6"><TeamRocket /><GardenCard /><RelayTrack /><WinsFeed /></div>
+    </div>
+  )],
   ['team', 'Team', () => <div className="grid gap-4 lg:grid-cols-2"><BossBattle /><MoodWeather /><Celebrations /><Coffee /><Launch /></div>],
   ['wall', 'Shout-outs & ideas', () => <div className="grid gap-4 lg:grid-cols-2"><ShoutWall /><Ideas /></div>],
   ['rituals', 'Standup & retro', () => <div className="grid gap-4"><Standup /><Retro /></div>],
@@ -75,7 +88,7 @@ export default function Hub() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Team hub</h1>
         <div className="flex gap-2"><Link to="/cast" className={subtle}>Meet the cast</Link><button type="button" className={subtle} onClick={() => setWrapped(true)}><Emoji e="🎁" /> My week, wrapped</button></div>
       </div>
-      <Tabs defaultValue="team">
+      <Tabs defaultValue="today">
         <TabsList className="bg-slate-800 flex-wrap h-auto">{TABS.map(([v, l]) => <TabsTrigger key={v} value={v}>{l}</TabsTrigger>)}</TabsList>
         {TABS.map(([v, , C]) => <TabsContent key={v} value={v} className="mt-4"><C /></TabsContent>)}
       </Tabs>
