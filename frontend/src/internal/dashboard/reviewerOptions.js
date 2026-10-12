@@ -4,7 +4,10 @@ import { Se as useStore, Qe as PEOPLE, nt as personName } from '@/internal/min';
 export function useReviewerOptions(projectId) {
   const { me, projects } = useStore();
   const pmId = projects.find((p) => p.id === projectId)?.pmId;
-  return PEOPLE.filter((p) => p.id !== me)
+  const mine = PEOPLE.find((p) => p.id === me);
+  // A resource's work is approved by the project manager of the project: that is the only choice.
+  const choices = mine?.role === 'resource' && pmId ? PEOPLE.filter((p) => p.id === pmId) : PEOPLE.filter((p) => p.id !== me);
+  return choices
     .sort((a, b) => +(b.id === pmId) - +(a.id === pmId) || personName(a.id).localeCompare(personName(b.id)))
     .map((p) => ({
       id: p.id,

@@ -81,6 +81,20 @@ export function registerTracker(app, { store, wrap }) {
       case 'task': {
         const t = prev || data;
         if (!prev) return lead(u) && (mine(data.assignedById) || leadership(u)); // only managers and PMs give out tasks
+        // Review rules. A task is approved (done) or sent back (changes) only by its reviewer. Work by a resource is always
+        // reviewed by the project manager of its project. Only the current reviewer can pass the review to someone else.
+        if (['done', 'changes'].includes(data.status) && data.status !== prev.status && !mine(prev.reviewerId)) return false;
+        if (data.reviewerId !== prev.reviewerId && changed.includes('reviewerId')) {
+          const submitting = data.status === 'in_review' && prev.status !== 'in_review';
+          if (!submitting && !mine(prev.reviewerId)) return false;
+        }
+        if (data.status === 'in_review' && prev.status !== 'in_review') {
+          const assignee = (await live()).find((x) => x.id === data.assigneeId);
+          if (assignee && trackerRole(assignee) === 'resource') {
+            const project = (await find('project', data.projectId))?.data;
+            if (!project || data.reviewerId !== project.pmId) return false;
+          }
+        }
         return lead(u) || [t.assigneeId, t.assignedById, t.reviewerId, ...(t.history || []).map((h) => h.to)].some(mine);
       }
       case 'project': {

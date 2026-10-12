@@ -1005,6 +1005,23 @@ describe('tracker documents', () => {
     assert.equal(docs.find((d) => d.key === 't1').data.status, 'review');
   });
 
+  test('a resource\'s task is approved by the project manager of its project, and only by its reviewer', async () => {
+    await put(fay, 'project', 'prv', { id: 'prv', name: 'Review project', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann] });
+    const task = { id: 'rv1', title: 'x', projectId: 'prv', assigneeId: ids.ann, assignedById: ids.pm, status: 'todo', history: [] };
+    assert.equal((await put(pm, 'task', 'rv1', task)).ok, true);
+    assert.equal((await put(ann, 'task', 'rv1', { ...task, status: 'in_review', reviewerId: ids.bo })).ok, false, 'a resource cannot pick another reviewer');
+    assert.equal((await put(ann, 'task', 'rv1', { ...task, status: 'in_review', reviewerId: ids.pm })).ok, true);
+    const inReview = { ...task, status: 'in_review', reviewerId: ids.pm };
+    assert.equal((await put(ann, 'task', 'rv1', { ...inReview, status: 'done' })).ok, false, 'the resource cannot approve their own work');
+    assert.equal((await put(bo, 'task', 'rv1', { ...inReview, status: 'done' })).ok, false);
+    assert.equal((await put(admin, 'task', 'rv1', { ...inReview, status: 'done' })).ok, false, 'not even a manager who is not the reviewer');
+    assert.equal((await put(pm, 'task', 'rv1', { ...inReview, status: 'changes' })).ok, true, 'the project manager sends it back');
+    assert.equal((await put(ann, 'task', 'rv1', { ...inReview, status: 'in_review' })).ok, true, 'and the resource resubmits');
+    assert.equal((await put(ann, 'task', 'rv1', { ...inReview, reviewerId: ids.ann })).ok, false, 'only the reviewer passes the review on');
+    assert.equal((await put(pm, 'task', 'rv1', { ...inReview, reviewerId: ids.admin || ids.bo })).ok, true, 'the project manager may forward it');
+    assert.equal((await put(pm, 'task', 'rv1', { ...inReview, status: 'done' })).ok, false, 'once forwarded they are no longer the reviewer');
+  });
+
   test('projects: only leadership or project admins write; daily updates belong to their owner', async () => {
     assert.equal((await put(ann, 'project', 'p1', { id: 'p1', name: 'P', admins: [] })).ok, false);
     assert.equal((await put(fay, 'project', 'p1', { id: 'p1', name: 'P', status: 'active', admins: [ids.pm], pmId: ids.pm })).ok, true);

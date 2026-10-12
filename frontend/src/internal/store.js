@@ -93,6 +93,11 @@ export const useStore = create()(
         if (!project) throw new Error("Project not found.");
         return project;
       };
+      /** Only the task's reviewer (a resource's project manager) may approve it, send it back or pass the review on. */
+      const requireReviewer = (task) => {
+        if (task.reviewerId !== get().me)
+          throw new Error(`Only ${displayName(task.reviewerId)}, who reviews this task, can do that.`);
+      };
       /** `c` - project must be manageable (owner / admin / leadership) by me. */
       const requireManage = (id) => {
         const project = requireProject(id);
@@ -196,6 +201,12 @@ export const useStore = create()(
           if (!(doneQty > 0)) throw new Error("Enter how many you completed.");
           if (!(minutes > 0)) throw new Error("Enter the minutes you took.");
           if (!reviewerId) throw new Error("Choose who should review it.");
+          // A resource's work is always approved by the project manager of its project.
+          if (roleOf(task.assigneeId) === "resource") {
+            const pmId = get().projects.find((p) => p.id === task.projectId)?.pmId;
+            if (!pmId) throw new Error("This project has no project manager to review it.");
+            reviewerId = pmId;
+          }
           const isResubmit =
             task.status === "changes" ||
             task.reviews.some((r) => r.verdict === "feedback") ||
@@ -228,6 +239,7 @@ export const useStore = create()(
         },
         approve: (id) => {
           const task = requireTask(id);
+          requireReviewer(task);
           const at = nowIso();
           patchTask(id, {
             status: "done",
@@ -239,6 +251,7 @@ export const useStore = create()(
         },
         sendBack: (id, text) => {
           const task = requireTask(id);
+          requireReviewer(task);
           if (!text.trim()) throw new Error("Feedback cannot be empty.");
           const at = nowIso();
           patchTask(id, {
@@ -353,6 +366,7 @@ export const useStore = create()(
         },
         forwardReview: (id, toId, note) => {
           const task = requireTask(id);
+          requireReviewer(task);
           if (!toId || toId === get().me) throw new Error("Choose someone else to forward to.");
           const at = nowIso();
           patchTask(id, {
