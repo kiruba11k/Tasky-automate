@@ -223,17 +223,19 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
     res.status(201).json(rec);
   }));
 
-  // ---- users: managed by admins (any role) and team leaders (team members only) ----
+  // ---- users: admins manage everyone. Team leaders (project managers) can add people of any role, but can only edit or
+  // remove team members. ----
   const canManageUser = (actor, target, newRole) => {
     if (actor.role === 'admin') return true;
     if (actor.role !== 'team_leader') return false;
+    if (!target) return true; // adding someone
     return target?.role !== 'admin' && target?.role !== 'team_leader' && (newRole === undefined || newRole === 'team_member');
   };
 
   // A founder is an admin who gets the plain, professional view. Only admins can grant it, and it always implies the admin role.
   const founderRules = (actor, data, target) => {
     if (data.founder === undefined && data.role === undefined) return null;
-    if (data.founder !== undefined && actor.role !== 'admin') return 'Only admins can set the founder view';
+    if (data.founder !== undefined && actor.role !== 'admin' && actor.role !== 'team_leader') return 'Only admins can set the founder view';
     if (data.founder === true) data.role = 'admin';
     else if (data.role && data.role !== 'admin') data.founder = false;
     return null;

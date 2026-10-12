@@ -1,7 +1,7 @@
 // The persisted zustand store (localStorage key "ls-tracker-v2").
 import { create } from "zustand";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, LUNCH_BLOCK } from "./lib/dates.js";
-import { PEOPLE, TASK_TYPES, isLeadership, isAdminTier, roleOf } from "./lib/constants.js";
+import { PEOPLE, TASK_TYPES, isAdminTier, roleOf } from "./lib/constants.js";
 import {
   DEFAULT_METRICS,
   EMPTY_COUNTS,
@@ -252,7 +252,7 @@ export const useStore = create()(
         },
         assign: (draft) => {
           const me = get().me;
-          const task = buildTask(draft, isLeadership(roleOf(me)));
+          const task = buildTask(draft, isAdminTier(roleOf(me))); // tasks from any admin (manager, founder, project manager) are priority tasks
           set((s) => ({ tasks: [task, ...s.tasks] }));
           notify(
             draft.assigneeId,

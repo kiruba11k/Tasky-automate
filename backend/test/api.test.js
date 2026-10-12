@@ -76,7 +76,7 @@ for (const [name, makeStore] of backends) {
       const member = await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'Mo', email: 'mo@x.com' } });
       assert.equal(member.status, 201);
       assert.equal(member.body.role, 'team_member');
-      assert.equal((await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'X', email: 'x@x.com', role: 'admin' } })).status, 403);
+      assert.equal((await api('POST', '/api/entities/User', { token: lena, body: { full_name: 'X', email: 'x@x.com', role: 'admin' } })).status, 201); // team leaders (project managers) can add people of any role
       const mo = await login('mo@x.com');
       assert.equal((await api('POST', '/api/entities/User', { token: mo, body: { full_name: 'Y', email: 'y@x.com' } })).status, 403);
       const adminRec = (await api('GET', '/api/entities/User', { token: mo })).body.find((u) => u.role === 'admin');
@@ -1031,7 +1031,9 @@ describe('tracker documents', () => {
     assert.equal((await patch(ann, { status: 'active' })).ok, false);
     assert.equal((await patch(pm, { status: 'active' })).ok, true, 'a project manager approves a project they do not own');
     assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Res', email: 'newres@x.com', role: 'team_member' })).status, 201);
-    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Boss', email: 'newboss@x.com', role: 'admin' })).status, 403, 'only main admins add admins');
+    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Boss', email: 'newboss@x.com', role: 'admin' })).status, 201, 'a project manager can add managers too');
+    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Founder', email: 'newfounder@x.com', role: 'admin', founder: true })).status, 201);
+    assert.equal((await call('PUT', `/api/entities/User/${ids.pm}`, pm, { full_name: 'renamed' })).status, 403, 'but cannot edit other admins');
   });
 
   test('notices reach only their recipient; profiles belong to their owner', async () => {
