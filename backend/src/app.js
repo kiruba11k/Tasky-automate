@@ -153,7 +153,8 @@ export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = proce
 
   registerWeekly(app, { store, notifier, wrap });
   registerBirds(app, { store, notifier, wrap, clock });
-  const tracker = registerTracker(app, { store, wrap, isOwner });
+  const tracker = registerTracker(app, { store, wrap, isOwner, clock });
+  app.locals.tracker = tracker;
   registerSocial(app, { store, notifier, wrap, clock, secret: jwtSecret });
 
   // Weekly plans and notifications are written only through the endpoints above.

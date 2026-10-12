@@ -1185,3 +1185,48 @@ describe('main admin (ADMIN_EMAIL) and delete rules', () => {
     assert.ok(before);
   });
 });
+
+describe('chat lives for one day', () => {
+  let server, base, app, ann, bo, ids = {}, now = Date.parse('2026-10-12T09:00:00Z');
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+  const put = (token, kind, key, patch) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind, key, patch }] }).then((r) => r.body.results[0]);
+  const keys = async (token) => (await call('GET', '/api/tracker/docs', token)).body.docs.map((d) => `${d.kind}:${d.key}`);
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'owner@x.com' });
+    app = createApp({ store, jwtSecret: 's', ownerEmail: 'owner@x.com', clock: () => now });
+    server = app.listen(0);
+    base = `http://localhost:${server.address().port}`;
+    const owner = await login('owner@x.com');
+    for (const n of ['ann', 'bo']) ids[n] = (await call('POST', '/api/entities/User', owner, { full_name: n, email: `${n}@x.com`, role: 'team_member' })).body.id;
+    ann = await login('ann@x.com'); bo = await login('bo@x.com');
+  });
+  after(() => server.close());
+
+  test('messages and conversations disappear a day later, whoever has the page open', async () => {
+    await put(ann, 'conv', 'c1', { id: 'c1', name: 'x', memberIds: [ids.ann, ids.bo] });
+    await put(ann, 'alias', `${ids.ann}:c1`, { alias: 'Calm Koala' });
+    await put(ann, 'msg', 'm1', { id: 'm1', convId: 'c1', alias: 'Calm Koala', text: 'first' });
+    now += 20 * 3600 * 1000; // 20 hours later
+    await put(bo, 'msg', 'm2', { id: 'm2', convId: 'c1', alias: 'Swift Heron', text: 'second' });
+    assert.equal(await app.locals.tracker.sweepChat(), 0, 'nothing is old enough yet');
+    assert.deepEqual((await keys(bo)).filter((k) => k.startsWith('msg')).sort(), ['msg:m1', 'msg:m2']);
+    const mark = new Date(Date.now() - 60000).toISOString(); // (store timestamps are real time; the chat clock is the fake one)
+    now += 5 * 3600 * 1000; // 25 hours after the first message
+    assert.ok(!(await keys(bo)).includes('msg:m1'), 'an expired message is not served even before the sweep runs');
+    assert.equal(await app.locals.tracker.sweepChat(), 1, 'the first message is removed');
+    const delta = (await call('GET', `/api/tracker/docs?since=${encodeURIComponent(mark)}`, bo)).body.docs;
+    assert.deepEqual(delta.filter((d) => d.deleted).map((d) => d.key), ['m1'], 'open pages are told it is gone');
+    assert.ok((await keys(ann)).includes('msg:m2') && (await keys(ann)).includes('conv:c1'));
+    now += 20 * 3600 * 1000; // a day after the last message
+    assert.equal(await app.locals.tracker.sweepChat(), 3, 'the last message, the conversation and the alias go');
+    const left = await keys(ann);
+    assert.ok(!left.some((k) => /^(msg|conv|alias):/.test(k)), JSON.stringify(left));
+  });
+});

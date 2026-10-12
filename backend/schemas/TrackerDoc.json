@@ -6,7 +6,8 @@
     "key": { "type": "string", "description": "Id of the document inside its kind" },
     "owner_id": { "type": "string", "description": "Who wrote it last (never returned for anonymous chat messages)" },
     "data": { "type": "object" },
-    "deleted": { "type": "boolean" }
+    "deleted": { "type": "boolean" },
+    "born": { "type": "number", "description": "Server time (ms) the document was first saved; chat expiry counts from it" }
   },
   "required": ["kind", "key"]
 }

@@ -94,7 +94,7 @@ export function AnonymousChat({ onClose }) {
             )}
           </div>
           <p className="text-xs text-muted">
-            {'🎭 Anonymous: nobody, including management, can see who wrote what.'}
+            {'🎭 Anonymous: nobody, including management, can see who wrote what. Chats disappear a day after the last message.'}
             {myAlias && ` You appear as ${myAlias}.`}
           </p>
         </header>

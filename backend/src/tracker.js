@@ -45,7 +45,10 @@ export function mergePatch(target, patch) {
   return out;
 }
 
-export function registerTracker(app, { store, wrap, isOwner = () => false }) {
+const bornAt = (r) => (Number.isFinite(r.born) ? r.born : new Date(r.created_date).getTime());
+export const CHAT_TTL_MS = (Number(process.env.CHAT_TTL_MINUTES) || 24 * 60) * 60 * 1000; // chat messages and conversations live for one day (CHAT_TTL_MINUTES overrides, for testing)
+
+export function registerTracker(app, { store, wrap, isOwner = () => false, clock = Date.now }) {
   // Live updates: every connected tab is told when documents change, then asks for what it may see (/docs?since=).
   const listeners = new Set();
   const announce = (what = 'changed') => listeners.forEach((res) => { try { res.write(`data: ${what}\n\n`); } catch { listeners.delete(res); } });
@@ -136,11 +139,12 @@ export function registerTracker(app, { store, wrap, isOwner = () => false }) {
   app.get('/api/tracker/docs', wrap(async (req, res) => {
     const since = typeof req.query.since === 'string' ? req.query.since : '';
     if (since && Number.isNaN(Date.parse(since))) return res.status(400).json({ error: 'since must be a time' });
-    const now = new Date().toISOString();
+    const now = new Date(clock()).toISOString();
     const rows = await store.list('TrackerDoc', { sort: 'updated_date', limit: 100000, since: since || undefined });
     const docs = [];
     for (const r of rows) {
       if (!since && r.deleted) continue; // a first load has no use for tombstones
+      if (r.kind === 'msg' && !r.deleted && clock() - bornAt(r) > CHAT_TTL_MS) continue; // expired, the sweep will remove it
       if (await canRead(req.user, r)) docs.push(out(r));
     }
     res.json({ now, docs });
@@ -176,11 +180,45 @@ export function registerTracker(app, { store, wrap, isOwner = () => false }) {
       const changed = Object.keys(patch);
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
       if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: u.id });
-      else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false }, u.email);
+      else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
       results.push({ ...id, ok: true });
     }
     if (results.some((r) => r.ok)) announce();
     res.json({ results });
   }));
-  return { announce };
+
+  /**
+   * Chat is short lived: a message is deleted one day after it was sent, and a conversation (with everybody's aliases in it)
+   * one day after its last message. This runs on the server, so it does not matter who has the page open.
+   */
+  async function sweepChat() {
+    const now = clock();
+    const old = (r) => now - bornAt(r) > CHAT_TTL_MS;
+    const gone = (r) => store.update('TrackerDoc', r.id, { deleted: true, data: r.data, owner_id: r.owner_id }); // data stays: it is never served, but tells members it is gone
+    const msgs = await store.list('TrackerDoc', { query: { kind: 'msg' }, limit: 100000 });
+    let removed = 0;
+    for (const m of msgs.filter((x) => !x.deleted && old(x))) { await gone(m); removed += 1; }
+    const lastActivity = new Map(); // conversation id -> newest message time (expired or not)
+    for (const m of msgs) {
+      const c = m.data?.convId;
+      if (c) lastActivity.set(c, Math.max(lastActivity.get(c) || 0, bornAt(m)));
+    }
+    const convs = await store.list('TrackerDoc', { query: { kind: 'conv' }, limit: 100000 });
+    const dead = new Set();
+    for (const c of convs.filter((x) => !x.deleted)) {
+      if (now - Math.max(bornAt(c), lastActivity.get(c.key) || 0) > CHAT_TTL_MS) { await gone(c); dead.add(c.key); removed += 1; }
+    }
+    if (dead.size) {
+      for (const a of await store.list('TrackerDoc', { query: { kind: 'alias' }, limit: 100000 })) {
+        if (!a.deleted && dead.has(a.key.split(':').slice(1).join(':'))) { await gone(a); removed += 1; }
+      }
+    }
+    if (removed) announce();
+    return removed;
+  }
+  const timer = setInterval(() => sweepChat().catch((e) => console.error('chat sweep failed:', e)), 60 * 1000);
+  timer.unref?.();
+  setTimeout(() => sweepChat().catch(() => {}), 5000).unref?.();
+
+  return { announce, sweepChat };
 }
