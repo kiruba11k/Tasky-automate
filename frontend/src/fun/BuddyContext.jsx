@@ -37,7 +37,7 @@ export function BuddyProvider({ children }) {
     accessories: status?.catalog?.accessories || [],
     eggs: status?.eggs || { available: 0, earned: 0, hatched: 0, next_at: 3, done: 0 },
     refresh,
-    pin: (id) => save({ buddy: id }),
+    pin: (id) => { window.dispatchEvent(new Event('tasky:kick')); return save({ buddy: id }); },
     equip: (slot, id) => save({ equipped: { ...(status?.equipped || {}), [slot]: id } }),
   }), [status, refresh, save]);
 
