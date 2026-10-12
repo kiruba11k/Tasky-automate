@@ -28,7 +28,7 @@ export function Profile() {
   const profile = profiles[me] ?? {};
   const [name, setName] = useState(profile.name ?? person.name);
   const fileRef = useRef(null);
-  const assigner = isAssigner(person.role);
+  const assigner = isAssigner(person.role) && !person.tracked; // a manager who also does tasks sees their tasks like everyone else
   const myTasks = tasks
     .filter((t) => t.assigneeId === me)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

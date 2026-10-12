@@ -32,11 +32,16 @@ class HttpError extends Error {
 
 const strip = (body, keys) => Object.fromEntries(Object.entries(body || {}).filter(([k]) => !keys.includes(k)));
 
-/** Creates the first admin from ADMIN_EMAIL when no admin exists yet. */
+/**
+ * Creates the first admin from ADMIN_EMAIL when no admin exists yet. The main admin also does tasks by default
+ * (shown as a team member); they can switch that off in People > Manage people.
+ */
 export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
   if (!email) return false;
+  const existing = (await store.list('User', { query: { email: normEmail(email) } }))[0];
+  if (existing && existing.does_tasks === undefined) await store.update('User', existing.id, { does_tasks: true });
   if ((await store.list('User', { query: { role: 'admin' } })).length) return false;
-  await store.insert('User', { full_name: name, email: normEmail(email), role: 'admin', status: 'Active', project_ids: [] });
+  await store.insert('User', { full_name: name, email: normEmail(email), role: 'admin', status: 'Active', project_ids: [], does_tasks: true });
   return true;
 }
 

@@ -17,8 +17,8 @@ const ACCESS = { resource: 'team_member', pm: 'team_leader', manager: 'admin', f
 /** The tracker role of a user record from the server. */
 export const roleOfUser = (u) => (u.founder ? 'founder' : u.track_role || { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource');
 
-const blank = { name: '', email: '', role: 'resource', title: '', approver: false, active: true };
-const fromUser = (u) => ({ name: u.full_name || '', email: u.email || '', role: roleOfUser(u), title: u.designation || '', approver: !!u.approver, active: u.status !== 'Inactive' });
+const blank = { name: '', email: '', role: 'resource', title: '', approver: false, active: true, doesTasks: false };
+const fromUser = (u) => ({ name: u.full_name || '', email: u.email || '', role: roleOfUser(u), title: u.designation || '', approver: !!u.approver, active: u.status !== 'Inactive', doesTasks: !!u.does_tasks });
 
 /** Add a person, or edit one when `person` (a user record) is given. Only the main admin gets here. */
 export function PersonDialog({ open, onClose, person, onSaved }) {
@@ -39,6 +39,7 @@ export function PersonDialog({ open, onClose, person, onSaved }) {
       full_name: form.name.trim(),
       email: form.email.trim(),
       designation: form.title.trim() || (person ? '' : undefined),
+      does_tasks: ['manager', 'founder'].includes(form.role) ? form.doesTasks : false,
       ...(isOwner ? {} : {
         role: ACCESS[form.role],
         founder: form.role === 'founder',
@@ -92,6 +93,12 @@ export function PersonDialog({ open, onClose, person, onSaved }) {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.approver} onChange={(e) => setForm((f) => ({ ...f, approver: e.target.checked }))} />
             Can approve project proposals
+          </label>
+        )}
+        {['manager', 'founder'].includes(form.role) && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.doesTasks} onChange={(e) => setForm((f) => ({ ...f, doesTasks: e.target.checked }))} />
+            Also does tasks (shown as a team member and can be given work)
           </label>
         )}
         {person && !isOwner && (

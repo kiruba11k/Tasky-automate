@@ -10,6 +10,9 @@ export const isLeadership = (role) => role === "manager" || role === "founder";
  * projects, onboard projects that go live straight away, manage every project, assign to anyone and see the whole team.
  * Only the main admins add managers and founders, and their own tasks stay "priority" tasks.
  */
+/** Who counts as a team member in the numbers and can be given tasks: everyone except managers and founders, unless they also do tasks. */
+export const isTrackedPerson = (p) => !isLeadership(p.role) || !!p.tracked;
+
 export const isAdminTier = (role) => isLeadership(role) || role === "pm";
 
 /** `Cn` - the built-in task types (standard time per unit in minutes). */

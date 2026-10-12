@@ -53,10 +53,11 @@ export function Shell() {
   const [themeOpen, setThemeOpen] = useState(false);
   const isManager = isManagerRole(person.role); // manager or founder: the main admins
   const isAdmin = isAdminTier(person.role); // main admins and project managers
+  const alsoWorks = isAdmin && (person.role === 'pm' || !!person.tracked); // admins who do tasks themselves keep their own dashboard and day
   const isPm = projects.some((p) => isProjectPm(p, me) && p.status === 'active');
   const pending = isApprover(me) ? projects.filter((p) => p.status === 'pending').length : 0; // projects waiting for this approver
   const baseItems = [
-    ...(isManager
+    ...(isManager && !alsoWorks
       ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV]
       : isAdmin
         ? [DASHBOARD_NAV, TEAM_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, TEAM_UPDATES_NAV]
@@ -65,7 +66,7 @@ export function Shell() {
           : [DASHBOARD_NAV, PROJECTS_NAV]),
     PROFILE_NAV,
   ];
-  const badgeFor = (item) => (isAdmin && (isManager ? item === DASHBOARD_NAV : item === TEAM_NAV) ? pending : 0);
+  const badgeFor = (item) => (isAdmin && (isManager && !alsoWorks ? item === DASHBOARD_NAV : item === TEAM_NAV) ? pending : 0);
   const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: badgeFor(item) }))];
   const iconButton = 'focus-ring rounded-xl p-2 text-muted hover:bg-surface-2';
 
@@ -134,12 +135,12 @@ export function Shell() {
         </header>
         <main className="mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>
-            <Route path="/" element={isManager ? <ManagerDashboard /> : <MemberDashboard />} />
+            <Route path="/" element={isManager && !alsoWorks ? <ManagerDashboard /> : <MemberDashboard />} />
             <Route path="/projects" element={isAdmin ? <ManagerProjects /> : <MemberProjects />} />
-            <Route path="/daily" element={isManager ? <ManagerDaily /> : <MemberDaily />} />
+            <Route path="/daily" element={isManager && !alsoWorks ? <ManagerDaily /> : <MemberDaily />} />
             <Route path="/profile" element={<ProfilePage />} />
-            {isAdmin && !isManager && <Route path="/team" element={<ManagerDashboard />} />}
-            {isAdmin && !isManager && <Route path="/team-updates" element={<ManagerDaily />} />}
+            {alsoWorks && <Route path="/team" element={<ManagerDashboard />} />}
+            {alsoWorks && <Route path="/team-updates" element={<ManagerDaily />} />}
             {(isAdmin || isPm) && <Route path="/assign" element={<AssignPage key={me} />} />}
             {isAdmin && <Route path="/people" element={<PeoplePage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />

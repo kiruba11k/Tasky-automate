@@ -44,7 +44,7 @@ export function AssignTasks() {
   const [projectId, setProjectId] = useState(myProjects[0]?.id ?? '');
   const project = myProjects.find((G) => G.id === projectId) ?? myProjects[0];
   const teammates = PEOPLE.filter(
-    (G) => G.id !== me && G.role !== 'founder' && (isManager || project?.teamIds.includes(G.id)),
+    (G) => G.id !== me && (G.role !== 'founder' || G.tracked) && (isManager || project?.teamIds.includes(G.id)),
   );
   const [pickedAssignee, setPickedAssignee] = useState('');
   const [typeIdState, setTypeId] = useState('l1');

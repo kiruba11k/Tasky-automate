@@ -32,7 +32,7 @@ export const publicPerson = (u) => ({
   color: COLORS[trackerRole(u)],
   history: [],
 });
-const withApprovers = (users, isOwner) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id), owner: isOwner(u) })); };
+const withApprovers = (users, isOwner) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id), owner: isOwner(u), tracked: u.does_tasks === true })); };
 
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
 export function mergePatch(target, patch) {

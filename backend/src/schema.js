@@ -33,6 +33,7 @@ schemas.User = {
     buddy: { type: 'string' },
     birds_muted: { type: 'boolean' },
     founder: { type: 'boolean' },
+    does_tasks: { type: 'boolean', description: 'A manager or founder who also does tasks: shown and tracked as a team member' },
     approver: { type: 'boolean', description: 'May approve and decline project proposals' },
     track_role: { type: 'string', enum: ['founder', 'manager', 'pm', 'resource'] },
     birthday: { type: 'string' },

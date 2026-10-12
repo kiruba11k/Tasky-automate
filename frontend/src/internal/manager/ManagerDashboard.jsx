@@ -26,7 +26,7 @@ import {
 } from '@/internal/min';
 import { WeekGlance } from './WeekGlance';
 import { AssignmentDifficulty } from './AssignmentDifficulty';
-import { isApprover, approverNames } from '../lib/constants';
+import { isApprover, approverNames, isTrackedPerson } from '../lib/constants';
 
 /** Manager / founder dashboard, route "/". (bundle: KU) */
 export function ManagerDashboard() {
@@ -39,7 +39,7 @@ export function ManagerDashboard() {
     .flatMap((p) => p.meetings.filter((m) => m.date >= today).map((m) => ({ ...m, project: p.name })))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
     .slice(0, 6);
-  const team = PEOPLE.filter((person) => !isMemberRole(person.role)).sort((a, b) =>
+  const team = PEOPLE.filter(isTrackedPerson).sort((a, b) =>
     a.name.localeCompare(b.name),
   );
 

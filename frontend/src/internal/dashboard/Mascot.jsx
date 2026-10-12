@@ -1,3 +1,4 @@
+import { isTrackedPerson } from '@/internal/lib/constants';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
@@ -27,7 +28,7 @@ export function Mascot() {
   const today = dayKey(0);
   const todayDaily = daily[`${me}|${today}`];
   const missingTargets = isManager
-    ? PEOPLE.filter((p) => !isManagerRole(p.role) && !daily[`${p.id}|${today}`]?.sodAt).length
+    ? PEOPLE.filter((p) => isTrackedPerson(p) && !daily[`${p.id}|${today}`]?.sodAt).length
     : 0;
   const now = new Date();
   const hour = now.getHours();
