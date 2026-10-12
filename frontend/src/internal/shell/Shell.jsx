@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { MessageCircle, Palette, RotateCcw, Settings } from 'lucide-react';
+import { LogOut, MessageCircle, Palette, Settings } from 'lucide-react';
+import { useAuth } from '@/auth/AuthContext';
 import {
   Se as useStore,
   Qe as PEOPLE,
@@ -40,7 +41,8 @@ const ROLE_GROUPS = [
 
 /** Whole authenticated layout: side nav, top bar, routes, chat, mascot, toaster (original: `aue`). */
 export function Shell() {
-  const { me, notices, projects, setMe, reset } = useStore();
+  const { me, notices, projects } = useStore();
+  const { logout } = useAuth();
   const person = PEOPLE.find((p) => p.id === me);
   const [chatOpen, setChatOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -106,16 +108,8 @@ export function Shell() {
           <button aria-label="Theme" title="Theme" className={iconButton} onClick={() => setThemeOpen(true)}>
             <Palette size={18} />
           </button>
-          <button
-            aria-label="Reset demo data"
-            title="Reset demo data"
-            className={iconButton}
-            onClick={() => {
-              reset();
-              toast({ title: 'Demo data reset', tone: 'info' });
-            }}
-          >
-            <RotateCcw size={18} />
+          <button aria-label="Sign out" title="Sign out" className={iconButton} onClick={logout}>
+            <LogOut size={18} />
           </button>
         </div>
       </nav>
@@ -125,29 +119,12 @@ export function Shell() {
             <p className="text-sm font-extrabold tracking-tight">Lead Strategus</p>
             <span className="hidden text-xs text-muted sm:inline">Tracker</span>
           </div>
-          <label className="flex min-w-0 items-center gap-2 rounded-full bg-surface-2 py-1 pl-1 pr-2 text-xs">
+          <div className="flex min-w-0 items-center gap-2 rounded-full bg-surface-2 py-1 pl-1 pr-3 text-xs">
             <Avatar id={me} size="sm" />
-            <span className="hidden text-muted sm:inline">Viewing as</span>
-            <select
-              aria-label="Viewing as"
-              className="focus-ring min-w-0 max-w-[11rem] rounded-full bg-surface px-2 py-1 font-semibold sm:max-w-none"
-              value={me}
-              onChange={(e) => {
-                setMe(e.target.value);
-                navigate('/');
-              }}
-            >
-              {ROLE_GROUPS.map(([role, label]) => (
-                <optgroup key={role} label={label}>
-                  {PERSON_IDS.filter((id) => PEOPLE.find((p) => p.id === id)?.role === role).map((id) => (
-                    <option key={id} value={id}>
-                      {fullName(id)} · {PEOPLE.find((p) => p.id === id)?.title}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
+            <span className="min-w-0 truncate font-semibold">
+              {fullName(me)} · {person.title}
+            </span>
+          </div>
         </header>
         <main className="mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>

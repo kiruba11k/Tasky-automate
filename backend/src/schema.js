@@ -33,6 +33,7 @@ schemas.User = {
     buddy: { type: 'string' },
     birds_muted: { type: 'boolean' },
     founder: { type: 'boolean' },
+    track_role: { type: 'string', enum: ['founder', 'manager', 'pm', 'resource'] },
     birthday: { type: 'string' },
     fun_fact: { type: 'string' },
     equipped: { type: 'object' },

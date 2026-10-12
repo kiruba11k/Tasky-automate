@@ -1,0 +1,206 @@
+// Keeps the tracker store in step with the backend (documents under /api/tracker).
+// The UI changes the store as before. This module (1) loads everything the signed-in person may see, (2) sends each local
+// change to the server as a JSON merge patch, and (3) polls for other people's changes.
+import { request } from "@/api/client";
+import { useStore, emptyState } from "./store.js";
+import { rollProjectPeriods } from "./lib/domain.js";
+import { setPeople } from "./lib/people.js";
+import { toast } from "./kit/toast.js";
+
+// store collection -> document kind. "list" collections hold objects with an id, "map" collections are keyed objects.
+const COLLECTIONS = {
+  tasks: { kind: "task", shape: "list" },
+  projects: { kind: "project", shape: "list" },
+  notices: { kind: "notice", shape: "list" },
+  convs: { kind: "conv", shape: "list" },
+  msgs: { kind: "msg", shape: "list" },
+  daily: { kind: "daily", shape: "map" },
+  weekly: { kind: "weekly", shape: "map" },
+  profiles: { kind: "profile", shape: "map" },
+  aliases: { kind: "alias", shape: "map" },
+};
+const BY_KIND = Object.fromEntries(Object.entries(COLLECTIONS).map(([name, c]) => [c.kind, { name, ...c }]));
+const POLL_MS = 5000;
+const FLUSH_MS = 300;
+
+const docId = (kind, key) => `${kind}\u0000${key}`;
+const clone = (v) => JSON.parse(JSON.stringify(v));
+
+/** RFC 7386 merge patch that turns `from` into `to`, or undefined when equal. Arrays are replaced whole. */
+export function diffPatch(from, to) {
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  if (!isObj(from) || !isObj(to)) return JSON.stringify(from) === JSON.stringify(to) ? undefined : to;
+  const patch = {};
+  for (const k of Object.keys(to)) {
+    if (to[k] === undefined) continue;
+    const d = diffPatch(from[k], to[k]);
+    if (d !== undefined) patch[k] = d;
+  }
+  for (const k of Object.keys(from)) if (!(k in to) || to[k] === undefined) patch[k] = null;
+  return Object.keys(patch).length ? patch : undefined;
+}
+
+/** The documents of a state: Map docId -> { kind, key, data }. */
+function documents(state) {
+  const out = new Map();
+  for (const [name, c] of Object.entries(COLLECTIONS)) {
+    const value = state[name];
+    if (c.shape === "list") for (const item of value) out.set(docId(c.kind, item.id), { kind: c.kind, key: item.id, data: item });
+    else for (const [key, data] of Object.entries(value)) out.set(docId(c.kind, key), { kind: c.kind, key, data });
+  }
+  return out;
+}
+
+let session = null;
+
+/** Starts syncing for the signed-in user. Resolves once the first load is done; returns { stop }. */
+export async function startSync(user) {
+  if (session) session.stop();
+  const synced = new Map(); // docId -> last data known to match the server
+  const pending = new Set(); // docIds with local changes not yet saved
+  let since = "";
+  let timer = null;
+  let flushTimer = null;
+  let stopped = false;
+  let applying = false;
+  let busy = Promise.resolve();
+
+  const people = await request("GET", "/api/tracker/people");
+  setPeople(people);
+
+  /** Applies server documents to the store (without echoing them back). */
+  const apply = (docs, { replace = false } = {}) => {
+    applying = true;
+    try {
+      useStore.setState((state) => {
+        const next = replace ? { ...state, ...emptyState(), me: user.id } : { ...state };
+        const draft = {};
+        const get = (name) => (draft[name] ??= COLLECTIONS[name].shape === "list" ? [...next[name]] : { ...next[name] });
+        for (const d of docs) {
+          const c = BY_KIND[d.kind];
+          if (!c) continue;
+          const id = docId(d.kind, d.key);
+          if (!replace && pending.has(id)) continue; // my unsaved change wins until it is saved
+          const coll = get(c.name);
+          // A new week or month started: show the project's counters rolled over. Saved with the next manager edit.
+          if (d.kind === "project" && !d.deleted) d.data = rollProjectPeriods({ admins: [], finalized: {}, pastWeeks: [], pastMonths: [], ...d.data });
+          if (d.deleted) {
+            synced.delete(id);
+            if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll.splice(i, 1); } else delete coll[d.key];
+          } else {
+            synced.set(id, clone(d.data));
+            if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll[i] = d.data; else coll.push(d.data); } else coll[d.key] = d.data;
+          }
+        }
+        Object.assign(next, draft);
+        return next;
+      });
+    } finally {
+      applying = false;
+    }
+  };
+
+  const pull = async () => {
+    const res = await request("GET", `/api/tracker/docs${since ? `?since=${encodeURIComponent(since)}` : ""}`);
+    apply(res.docs, { replace: !since });
+    // Overlap a little so a write that lands at the same instant is never missed (re-applying is harmless).
+    since = new Date(new Date(res.now).getTime() - 2000).toISOString();
+  };
+
+  /** Sends what changed locally since the last save. */
+  const flush = () => {
+    busy = busy.then(async () => {
+      if (stopped) return;
+      const patches = [];
+      const deletes = [];
+      const current = documents(useStore.getState());
+      for (const id of [...pending]) {
+        const doc = current.get(id);
+        if (!doc) { const [kind, key] = id.split("\u0000"); if (synced.has(id)) deletes.push({ kind, key }); continue; }
+        const patch = diffPatch(synced.get(id) ?? {}, doc.data);
+        if (patch !== undefined) patches.push({ kind: doc.kind, key: doc.key, patch, id, data: clone(doc.data) });
+      }
+      for (const id of pending) if (!patches.some((p) => p.id === id) && !deletes.some((d) => docId(d.kind, d.key) === id)) pending.delete(id);
+      if (!patches.length && !deletes.length) return;
+      try {
+        const res = await request("POST", "/api/tracker/docs/batch", {
+          patches: patches.map(({ kind, key, patch }) => ({ kind, key, patch })),
+          deletes,
+        });
+        let rejected = null;
+        for (const r of res.results) {
+          const id = docId(r.kind, r.key);
+          if (r.ok) {
+            const p = patches.find((x) => x.id === id);
+            if (p) synced.set(id, p.data); else synced.delete(id);
+            pending.delete(id);
+          } else rejected = rejected ?? r;
+        }
+        if (rejected) {
+          toast({ title: "Some changes could not be saved", description: rejected.error || "You are not allowed to do that.", tone: "info" });
+          pending.clear();
+          await pull(); // show the server's version again
+          since = "";
+          await pull();
+        }
+      } catch (e) {
+        toast({ title: "Could not reach the server", description: "Your last change is kept here and will be retried.", tone: "info" });
+        flushTimer = setTimeout(flush, 4000);
+      }
+    });
+    return busy;
+  };
+
+  const schedule = () => {
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, FLUSH_MS);
+  };
+
+  await pull();
+  useStore.setState({ me: user.id });
+
+  // Local changes -> mark which documents changed (cheap reference checks per collection), then save soon.
+  const unsubscribe = useStore.subscribe((state, prev) => {
+    if (applying) return;
+    let any = false;
+    for (const [name, c] of Object.entries(COLLECTIONS)) {
+      if (state[name] === prev[name]) continue;
+      const before = c.shape === "list" ? new Map(prev[name].map((x) => [x.id, x])) : new Map(Object.entries(prev[name]));
+      const after = c.shape === "list" ? new Map(state[name].map((x) => [x.id, x])) : new Map(Object.entries(state[name]));
+      for (const [key, data] of after) if (before.get(key) !== data) { pending.add(docId(c.kind, key)); any = true; }
+      for (const key of before.keys()) if (!after.has(key)) { pending.add(docId(c.kind, key)); any = true; }
+    }
+    if (any) schedule();
+  });
+
+  const tick = async () => {
+    if (stopped) return;
+    if (!document.hidden && !pending.size) {
+      try { await pull(); } catch { /* offline: try again next time */ }
+    }
+    timer = setTimeout(tick, POLL_MS);
+  };
+  timer = setTimeout(tick, POLL_MS);
+  const onVisible = () => { if (!document.hidden) { clearTimeout(timer); tick(); } };
+  document.addEventListener("visibilitychange", onVisible);
+  const onUnload = () => { if (pending.size) flush(); };
+  window.addEventListener("pagehide", onUnload);
+
+  session = {
+    stop() {
+      stopped = true;
+      clearTimeout(timer);
+      clearTimeout(flushTimer);
+      unsubscribe();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pagehide", onUnload);
+      useStore.setState(emptyState());
+      session = null;
+    },
+    flush,
+    reloadPeople: async () => setPeople(await request("GET", "/api/tracker/people")),
+  };
+  return session;
+}
+
+export const currentSession = () => session;

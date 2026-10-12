@@ -1,0 +1,133 @@
+// Lead Strategus Tracker: people, and the documents (tasks, projects, daily and weekly updates, notices, profiles, chat)
+// the tracker UI keeps. The UI keeps its own rules; this module decides who may read and write which document.
+// Anonymous chat: the sender of a message is kept only as owner_id and is never returned; each person's alias lives in a
+// private "alias" document that only that person can read.
+
+export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias'];
+const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
+const ROLES = ['founder', 'manager', 'pm', 'resource'];
+
+/** Tracker role: founder | manager | pm | resource (derived from the user's role unless set explicitly). */
+export const trackerRole = (u) => (u.founder ? 'founder' : ROLES.includes(u.track_role) ? u.track_role : { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource');
+const leadership = (u) => ['founder', 'manager'].includes(trackerRole(u));
+const lead = (u) => leadership(u) || trackerRole(u) === 'pm';
+const COLORS = { founder: 'lavender', manager: 'peach', pm: 'sky', resource: 'mint' };
+const TITLES = { founder: 'Founder', manager: 'Manager', pm: 'Project Manager', resource: 'Resource' };
+
+export const publicPerson = (u) => ({
+  id: u.id,
+  name: u.full_name || u.email,
+  role: trackerRole(u),
+  title: u.designation || TITLES[trackerRole(u)],
+  color: COLORS[trackerRole(u)],
+  history: [],
+});
+
+/** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
+export function mergePatch(target, patch) {
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch;
+  const out = target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null) delete out[k];
+    else out[k] = mergePatch(out[k], v);
+  }
+  return out;
+}
+
+export function registerTracker(app, { store, wrap }) {
+  const live = async () => (await store.list('User', { limit: 1000 })).filter((u) => u.status !== 'Inactive');
+  const find = async (kind, key) => (await store.list('TrackerDoc', { query: { kind, key }, limit: 1 }))[0];
+  const convMembers = async (convId) => (await find('conv', convId))?.data?.memberIds || [];
+
+  /** May `u` see this document? */
+  async function canRead(u, doc) {
+    const d = doc.data || {};
+    switch (doc.kind) {
+      case 'notice': return d.to === u.id;
+      case 'alias': return doc.key.startsWith(`${u.id}:`);
+      case 'conv': return (d.memberIds || []).includes(u.id);
+      case 'msg': return (await convMembers(d.convId)).includes(u.id);
+      default: return true; // tasks, projects, daily, weekly and profiles are shared inside the team
+    }
+  }
+
+  /** May `u` write `data` to this document? `prev` is the stored data (undefined for a new document). */
+  async function canWrite(u, kind, key, data, prev, changed = []) {
+    const mine = (id) => id === u.id;
+    switch (kind) {
+      case 'task': {
+        const t = prev || data;
+        if (!prev) return lead(u) && (mine(data.assignedById) || leadership(u)); // only managers and PMs give out tasks
+        return lead(u) || [t.assigneeId, t.assignedById, t.reviewerId, ...(t.history || []).map((h) => h.to)].some(mine);
+      }
+      case 'project': {
+        const p = prev || data;
+        if (leadership(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true;
+        // everyone else on the team may only record that a day was finalized (when they send their end of day)
+        return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
+      }
+      case 'daily': case 'weekly': return key.startsWith(`${u.id}|`) || leadership(u);
+      case 'profile': return mine(key) || leadership(u);
+      case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
+      case 'conv': return (data.memberIds || []).includes(u.id) || (prev?.memberIds || []).includes(u.id);
+      case 'msg': return !prev && (await convMembers(data.convId)).includes(u.id);
+      case 'alias': return key.startsWith(`${u.id}:`);
+      default: return false;
+    }
+  }
+
+  const out = (doc) => ({ kind: doc.kind, key: doc.key, data: doc.deleted ? null : doc.data, deleted: !!doc.deleted, updated: new Date(doc.updated_date).toISOString() });
+
+  app.get('/api/tracker/people', wrap(async (req, res) => {
+    res.json((await live()).map(publicPerson).sort((a, b) => a.name.localeCompare(b.name)));
+  }));
+
+  // Everything this person may see; pass `since` (an ISO time from an earlier response's `now`) to get only changes.
+  app.get('/api/tracker/docs', wrap(async (req, res) => {
+    const since = typeof req.query.since === 'string' ? req.query.since : '';
+    const now = new Date().toISOString();
+    const rows = await store.list('TrackerDoc', { sort: 'updated_date', limit: 100000 });
+    const docs = [];
+    for (const r of rows) {
+      if (since && new Date(r.updated_date).toISOString() <= since) continue;
+      if (!since && r.deleted) continue; // a first load has no use for tombstones
+      if (await canRead(req.user, r)) docs.push(out(r));
+    }
+    res.json({ now, docs });
+  }));
+
+  // Apply a batch of changes: { patches: [{kind, key, patch}], deletes: [{kind, key}] }. `patch` is a JSON merge patch
+  // (a whole document for a new one). Each item answers on its own.
+  app.post('/api/tracker/docs/batch', wrap(async (req, res) => {
+    const u = req.user;
+    const results = [];
+    const items = [
+      ...(Array.isArray(req.body?.patches) ? req.body.patches.map((p) => ({ ...p, del: false })) : []),
+      ...(Array.isArray(req.body?.deletes) ? req.body.deletes.map((p) => ({ ...p, del: true })) : []),
+    ].slice(0, 500);
+    for (const it of items) {
+      const { kind, key } = it;
+      const id = { kind, key };
+      if (!KINDS.includes(kind) || typeof key !== 'string' || !key || key.length > 200) { results.push({ ...id, ok: false, error: 'Bad document id' }); continue; }
+      const existing = await find(kind, key);
+      const prev = existing && !existing.deleted ? existing.data : undefined;
+      if (it.del) {
+        if (!existing || existing.deleted) { results.push({ ...id, ok: true }); continue; }
+        if (!(await canWrite(u, kind, key, prev, prev))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
+        await store.update('TrackerDoc', existing.id, { deleted: true, data: {}, owner_id: u.id });
+        results.push({ ...id, ok: true });
+        continue;
+      }
+      const patch = it.patch;
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch) || JSON.stringify(patch).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Bad document' }); continue; }
+      const data = mergePatch(prev || {}, patch);
+      if (JSON.stringify(data).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Document too large' }); continue; }
+      const changed = Object.keys(patch);
+      if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
+      if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: u.id });
+      else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false }, u.email);
+      results.push({ ...id, ok: true });
+    }
+    res.json({ results });
+  }));
+}

@@ -73,8 +73,8 @@ export const VARIANT_PER_UNIT = {
   Templated: 1,
 };
 
-/** `Qe` - the people in the demo organisation. */
-export const PEOPLE = [
+/** The people of the demo organisation (used only by lib/seed.js demo data). */
+export const DEMO_PEOPLE = [
   {
     id: "bheeshma",
     name: "Bheeshma",
@@ -157,8 +157,11 @@ export const PEOPLE = [
   },
 ];
 
-/** `mV` - all person ids. */
-export const PERSON_IDS = PEOPLE.map((p) => p.id);
+/** `Qe` - the people of the organisation. Filled from the backend (see lib/people.js); mutated in place so imports stay live. */
+export const PEOPLE = [];
+
+/** `mV` - all person ids (kept in step with PEOPLE). */
+export const PERSON_IDS = [];
 
 /** `Wo` / `Dg` - role of a person id (undefined when unknown). */
 export const roleOf = (personId) =>

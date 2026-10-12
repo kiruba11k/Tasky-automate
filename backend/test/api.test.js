@@ -960,3 +960,102 @@ describe('team spirit features', () => {
     assert.equal(ideas[0].votes, 2); assert.equal(ideas[0].author, null);
   });
 });
+
+describe('tracker documents', () => {
+  let server, base, admin, pm, ann, bo;
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+  const put = (token, kind, key, data) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind, key, patch: data }] }).then((r) => r.body.results[0]);
+  const ids = {};
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    server = createApp({ store, jwtSecret: 's' }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    admin = await login('boss@example.com');
+    for (const [n, role, extra] of [['pm', 'team_leader'], ['ann', 'team_member'], ['bo', 'team_member'], ['fay', 'team_member', { founder: true }]]) {
+      ids[n] = (await call('POST', '/api/entities/User', admin, { full_name: n, email: `${n}@x.com`, role, ...extra })).body.id;
+    }
+    pm = await login('pm@x.com'); ann = await login('ann@x.com'); bo = await login('bo@x.com');
+  });
+  after(() => server.close());
+
+  test('people carry a tracker role and the generic API cannot read documents', async () => {
+    const people = (await call('GET', '/api/tracker/people', ann)).body;
+    assert.deepEqual(Object.fromEntries(people.map((p) => [p.name, p.role])), { Admin: 'manager', pm: 'pm', ann: 'resource', bo: 'resource', fay: 'founder' });
+    assert.equal((await call('GET', '/api/entities/TrackerDoc', admin)).status, 404);
+    assert.equal((await call('GET', '/api/tracker/docs')).status, 401);
+  });
+
+  test('tasks: managers and PMs assign; the assignee updates their own task; others cannot', async () => {
+    const task = { id: 't1', title: 'x', assigneeId: ids.ann, assignedById: ids.pm, history: [] };
+    assert.equal((await put(ann, 'task', 't1', { ...task, assignedById: ids.ann })).ok, false, 'a resource cannot give out tasks');
+    assert.equal((await put(pm, 'task', 't1', task)).ok, true);
+    assert.equal((await put(ann, 'task', 't1', { ...task, status: 'review' })).ok, true);
+    assert.equal((await put(bo, 'task', 't1', { ...task, status: 'done' })).ok, false);
+    const docs = (await call('GET', '/api/tracker/docs', bo)).body.docs;
+    assert.equal(docs.find((d) => d.key === 't1').data.status, 'review');
+  });
+
+  test('projects: only leadership or project admins write; daily updates belong to their owner', async () => {
+    assert.equal((await put(ann, 'project', 'p1', { id: 'p1', name: 'P', admins: [] })).ok, false);
+    assert.equal((await put(admin, 'project', 'p1', { id: 'p1', name: 'P', admins: [ids.pm], pmId: ids.pm })).ok, true);
+    assert.equal((await put(pm, 'project', 'p1', { id: 'p1', name: 'P2', admins: [ids.pm], pmId: ids.pm })).ok, true);
+    assert.equal((await put(ann, 'daily', `${ids.ann}|2026-10-12`, { plan: [] })).ok, true);
+    assert.equal((await put(bo, 'daily', `${ids.ann}|2026-10-12`, { plan: [1] })).ok, false);
+  });
+
+  test('patches merge field by field, and team members may only finalize days on a project', async () => {
+    await put(admin, 'project', 'p2', { id: 'p2', name: 'P2', pmId: ids.pm, admins: [], teamIds: [ids.ann], finalized: {}, week: { a: 1, b: 2 } });
+    const patch = (token, p) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind: 'project', key: 'p2', patch: p }] }).then((r) => r.body.results[0]);
+    assert.equal((await patch(ann, { finalized: { '2026-10-12': 'now' } })).ok, true);
+    assert.equal((await patch(pm, { week: { a: 5 } })).ok, true);
+    assert.equal((await patch(ann, { name: 'hacked' })).ok, false);
+    assert.equal((await patch(bo, { finalized: { '2026-10-13': 'now' } })).ok, false);
+    const doc = (await call('GET', '/api/tracker/docs', bo)).body.docs.find((d) => d.key === 'p2').data;
+    assert.deepEqual(doc.week, { a: 5, b: 2 });
+    assert.deepEqual(doc.finalized, { '2026-10-12': 'now' });
+    assert.equal(doc.name, 'P2');
+    await patch(pm, { week: { b: null } });
+    assert.deepEqual((await call('GET', '/api/tracker/docs', bo)).body.docs.find((d) => d.key === 'p2').data.week, { a: 5 });
+  });
+
+  test('notices reach only their recipient; profiles belong to their owner', async () => {
+    assert.equal((await put(pm, 'notice', 'n1', { id: 'n1', to: ids.ann, text: 'hi', read: false })).ok, true);
+    assert.equal((await put(bo, 'notice', 'n1', { id: 'n1', to: ids.ann, text: 'hi', read: true })).ok, false);
+    assert.equal((await put(ann, 'notice', 'n1', { id: 'n1', to: ids.ann, text: 'hi', read: true })).ok, true);
+    assert.ok((await call('GET', '/api/tracker/docs', ann)).body.docs.some((d) => d.key === 'n1'));
+    assert.ok(!(await call('GET', '/api/tracker/docs', bo)).body.docs.some((d) => d.key === 'n1'));
+    assert.equal((await put(ann, 'profile', ids.bo, { name: 'x' })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann' })).ok, true);
+  });
+
+  test('anonymous chat: members read the thread, outsiders do not, and aliases stay private', async () => {
+    assert.equal((await put(ann, 'conv', 'c1', { id: 'c1', name: 'Ann & Bo', memberIds: [ids.ann, ids.bo] })).ok, true);
+    assert.equal((await put(ann, 'alias', `${ids.ann}:c1`, { alias: 'Sneaky Otter' })).ok, true);
+    assert.equal((await put(ann, 'msg', 'm1', { id: 'm1', convId: 'c1', alias: 'Sneaky Otter', text: 'hello' })).ok, true);
+    assert.equal((await put(pm, 'msg', 'm2', { id: 'm2', convId: 'c1', alias: 'x', text: 'let me in' })).ok, false);
+    const seenByBo = (await call('GET', '/api/tracker/docs', bo)).body.docs;
+    assert.ok(seenByBo.some((d) => d.key === 'm1'));
+    assert.ok(!seenByBo.some((d) => d.kind === 'alias'));
+    assert.ok(!JSON.stringify(seenByBo).includes(ids.ann + ':'), 'sender id never leaves the server');
+    assert.ok(!(await call('GET', '/api/tracker/docs', pm)).body.docs.some((d) => d.key === 'm1'));
+  });
+
+  test('incremental sync returns changes and tombstones', async () => {
+    const first = (await call('GET', '/api/tracker/docs', ann)).body;
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal((await put(pm, 'task', 't1', { id: 't1', title: 'x', assigneeId: ids.ann, assignedById: ids.pm, history: [], status: 'doing' })).ok, true);
+    const delta = (await call('GET', `/api/tracker/docs?since=${encodeURIComponent(first.now)}`, ann)).body;
+    assert.deepEqual(delta.docs.map((d) => d.key), ['t1']);
+    await call('POST', '/api/tracker/docs/batch', pm, { deletes: [{ kind: 'task', key: 't1' }] });
+    const gone = (await call('GET', `/api/tracker/docs?since=${encodeURIComponent(delta.now)}`, ann)).body.docs;
+    assert.equal(gone[0].deleted, true);
+    assert.ok(!(await call('GET', '/api/tracker/docs', ann)).body.docs.some((d) => d.key === 't1'));
+  });
+});

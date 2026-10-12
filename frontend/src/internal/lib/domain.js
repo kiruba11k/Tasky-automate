@@ -77,7 +77,7 @@ export const isProjectOwner = (project, personId) => project?.pmId === personId;
 export const isProjectAdmin = (project, personId) => !!project?.admins?.includes(personId);
 
 /** `nc` - ids of everyone who is a resource / PM (not manager or founder). */
-export const TRACKED_PEOPLE_IDS = PEOPLE.filter((p) => !isLeadership(p.role)).map((p) => p.id);
+export const TRACKED_PEOPLE_IDS = [];
 
 /** `RV` - static display name from the people table (id when unknown). */
 export const staticPersonName = (id) => PEOPLE.find((p) => p.id === id)?.name ?? id;

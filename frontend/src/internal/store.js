@@ -1,6 +1,5 @@
 // The persisted zustand store (localStorage key "ls-tracker-v2").
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, LUNCH_BLOCK } from "./lib/dates.js";
 import { PEOPLE, TASK_TYPES, isLeadership, roleOf } from "./lib/constants.js";
 import {
@@ -23,7 +22,20 @@ import {
   weeklySnapshot,
   dailySnapshot,
 } from "./lib/domain.js";
-import { buildInitialState } from "./lib/seed.js";
+
+/** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
+export const emptyState = () => ({
+  me: null,
+  profiles: {},
+  tasks: [],
+  projects: [],
+  notices: [],
+  convs: [],
+  msgs: [],
+  aliases: {},
+  daily: {},
+  weekly: {},
+});
 
 export const STORAGE_KEY = "ls-tracker-v2";
 export const STORAGE_VERSION = 10;
@@ -37,7 +49,7 @@ export const displayName = (personId) =>
 /** `be` - first word of the display name. */
 export const firstName = (personId) => displayName(personId).split(" ")[0];
 
-/** Persist `merge`: keep the stored state only when it has the current shape. */
+/** Rolls project week / month counters forward; used when documents arrive from the server. */
 export function mergePersistedState(persisted, current) {
   const stored = persisted;
   return !stored ||
@@ -51,7 +63,6 @@ export function mergePersistedState(persisted, current) {
 
 /** `Se` - the app store. State shape = `buildInitialState()` plus the actions below. */
 export const useStore = create()(
-  persist(
     (set, get) => {
       // ------------------------------------------------------------ helpers
       /** `n` - push a notice for `to`. */
@@ -174,7 +185,7 @@ export const useStore = create()(
         });
 
       return {
-        ...buildInitialState(),
+        ...emptyState(),
         setMe: (id) => set({ me: id }),
         startTask: (id) => patchTask(id, { status: "in_progress" }),
         undoStart: (id) => patchTask(id, { status: "todo" }),
@@ -867,28 +878,9 @@ export const useStore = create()(
                 ),
               );
         },
-        reset: () => set({ ...buildInitialState(), me: get().me }),
+        reset: () => set({ ...emptyState(), me: get().me }),
       };
     },
-    {
-      name: STORAGE_KEY,
-      version: STORAGE_VERSION,
-      storage: createJSONStorage(() => localStorage),
-      migrate: () => buildInitialState(),
-      merge: mergePersistedState,
-    },
-  ),
 );
 
 export default useStore;
-
-// Keep several tabs in sync: re-read storage on change but keep my own identity.
-if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-  window.addEventListener("storage", (event) => {
-    if (event.key !== STORAGE_KEY) return;
-    const me = useStore.getState().me;
-    Promise.resolve(useStore.persist.rehydrate())
-      .then(() => useStore.setState({ me }))
-      .catch(() => {});
-  });
-}

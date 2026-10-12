@@ -32,6 +32,8 @@ import {
 } from '@/internal/min';
 import { TAG_ORDER, roleOf, titleOf, totalKpis } from './peopleUtils';
 import { PersonDetailModal } from './PersonDetail';
+import { AddPerson } from './AddPerson';
+import { Button } from '../ui/Button';
 
 const WHO_OPTIONS = [
   { id: 'all', label: 'Everyone' },
@@ -53,6 +55,7 @@ export function People() {
   const [who, setWho] = useState('all');
   const [sort, setSort] = useState({ col: 'name', dir: 'asc' });
   const [openPerson, setOpenPerson] = useState(null);
+  const [adding, setAdding] = useState(false);
 
   const options = buildPeriodOptions(gran, calendar);
   const safeIndex = Math.min(index, options.length - 1);
@@ -141,13 +144,17 @@ export function People() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">People</h1>
-        <p className="text-sm text-muted">
-          Everyone's daily, weekly and monthly progress: who to acknowledge, who needs support, and
-          where the time goes.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">People</h1>
+          <p className="text-sm text-muted">
+            Everyone's daily, weekly and monthly progress: who to acknowledge, who needs support, and
+            where the time goes.
+          </p>
+        </div>
+        <Button onClick={() => setAdding(true)}>Add person</Button>
       </div>
+      <AddPerson open={adding} onClose={() => setAdding(false)} />
       <Card className="!py-4">
         <div
           className="flex flex-wrap items-center gap-x-3 gap-y-2"

@@ -11,6 +11,7 @@ import { createNotifier } from './notify.js';
 import { validateThemePrefs } from './theme.js';
 import { registerBirds } from './birds.js';
 import { registerSocial } from './social.js';
+import { registerTracker } from './tracker.js';
 import { buddyStatus, hatchEgg, parade, validateBuddyPrefs } from './buddies.js';
 import { registerWeekly } from './weekly.js';
 import { parseVoice } from './voice.js';
@@ -145,10 +146,11 @@ export function createApp({ store, jwtSecret, staticDir, llm, random = Math.rand
 
   registerWeekly(app, { store, notifier, wrap });
   registerBirds(app, { store, notifier, wrap, clock });
+  registerTracker(app, { store, wrap });
   registerSocial(app, { store, notifier, wrap, clock, secret: jwtSecret });
 
   // Weekly plans and notifications are written only through the endpoints above.
-  const PRIVATE_ENTITIES = new Set(['BirdMessage', 'Mood', 'ShoutOut', 'CoffeeEntry', 'WordGame', 'Standup', 'RetroNote', 'Idea']);
+  const PRIVATE_ENTITIES = new Set(['TrackerDoc', 'BirdMessage', 'Mood', 'ShoutOut', 'CoffeeEntry', 'WordGame', 'Standup', 'RetroNote', 'Idea']);
   const READ_ONLY_ENTITIES = new Set(['WeeklyTask', 'WeeklyAssignment', 'Achievement', 'Kudos']);
   app.use('/api/entities/:entity', (req, res, next) => {
     const { entity: name } = req.params;

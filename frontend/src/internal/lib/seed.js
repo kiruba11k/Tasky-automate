@@ -11,7 +11,7 @@ import {
   previousWeekday,
   todayKey,
 } from "./dates.js";
-import { PEOPLE, TASK_TYPES } from "./constants.js";
+import { DEMO_PEOPLE as PEOPLE, TASK_TYPES } from "./constants.js";
 import {
   computeStandardMinutes,
   dailySnapshot,

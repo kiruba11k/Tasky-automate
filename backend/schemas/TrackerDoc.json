@@ -1,0 +1,12 @@
+{
+  "name": "TrackerDoc",
+  "type": "object",
+  "properties": {
+    "kind": { "type": "string", "description": "task | project | daily | weekly | notice | profile | conv | msg | alias" },
+    "key": { "type": "string", "description": "Id of the document inside its kind" },
+    "owner_id": { "type": "string", "description": "Who wrote it last (never returned for anonymous chat messages)" },
+    "data": { "type": "object" },
+    "deleted": { "type": "boolean" }
+  },
+  "required": ["kind", "key"]
+}
