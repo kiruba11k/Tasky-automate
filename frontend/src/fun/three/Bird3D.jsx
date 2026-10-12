@@ -123,7 +123,7 @@ export default function Bird3D({ type = 'robin', pose = 'perch', envelope = fals
   const size = b.size || 1;
   const tl = (b.tailLen || 0.38) + 0.14;
   return (
-    <group scale={size} {...rest}>
+    <group scale={[size * 0.74, size, size]} {...rest}>
       <group ref={root}>
         <group ref={body}>
           <Part color={b.body} s={[0.4, 0.43, 0.6]} p={[0, 0.58, -0.08]} r={[-0.55, 0, 0]} />

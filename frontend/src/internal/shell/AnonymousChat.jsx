@@ -22,7 +22,10 @@ export function AnonymousChat({ onClose }) {
   const myAlias = active ? aliases[`${me}:${active.id}`] : undefined;
   const endRef = useRef(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: 'end' }), [messages.length, active?.id]);
+  useEffect(() => {
+    // braces on purpose: an effect must not return a value, and some browsers' scrollIntoView does (React then tries to call it on cleanup)
+    endRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages.length, active?.id]);
 
   const convTitle = (conv) =>
     conv.group
