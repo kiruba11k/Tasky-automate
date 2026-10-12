@@ -9,6 +9,7 @@ const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
 /** Tracker role: founder | manager | pm | resource (derived from the user's role unless set explicitly). */
 export const trackerRole = (u) => (u.founder ? 'founder' : ROLES.includes(u.track_role) ? u.track_role : { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource');
+// Main admins (founder, manager) and project managers are all admins; only the main admins are "leadership".
 const leadership = (u) => ['founder', 'manager'].includes(trackerRole(u));
 const lead = (u) => leadership(u) || trackerRole(u) === 'pm';
 const COLORS = { founder: 'lavender', manager: 'peach', pm: 'sky', resource: 'mint' };
@@ -62,7 +63,7 @@ export function registerTracker(app, { store, wrap }) {
       }
       case 'project': {
         const p = prev || data;
-        if (leadership(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true;
+        if (lead(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true; // admins: managers, founders and PMs
         // everyone else on the team may only record that a day was finalized (when they send their end of day)
         return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
       }

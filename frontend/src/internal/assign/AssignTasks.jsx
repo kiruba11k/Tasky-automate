@@ -1,8 +1,8 @@
+import { isAdminTier } from '@/internal/lib/constants';
 import React, { useState, useEffect } from 'react';
 import { RotateCcwClock, Plus, Gauge, ShoppingBasket, Trash, Send, Star } from 'lucide-react';
 import {
   Se as useStore,
-  xn as isManagerRole,
   Qe as PEOPLE,
   ea as canAssignOnProject,
   Cn as STANDARD_TASK_TYPES,
@@ -39,7 +39,7 @@ import {
 /** Route "/assign": build a list of tasks and assign them to teammates. */
 export function AssignTasks() {
   const { me, tasks, projects, assignMany } = useStore();
-  const isManager = isManagerRole(PEOPLE.find((G) => G.id === me)?.role);
+  const isManager = isAdminTier(PEOPLE.find((G) => G.id === me)?.role);
   const myProjects = projects.filter((G) => G.status === 'active' && canAssignOnProject(G, me));
   const [projectId, setProjectId] = useState(myProjects[0]?.id ?? '');
   const project = myProjects.find((G) => G.id === projectId) ?? myProjects[0];

@@ -17,10 +17,11 @@ import {
   TASK_TYPES,
   VARIANT_PER_UNIT,
   isLeadership,
+  isAdminTier,
   roleOf,
 } from "./constants.js";
 
-export { isLeadership, roleOf };
+export { isLeadership, isAdminTier, roleOf };
 
 /** `Tn` - short random id. */
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -66,7 +67,7 @@ export function canManageProject(project, personId) {
   return project
     ? project.pmId === personId ||
         (project.admins ?? []).includes(personId) ||
-        isLeadership(roleOf(personId))
+        isAdminTier(roleOf(personId))
     : false;
 }
 

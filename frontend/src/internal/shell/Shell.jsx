@@ -30,7 +30,8 @@ import { ThemeDialog } from '@/internal/ui/ThemeDialog';
 import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
 import { useNoticeToasts } from './useNoticeToasts';
-import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV } from './navItems';
+import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV } from './navItems';
+import { isAdminTier } from '@/internal/lib/constants';
 
 const ROLE_GROUPS = [
   ['pm', 'Project managers'],
@@ -50,17 +51,22 @@ export function Shell() {
   const navigate = useNavigate();
   useNoticeToasts();
   const [themeOpen, setThemeOpen] = useState(false);
-  const isManager = isManagerRole(person.role);
+  const isManager = isManagerRole(person.role); // manager or founder: the main admins
+  const isAdmin = isAdminTier(person.role); // main admins and project managers
   const isPm = projects.some((p) => isProjectPm(p, me) && p.status === 'active');
+  const pending = projects.filter((p) => p.status === 'pending').length; // projects waiting for an admin's approval
   const baseItems = [
     ...(isManager
       ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV]
-      : isPm
-        ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
-        : [DASHBOARD_NAV, PROJECTS_NAV]),
+      : isAdmin
+        ? [DASHBOARD_NAV, TEAM_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, TEAM_UPDATES_NAV]
+        : isPm
+          ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
+          : [DASHBOARD_NAV, PROJECTS_NAV]),
     PROFILE_NAV,
   ];
-  const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: 0 }))];
+  const badgeFor = (item) => (isAdmin && (isManager ? item === DASHBOARD_NAV : item === TEAM_NAV) ? pending : 0);
+  const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: badgeFor(item) }))];
   const iconButton = 'focus-ring rounded-xl p-2 text-muted hover:bg-surface-2';
 
   return (
@@ -95,7 +101,7 @@ export function Shell() {
           </NavLink>
         ))}
         <div className="mt-auto flex flex-col items-center gap-2">
-          {isManager && (
+          {isAdmin && (
             <button
               aria-label="Onboard a new project"
               title="Onboard a new project"
@@ -129,11 +135,13 @@ export function Shell() {
         <main className="mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>
             <Route path="/" element={isManager ? <ManagerDashboard /> : <MemberDashboard />} />
-            <Route path="/projects" element={isManager ? <ManagerProjects /> : <MemberProjects />} />
+            <Route path="/projects" element={isAdmin ? <ManagerProjects /> : <MemberProjects />} />
             <Route path="/daily" element={isManager ? <ManagerDaily /> : <MemberDaily />} />
             <Route path="/profile" element={<ProfilePage />} />
-            {(isManager || isPm) && <Route path="/assign" element={<AssignPage key={me} />} />}
-            {isManager && <Route path="/people" element={<PeoplePage />} />}
+            {isAdmin && !isManager && <Route path="/team" element={<ManagerDashboard />} />}
+            {isAdmin && !isManager && <Route path="/team-updates" element={<ManagerDaily />} />}
+            {(isAdmin || isPm) && <Route path="/assign" element={<AssignPage key={me} />} />}
+            {isAdmin && <Route path="/people" element={<PeoplePage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

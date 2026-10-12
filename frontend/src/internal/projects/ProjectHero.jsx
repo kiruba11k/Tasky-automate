@@ -1,3 +1,4 @@
+import { isAdminTier } from '@/internal/lib/constants';
 import React from 'react';
 import { Settings2, Crown, ShieldCheck } from 'lucide-react';
 import {
@@ -5,7 +6,6 @@ import {
   Te as Button,
   vt as Avatar,
   ea as canEditProject,
-  xn as isManagerRole,
   Wo as roleOf,
   $e as dayKey,
   Rw as DEFAULT_STANDARDS,
@@ -30,7 +30,7 @@ export function ProjectHero({ p, color, onEdit }) {
       ? 'You own this project'
       : p.admins.includes(me)
         ? 'You are a project admin'
-        : isManagerRole(roleOf(me))
+        : isAdminTier(roleOf(me))
           ? 'Management'
           : 'You are on the team';
   const onTeam = p.teamIds.includes(me) || p.hours[me] != null;

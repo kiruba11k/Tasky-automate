@@ -1,7 +1,7 @@
 // The persisted zustand store (localStorage key "ls-tracker-v2").
 import { create } from "zustand";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, LUNCH_BLOCK } from "./lib/dates.js";
-import { PEOPLE, TASK_TYPES, isLeadership, roleOf } from "./lib/constants.js";
+import { PEOPLE, TASK_TYPES, isLeadership, isAdminTier, roleOf } from "./lib/constants.js";
 import {
   DEFAULT_METRICS,
   EMPTY_COUNTS,
@@ -103,12 +103,12 @@ export const useStore = create()(
       /** `f` - project must be owned by me (or I am leadership). */
       const requireOwner = (id) => {
         const project = requireProject(id);
-        if (project.pmId !== get().me && !isLeadership(roleOf(get().me)))
+        if (project.pmId !== get().me && !isAdminTier(roleOf(get().me)))
           throw new Error("Only the project owner can do this.");
         return project;
       };
-      /** `p` - ids of managers / founders (they approve projects). */
-      const leadershipIds = () => PEOPLE.filter((p) => isLeadership(p.role)).map((p) => p.id);
+      /** `p` - ids of the other admins: managers, founders and project managers (they approve projects). */
+      const leadershipIds = () => PEOPLE.filter((p) => isAdminTier(p.role) && p.id !== get().me).map((p) => p.id);
       /** `h` - validate an assignment draft and build the task record. */
       const buildTask = (draft, priority) => {
         const me = get().me;
@@ -592,7 +592,7 @@ export const useStore = create()(
               validateTargets(counts),
             ]),
           );
-          const autoApprove = isLeadership(roleOf(me));
+          const autoApprove = isAdminTier(roleOf(me));
           const id = newId();
           set((s) => ({
             projects: [

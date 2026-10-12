@@ -1025,6 +1025,15 @@ describe('tracker documents', () => {
     assert.deepEqual((await call('GET', '/api/tracker/docs', bo)).body.docs.find((d) => d.key === 'p2').data.week, { a: 5 });
   });
 
+  test('project managers are admins too: they approve any project, resources cannot', async () => {
+    await put(admin, 'project', 'p3', { id: 'p3', name: 'P3', pmId: ids.fay, admins: [], status: 'pending', teamIds: [] });
+    const patch = (token, p) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind: 'project', key: 'p3', patch: p }] }).then((r) => r.body.results[0]);
+    assert.equal((await patch(ann, { status: 'active' })).ok, false);
+    assert.equal((await patch(pm, { status: 'active' })).ok, true, 'a project manager approves a project they do not own');
+    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Res', email: 'newres@x.com', role: 'team_member' })).status, 201);
+    assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Boss', email: 'newboss@x.com', role: 'admin' })).status, 403, 'only main admins add admins');
+  });
+
   test('notices reach only their recipient; profiles belong to their owner', async () => {
     assert.equal((await put(pm, 'notice', 'n1', { id: 'n1', to: ids.ann, text: 'hi', read: false })).ok, true);
     assert.equal((await put(bo, 'notice', 'n1', { id: 'n1', to: ids.ann, text: 'hi', read: true })).ok, false);

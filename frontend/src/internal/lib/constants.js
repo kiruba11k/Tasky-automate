@@ -5,6 +5,13 @@
 /** `xn` - manager and founder roles are "leadership": they approve projects. */
 export const isLeadership = (role) => role === "manager" || role === "founder";
 
+/**
+ * Admin tier: managers and founders (the main admins) plus project managers. Project managers can approve and decline
+ * projects, onboard projects that go live straight away, manage every project, assign to anyone and see the whole team.
+ * Only the main admins add managers and founders, and their own tasks stay "priority" tasks.
+ */
+export const isAdminTier = (role) => isLeadership(role) || role === "pm";
+
 /** `Cn` - the built-in task types (standard time per unit in minutes). */
 export const TASK_TYPES = [
   {

@@ -5,6 +5,8 @@ import { toast } from '../kit/toast';
 import { Button } from '../ui/Button';
 import { INPUT_CLASS } from '../ui/format';
 import { setPeople } from '../lib/people';
+import { useStore } from '../store';
+import { isLeadership, roleOf } from '../lib/constants';
 
 const ROLES = [
   ['resource', 'Resource'],
@@ -18,6 +20,8 @@ const ACCESS = { resource: 'team_member', pm: 'team_leader', manager: 'admin', f
 /** Adds a person by work email; only people added here can sign in. */
 export function AddPerson({ open, onClose }) {
   const [form, setForm] = useState({ name: '', email: '', role: 'resource', title: '' });
+  const mainAdmin = isLeadership(roleOf(useStore((s) => s.me))); // project managers may add resources only
+  const roles = mainAdmin ? ROLES : ROLES.filter(([id]) => id === 'resource');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -60,7 +64,7 @@ export function AddPerson({ open, onClose }) {
         <label className="block text-sm font-medium">
           Role
           <select className={`${INPUT_CLASS} mt-1`} value={form.role} onChange={set('role')}>
-            {ROLES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            {roles.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
           </select>
         </label>
         <label className="block text-sm font-medium">

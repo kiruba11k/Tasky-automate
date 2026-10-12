@@ -5,7 +5,7 @@ import { request } from "@/api/client";
 import { useStore, emptyState } from "./store.js";
 import { diffPatch } from "./lib/diffPatch.js";
 import { rollProjectPeriods } from "./lib/domain.js";
-import { isLeadership, roleOf } from "./lib/constants.js";
+import { isAdminTier, roleOf } from "./lib/constants.js";
 import { setPeople } from "./lib/people.js";
 import { toast } from "./kit/toast.js";
 
@@ -99,7 +99,7 @@ export async function startSync(user) {
     const days = [...new Set(Object.keys(daily).map((k) => k.split("|")[1]))].filter((d) => d >= limit);
     let changed = false;
     const next = projects.map((p) => {
-      if (p.status !== "active" || !p.teamIds?.length || !(p.teamIds.includes(me) || isLeadership(roleOf(me)))) return p;
+      if (p.status !== "active" || !p.teamIds?.length || !(p.teamIds.includes(me) || isAdminTier(roleOf(me)))) return p;
       const finalized = { ...p.finalized };
       for (const d of days) {
         if (finalized[d]) continue;

@@ -1,3 +1,4 @@
+import { isAdminTier } from '@/internal/lib/constants';
 import React, { useState, useEffect, useMemo } from 'react';
 import { CalendarRange, Crown, ArrowRightLeft, Plus, ShieldCheck, Trash, X } from 'lucide-react';
 import {
@@ -6,7 +7,6 @@ import {
   Te as Button,
   Ya as Modal,
   vt as Avatar,
-  xn as isManagerRole,
   Wo as roleOf,
   $e as dayKey,
   Mt as weekStart,
@@ -45,7 +45,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
     removeProjectAdmin,
     transferProject,
   } = useStore();
-  const isManager = isManagerRole(roleOf(me));
+  const isManager = isAdminTier(roleOf(me)); // admins (managers, founders, project managers) create projects that go live at once
   const ownerId = edit ? edit.pmId : me;
   const canManageAdmins = !edit || edit.pmId === me || isManager;
 
