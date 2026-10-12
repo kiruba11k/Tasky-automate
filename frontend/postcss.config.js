@@ -17,6 +17,7 @@ export default {
         if (selector.startsWith('body.')) return prefix + selector.slice(4); // body.fun x -> .fun-scope.fun x
         if (selector.startsWith('body ')) return prefix + selector.slice(4);
         if (selector.startsWith('html ')) return prefix + selector.slice(4);
+        if (selector.startsWith('html[')) return selector; // theme-mode rules already name <html>
         return prefixed;
       },
     }),

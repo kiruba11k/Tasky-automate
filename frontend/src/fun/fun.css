@@ -525,3 +525,14 @@ body.pro .animated-gradient-bg-enhanced::before, body.pro .animated-gradient-bg-
 @keyframes knight-boom { 0% { opacity: 0; transform: scale(.3) rotate(-10deg); } 30% { opacity: 1; transform: scale(1.3) rotate(6deg); } 100% { opacity: 0; transform: scale(1.1) translateY(-20px); } }
 @keyframes knight-fly { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 20% { transform: translate(40px, -30px) rotate(90deg); } 100% { transform: translate(85vw, -85vh) rotate(1080deg) scale(.3); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .knight-kick { display: none; } }
+
+/* Surfaces that are always dark (page banners, stages) keep the dark palette whatever theme is active, so their text stays readable. */
+.page-hero, .on-dark {
+  --c-white: 255 255 255;
+  --slate-50: 248 250 252; --slate-100: 241 245 249; --slate-200: 226 232 240; --slate-300: 203 213 225; --slate-400: 148 163 184;
+  --slate-500: 100 116 139; --slate-600: 71 85 105; --slate-700: 51 65 85; --slate-800: 30 41 59; --slate-900: 15 23 42; --slate-950: 2 6 23;
+  color: #f8fafc;
+}
+
+/* Light themes swap bright fills (yellow, emerald...) for deep ones; any "dark ink" label on such a fill becomes white. */
+html[data-mode='light'] :is([class*='bg-yellow-300'], [class*='bg-yellow-400'], [class*='bg-emerald-300'], [class*='bg-emerald-400'], [class*='bg-amber-300'], [class*='bg-amber-400'], [class*='bg-green-300'], [class*='bg-green-400'], [class*='bg-sky-300'], [class*='bg-sky-400'], [class*='bg-cyan-300'], [class*='bg-cyan-400'], [class*='bg-orange-300'], [class*='bg-orange-400'], [class*='bg-pink-300'], [class*='bg-pink-400'], [class*='bg-purple-300'], [class*='bg-purple-400'], [class*='bg-blue-300'], [class*='bg-blue-400'], [class*='bg-red-300'], [class*='bg-red-400'], [class*='bg-indigo-300'], [class*='bg-indigo-400']):not([class*='/']).text-ink { color: #fff; }
