@@ -3,7 +3,9 @@
 // change to the server as a JSON merge patch, and (3) polls for other people's changes.
 import { request } from "@/api/client";
 import { useStore, emptyState } from "./store.js";
+import { diffPatch } from "./lib/diffPatch.js";
 import { rollProjectPeriods } from "./lib/domain.js";
+import { isLeadership, roleOf } from "./lib/constants.js";
 import { setPeople } from "./lib/people.js";
 import { toast } from "./kit/toast.js";
 
@@ -25,20 +27,6 @@ const FLUSH_MS = 300;
 
 const docId = (kind, key) => `${kind}\u0000${key}`;
 const clone = (v) => JSON.parse(JSON.stringify(v));
-
-/** RFC 7386 merge patch that turns `from` into `to`, or undefined when equal. Arrays are replaced whole. */
-export function diffPatch(from, to) {
-  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
-  if (!isObj(from) || !isObj(to)) return JSON.stringify(from) === JSON.stringify(to) ? undefined : to;
-  const patch = {};
-  for (const k of Object.keys(to)) {
-    if (to[k] === undefined) continue;
-    const d = diffPatch(from[k], to[k]);
-    if (d !== undefined) patch[k] = d;
-  }
-  for (const k of Object.keys(from)) if (!(k in to) || to[k] === undefined) patch[k] = null;
-  return Object.keys(patch).length ? patch : undefined;
-}
 
 /** The documents of a state: Map docId -> { kind, key, data }. */
 function documents(state) {
@@ -65,6 +53,7 @@ export async function startSync(user) {
   let applying = false;
   let busy = Promise.resolve();
 
+  try { if (localStorage.getItem("tracker_debug")) window.__tracker = { useStore }; } catch { /* ignore */ }
   const people = await request("GET", "/api/tracker/people");
   setPeople(people);
 
@@ -100,9 +89,32 @@ export async function startSync(user) {
     }
   };
 
+  /**
+   * A project's day is finalized once everyone on its team has sent their end of day. Two people can send within one poll
+   * of each other, and neither knows about the other's, so after every load the signed-in person finishes the job.
+   */
+  const finalizeCompleteDays = () => {
+    const { projects, daily, me } = useStore.getState();
+    const limit = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
+    const days = [...new Set(Object.keys(daily).map((k) => k.split("|")[1]))].filter((d) => d >= limit);
+    let changed = false;
+    const next = projects.map((p) => {
+      if (p.status !== "active" || !p.teamIds?.length || !(p.teamIds.includes(me) || isLeadership(roleOf(me)))) return p;
+      const finalized = { ...p.finalized };
+      for (const d of days) {
+        if (finalized[d]) continue;
+        const sent = p.teamIds.map((id) => daily[`${id}|${d}`]?.eodAt);
+        if (sent.every(Boolean)) { finalized[d] = [...sent].sort().pop(); changed = true; }
+      }
+      return changed && finalized !== p.finalized ? { ...p, finalized } : p;
+    });
+    if (changed) useStore.setState({ projects: next });
+  };
+
   const pull = async () => {
     const res = await request("GET", `/api/tracker/docs${since ? `?since=${encodeURIComponent(since)}` : ""}`);
     apply(res.docs, { replace: !since });
+    finalizeCompleteDays();
     // Overlap a little so a write that lands at the same instant is never missed (re-applying is harmless).
     since = new Date(new Date(res.now).getTime() - 2000).toISOString();
   };
@@ -198,8 +210,10 @@ export async function startSync(user) {
       session = null;
     },
     flush,
+    pullNow: async () => { await flush(); await pull(); },
     reloadPeople: async () => setPeople(await request("GET", "/api/tracker/people")),
   };
+  try { if (localStorage.getItem("tracker_debug")) window.__tracker = { useStore, sync: session }; } catch { /* ignore */ }
   return session;
 }
 
