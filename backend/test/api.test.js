@@ -1230,3 +1230,41 @@ describe('chat lives for one day', () => {
     assert.ok(!left.some((k) => /^(msg|conv|alias):/.test(k)), JSON.stringify(left));
   });
 });
+
+describe('tracker tasks feed the fun layer', () => {
+  let server, base, owner, pm, ann, ids = {};
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+  const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+  const batch = (token, b) => call('POST', '/api/tracker/docs/batch', token, b).then((r) => r.body.results[0]);
+  before(async () => {
+    const store = new MemoryStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'owner@x.com' });
+    server = createApp({ store, jwtSecret: 's', ownerEmail: 'owner@x.com' }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    owner = await login('owner@x.com');
+    for (const [n, role] of [['pm', 'team_leader'], ['ann', 'team_member']]) ids[n] = (await call('POST', '/api/entities/User', owner, { full_name: n, email: `${n}@x.com`, role })).body.id;
+    pm = await login('pm@x.com'); ann = await login('ann@x.com');
+  });
+  after(() => server.close());
+
+  test('an approved task counts as finished work: XP, level and the daily list follow', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    assert.equal((await batch(owner, { patches: [{ kind: 'project', key: 'fp', patch: { id: 'fp', name: 'P', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann] } }] })).ok, true);
+    const task = { id: 'ft1', projectId: 'fp', title: 'Finish the deck', assigneeId: ids.ann, assignedById: ids.pm, status: 'todo', targetMinutes: 60, history: [], date: today };
+    assert.equal((await batch(pm, { patches: [{ kind: 'task', key: 'ft1', patch: task }] })).ok, true);
+    const before = (await call('POST', '/api/me/sync', ann, { today })).body;
+    assert.equal(before.completed_total, 0);
+    assert.equal((await batch(ann, { patches: [{ kind: 'task', key: 'ft1', patch: { status: 'in_review', reviewerId: ids.pm, minutes: 50 } }] })).ok, true);
+    assert.equal((await batch(pm, { patches: [{ kind: 'task', key: 'ft1', patch: { status: 'done', approvedAt: new Date().toISOString() } }] })).ok, true);
+    const after = (await call('POST', '/api/me/sync', ann, { today })).body;
+    assert.equal(after.completed_total, 1);
+    assert.ok(after.xp >= 10);
+    assert.equal((await batch(pm, { deletes: [{ kind: 'task', key: 'ft1' }] })).ok, true);
+    assert.equal((await call('POST', '/api/me/sync', ann, { today })).body.completed_total, 0, 'a deleted task stops counting');
+  });
+});

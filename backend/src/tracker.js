@@ -170,6 +170,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (!(await canWrite(u, kind, key, prev, prev, [], true, existing))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
         // the data stays (it is never served) so that people who could see the document are told it is gone
         await store.update('TrackerDoc', existing.id, { deleted: true, data: prev, owner_id: u.id });
+        if (kind === 'task') await mirrorTask(key, prev, true);
         results.push({ ...id, ok: true });
         continue;
       }
@@ -181,11 +182,41 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
       if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: u.id });
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
+      if (kind === 'task') await mirrorTask(key, data, false);
       results.push({ ...id, ok: true });
     }
     if (results.some((r) => r.ok)) announce();
     res.json({ results });
   }));
+
+  /**
+   * The fun layer (levels, streaks, quests, the weekly boss, the daily wheel) counts finished work in DailyTask records.
+   * Every tracker task keeps one such record in step with it: Completed once the reviewer approves.
+   */
+  async function mirrorTask(key, doc, deleted) {
+    const existing = (await store.list('DailyTask', { query: { tracker_key: key }, limit: 1 }))[0];
+    if (deleted || !doc?.assigneeId) { if (existing) await store.remove('DailyTask', existing.id); return; }
+    const status = { done: 'Completed', in_progress: 'In Progress', in_review: 'In Progress', changes: 'In Progress' }[doc.status] || 'Pending';
+    const day = (iso) => String(iso || '').slice(0, 10);
+    const rec = {
+      tracker_key: key,
+      user_id: doc.assigneeId,
+      date: status === 'Completed' ? day(doc.approvedAt) || day(new Date(clock()).toISOString()) : day(doc.date) || day(new Date(clock()).toISOString()),
+      task: String(doc.title || 'Task'),
+      expected_outcome: String(doc.title || 'Task'),
+      expected_time: Math.max(0.1, (Number(doc.targetMinutes) || 6) / 60),
+      actual_time_taken: Math.max(0, (Number(doc.minutes) || 0) / 60),
+      task_status: status,
+      priority: doc.priority ? 'High' : 'Medium',
+      file_source: 'manual',
+    };
+    if (existing) await store.update('DailyTask', existing.id, rec);
+    else await store.insert('DailyTask', rec);
+  }
+  async function backfillMirrors() {
+    for (const d of await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 })) await mirrorTask(d.key, d.data, !!d.deleted);
+  }
+  setTimeout(() => backfillMirrors().catch((e) => console.error('mirror backfill failed:', e)), 3000).unref?.();
 
   /**
    * Chat is short lived: a message is deleted one day after it was sent, and a conversation (with everybody's aliases in it)

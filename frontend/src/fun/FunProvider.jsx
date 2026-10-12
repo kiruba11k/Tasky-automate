@@ -35,7 +35,7 @@ const SETTINGS_KEY = 'tasky_fun';
 
 function loadSettings() {
   const lowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2));
-  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: true, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, flybys: true, season: true, rhythm: true };
+  const defaults = { sound: true, anim: reducedMotion() ? 'calm' : 'full', mascot: false, cartoon: true, progress: 'chase', critters: true, view3d: !lowEnd, heroes: true, sparkles: true, saver: true, pal: false, flybys: true, season: true, rhythm: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return defaults; }
 }
 
@@ -352,9 +352,12 @@ function FunProviderFull({ children }) {
 
   const value = useMemo(() => ({ settings, setSettings, stats, celebrate, say, mood, refreshStats: loadStats }), [settings, setSettings, stats, celebrate, say, mood, loadStats]);
 
+  const scope = `fun-scope${settings.cartoon ? ' fun' : ''}${settings.anim === 'calm' ? ' calm' : ''}`;
   return (
     <FunContext.Provider value={value}>
       {children}
+      <div id="fun-portal" className={scope} />
+      <div className={scope}>
       {settings.mascot && (
         <div className="mascot-corner fixed left-3 z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]" style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
           <button type="button" onClick={poke} aria-label="Tap Tasky for a joke" className="pointer-events-auto shrink-0 focus:outline-none">
@@ -395,6 +398,7 @@ function FunProviderFull({ children }) {
       </div>
       {scene && <ChaseCutscene key={scene.id} kind={scene.kind} onDone={() => setScene(null)} />}
       <BadgeUnlock badge={badgeQueue[0]} onClose={() => setBadgeQueue((q) => q.slice(1))} />
+      </div>
     </FunContext.Provider>
   );
 }
@@ -416,6 +420,17 @@ function FunProviderPro({ children }) {
 export function FunProvider({ children }) {
   const { user } = useAuth();
   return user?.founder ? <FunProviderPro>{children}</FunProviderPro> : <FunProviderFull>{children}</FunProviderFull>;
+}
+
+/** The class that scopes the fun styles (see postcss.config.js), with the person's fun / calm choices. */
+export function useFunScope() {
+  const { settings } = useFun();
+  return `fun-scope${settings.cartoon ? ' fun' : ''}${settings.anim === 'calm' ? ' calm' : ''}`;
+}
+
+/** Wrap anything that uses the fun layer's styles (3D banners, hub cards, games) so they render correctly inside the tracker UI. */
+export function FunScope({ className = '', ...props }) {
+  return <div className={`${useFunScope()} ${className}`} {...props} />;
 }
 
 export function useFun() {

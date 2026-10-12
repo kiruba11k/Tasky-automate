@@ -12,6 +12,10 @@
     "user_id": {
       "type": "string"
     },
+    "tracker_key": {
+      "type": "string",
+      "description": "Id of the tracker task this record mirrors (feeds levels, streaks, quests and the team boss for the fun layer)"
+    },
     "task": {
       "type": "string"
     },

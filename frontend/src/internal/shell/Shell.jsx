@@ -30,7 +30,11 @@ import { ThemeDialog } from '@/internal/ui/ThemeDialog';
 import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
 import { useNoticeToasts } from './useNoticeToasts';
-import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV } from './navItems';
+import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
+import { FunChip } from '../fun/FunChip';
+import HubPage from '@/hub/HubPage';
+import CastPage from '@/fun/CastPage';
+import PageHero from '@/fun/PageHero';
 import { isAdminTier, isApprover } from '@/internal/lib/constants';
 
 const ROLE_GROUPS = [
@@ -51,6 +55,7 @@ export function Shell() {
   const navigate = useNavigate();
   useNoticeToasts();
   const [themeOpen, setThemeOpen] = useState(false);
+  const hasFun = person.role !== 'founder'; // everyone but founders gets the playful layer (3D scenes, hub, games, birds)
   const isManager = isManagerRole(person.role); // manager or founder: the main admins
   const isAdmin = isAdminTier(person.role); // main admins and project managers
   const alsoWorks = isAdmin && (person.role === 'pm' || !!person.tracked); // admins who do tasks themselves keep their own dashboard and day
@@ -64,6 +69,7 @@ export function Shell() {
         : isPm
           ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
           : [DASHBOARD_NAV, PROJECTS_NAV]),
+    ...(hasFun ? [HUB_NAV] : []),
     PROFILE_NAV,
   ];
   const badgeFor = (item) => (isAdmin && (isManager && !alsoWorks ? item === DASHBOARD_NAV : item === TEAM_NAV) ? pending : 0);
@@ -121,24 +127,30 @@ export function Shell() {
         </div>
       </nav>
       <div className="relative z-[1] min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-10 flex items-center justify-end gap-3 sm:justify-between border-b border-line bg-surface/90 px-4 py-3 backdrop-blur sm:px-6">
+          <div className="hidden items-center gap-2 sm:flex">
             <p className="text-sm font-extrabold tracking-tight">Lead Strategus</p>
             <span className="hidden text-xs text-muted sm:inline">Tracker</span>
           </div>
-          <div className="flex min-w-0 items-center gap-2 rounded-full bg-surface-2 py-1 pl-1 pr-3 text-xs">
-            <Avatar id={me} size="sm" />
-            <span className="min-w-0 truncate font-semibold">
-              {fullName(me)} · {person.title}
-            </span>
+          <div className="flex min-w-0 items-center gap-2">
+            {hasFun && <FunChip />}
+            <div className="flex min-w-0 items-center gap-2 rounded-full bg-surface-2 py-1 pl-1 pr-1 text-xs sm:pr-3">
+              <Avatar id={me} size="sm" />
+              <span className="hidden min-w-0 truncate font-semibold sm:inline">
+                {fullName(me)} · {person.title}
+              </span>
+            </div>
           </div>
         </header>
+        {hasFun && <PageHero />}
         <main className="mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>
             <Route path="/" element={isManager && !alsoWorks ? <ManagerDashboard /> : <MemberDashboard />} />
             <Route path="/projects" element={isAdmin ? <ManagerProjects /> : <MemberProjects />} />
             <Route path="/daily" element={isManager && !alsoWorks ? <ManagerDaily /> : <MemberDaily />} />
             <Route path="/profile" element={<ProfilePage />} />
+            {hasFun && <Route path="/hub" element={<HubPage />} />}
+            {hasFun && <Route path="/cast" element={<CastPage />} />}
             {alsoWorks && <Route path="/team" element={<ManagerDashboard />} />}
             {alsoWorks && <Route path="/team-updates" element={<ManagerDaily />} />}
             {(isAdmin || isPm) && <Route path="/assign" element={<AssignPage key={me} />} />}

@@ -1,3 +1,4 @@
+/* The playful layer's styles. postcss.config.js scopes every rule here under .fun-scope, so none of this reaches the tracker UI. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -26,7 +27,6 @@
     --radius: 0.5rem;
   }
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
 }
 
 /* ======================= Playful / cartoon layer ======================= */
@@ -502,3 +502,17 @@ body.calm .launch-rocket { animation: none; }
 body.pro *:not(.animate-spin) { animation: none !important; }
 body.pro .theme-pattern, body.pro .season-layer { display: none !important; }
 body.pro .animated-gradient-bg-enhanced::before, body.pro .animated-gradient-bg-enhanced::after { display: none !important; }
+
+/* A page of the fun layer shown inside the light tracker UI: a dark stage so its white text and cards read properly. */
+.fun-scope.fun-page { background: #0b1220; color: #f8fafc; border-radius: 1.25rem; overflow: hidden; }
+
+/* The frosted cards the fun layer's pages are built from (these lived in the old layout). */
+.glass-effect-enhanced {
+  background: var(--glass-bg, rgba(15, 23, 42, 0.65));
+  backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--glass-border, rgb(var(--line-a, 16 185 129) / 0.3));
+  border-radius: 0.75rem;
+  box-shadow: var(--glass-shadow, 0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 15px rgb(var(--line-a, 16 185 129) / 0.1));
+}
+.glow-effect { box-shadow: 0 0 15px rgb(var(--line-a, 16 185 129) / 0.3), 0 0 25px rgb(var(--line-a, 16 185 129) / 0.2); }
+.fun-scope { --text-primary: #f8fafc; --text-secondary: #cbd5e1; }

@@ -137,6 +137,12 @@ Privacy: authors of ideas, retro notes, votes and mood answers are never returne
 
 An admin can add a person as **Founder** (Management > Team members > Role > Founder). A founder has exactly the admin permissions but sees a plain, professional app: no mascot, 3D scenes, birds, games, sounds, confetti, animated backgrounds, level chip or Team Hub. It is stored as `founder: true` on the user (always with `role: admin`); only admins can set it.
 
+## The playful layer (3D, animations, employee fun)
+
+Everyone except **founders** gets the fun layer on top of the tracker UI: 3D buddies and a themed 3D banner on each page, confetti and level-ups when work is approved, the **Team hub** (boss battle, team weather, coffee roulette, shout-outs, standup bird, retro board, ideas, daily word, trivia, wheel, Flappy bird and more), the cast and fitting room, anonymous birds, seasonal weather and sounds. Each person adjusts it from the level chip in the top bar (3D, page scenes, sounds, effects, birds, cursor pal, screensaver, daily rhythm, calm mode...); the choices are saved on their device. Founders see the plain tracker only, with none of this loaded.
+
+How it fits: the fun code lives in `src/fun`, `src/hub` and `src/internal/fun`. Its stylesheet (`src/fun/fun.css`) is scoped under `.fun-scope` (see `postcss.config.js`) so it cannot restyle the tracker UI, and its dialogs render into `#fun-portal`. `src/internal/fun/FunBridge.jsx` turns tracker changes (a task assigned, submitted, approved) into the events the fun layer reacts to. For levels, streaks, quests and the weekly boss, the server keeps one `DailyTask` record in step with every tracker task (`mirrorTask` in `backend/src/tracker.js`): it counts as finished work once the reviewer approves it.
+
 ## Themes
 
 Eight built-in themes — **light:** Sunny Day, Bubblegum Pop, Mint Fresh, Sky Pop; **dark:** Midnight (the original), Neon Arcade, Forest Night, Cherry Cola — each with its own background pattern and a mascot tinted to match. Switch from the header: ☀/🌙 quick toggle, or the palette button for the gallery (live mini-previews). Also: **Match my device** (follows the system light/dark setting live), a **Cartoon style** switch (outlined stickers, bouncy buttons, hard shadows), and **Make your own theme** (pick a mode, two colours and a background tint; export/import as JSON to share with teammates).
