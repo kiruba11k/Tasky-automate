@@ -30,7 +30,7 @@ export function registerBirds(app, { store, notifier, wrap, clock = Date.now }) 
 
   // Everyone who can receive a bird (a plain list: name and buddy only, never roles, emails or mute settings).
   app.get('/api/birds/recipients', wrap(async (req, res) => {
-    const users = (await store.list('User')).filter((u) => u.status !== 'Inactive' && u.id !== req.user.id);
+    const users = (await store.list('User')).filter((u) => u.status !== 'Inactive' && !u.founder && u.id !== req.user.id);
     res.json(users.map((u) => ({ id: u.id, name: u.full_name || u.email, buddy: u.buddy || null, equipped: u.equipped || {} })));
   }));
 
@@ -40,7 +40,7 @@ export function registerBirds(app, { store, notifier, wrap, clock = Date.now }) 
     const msg = typeof text === 'string' ? text.trim() : '';
     if (!msg) return res.status(400).json({ error: 'Write something for the bird to carry' });
     if (msg.length > MAX_TEXT) return res.status(400).json({ error: `Keep it under ${MAX_TEXT} characters` });
-    const everyone = (await store.list('User')).filter((u) => u.status !== 'Inactive' && u.id !== req.user.id);
+    const everyone = (await store.list('User')).filter((u) => u.status !== 'Inactive' && !u.founder && u.id !== req.user.id);
     let targets;
     if (to === 'all') targets = everyone;
     else if (Array.isArray(to) && to.length) {
