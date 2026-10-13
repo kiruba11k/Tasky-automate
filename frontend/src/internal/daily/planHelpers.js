@@ -33,3 +33,6 @@ export const nonEmptyExtras = (extras) => extras.filter((x) => x.work.trim() || 
 /** A submitted task that has logged minutes. */
 export const isSubmittedWithTime = (task) =>
   (task.status === 'done' || task.status === 'in_review') && task.minutes != null;
+
+/** The default lunch row (1pm to 2pm). */
+export const LUNCH_BLOCK = lunchBlock();
