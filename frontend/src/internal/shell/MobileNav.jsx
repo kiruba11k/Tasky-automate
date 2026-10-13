@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Ellipsis, LogOut, Palette, Settings, X } from 'lucide-react';
+import { Ellipsis, LogOut, Palette, X } from 'lucide-react';
 import { cx } from '@/internal/ui/cx';
 
 const PRIMARY = 4; // tabs in the bottom bar; everything else goes under "More"
 
 /** Phone navigation: a bottom tab bar (the side rail is hidden below 768px) with a "More" sheet for the rest and the account actions. */
-export function MobileNav({ items, onProject, projectLabel, onTheme, onLogout }) {
+export function MobileNav({ items, onTheme, onLogout }) {
   const [more, setMore] = useState(false);
   const loc = useLocation();
   useEffect(() => { setMore(false); }, [loc.pathname]);
@@ -46,7 +46,6 @@ export function MobileNav({ items, onProject, projectLabel, onTheme, onLogout })
               ))}
             </div>
             <div className="m-actions">
-              {onProject && <button type="button" onClick={() => { setMore(false); onProject(); }}><Settings size={18} /> {projectLabel}</button>}
               <button type="button" onClick={() => { setMore(false); onTheme(); }}><Palette size={18} /> Theme</button>
               <button type="button" onClick={onLogout}><LogOut size={18} /> Sign out</button>
             </div>

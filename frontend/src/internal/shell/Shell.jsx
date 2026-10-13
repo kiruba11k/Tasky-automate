@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { LogOut, MessageCircle, Palette, Settings } from 'lucide-react';
+import { LogOut, MessageCircle, Palette } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import {
   Se as useStore,
@@ -10,7 +10,6 @@ import {
   xn as isManagerRole,
   ea as isProjectPm,
   Ye as toast,
-  qh as ProjectDialog,
   uR as Toaster,
   qU as MemberDashboard,
   KU as ManagerDashboard,
@@ -50,7 +49,6 @@ export function Shell() {
   const { logout } = useAuth();
   const person = PEOPLE.find((p) => p.id === me);
   const [chatOpen, setChatOpen] = useState(false);
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const unreadChat = notices.filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous'))).length;
   const navigate = useNavigate();
   // new-notice cards and desktop alerts are shown by <Alerts /> (App.jsx)
@@ -108,16 +106,6 @@ export function Shell() {
           </NavLink>
         ))}
         <div className="mt-auto flex flex-col items-center gap-2">
-          {isAdmin && (
-            <button
-              aria-label={isApprover(me) ? 'Onboard a new project' : 'Propose a new project'}
-              title={isApprover(me) ? 'Onboard a new project' : 'Propose a new project'}
-              className={iconButton}
-              onClick={() => setProjectDialogOpen(true)}
-            >
-              <Settings size={18} />
-            </button>
-          )}
           <button aria-label="Theme" title="Theme" className={iconButton} onClick={() => setThemeOpen(true)}>
             <Palette size={18} />
           </button>
@@ -186,12 +174,9 @@ export function Shell() {
       </div>
       <MobileNav
         items={navItems}
-        onProject={isAdmin ? () => setProjectDialogOpen(true) : null}
-        projectLabel={isApprover(me) ? 'Onboard a new project' : 'Propose a new project'}
         onTheme={() => setThemeOpen(true)}
         onLogout={logout}
       />
-      <ProjectDialog open={projectDialogOpen} onClose={() => setProjectDialogOpen(false)} />
       <ThemeDialog open={themeOpen} onClose={() => setThemeOpen(false)} />
       {!hasFun && <Mascot />}
       <Toaster />
