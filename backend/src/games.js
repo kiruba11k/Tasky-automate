@@ -7,7 +7,17 @@ export const GAMES = {
   c4: { name: 'Connect four', min: 2, max: 2 },
   rps: { name: 'Rock paper scissors', min: 2, max: 2 },
   race: { name: 'Reaction race', min: 2, max: 8 },
+  bs: { name: 'Battleship', min: 2, max: 2 },
+  pig: { name: 'Pig dice', min: 2, max: 4 },
+  mem: { name: 'Memory duel', min: 2, max: 4 },
+  tug: { name: 'Tug of war', min: 2, max: 2 },
 };
+export const BS_SIZE = 8;
+export const BS_FLEET = [4, 3, 3, 2];
+export const PIG_TARGET = 50;
+export const MEM_SYMBOLS = ['🐱', '🐶', '🦊', '🐼', '🐸', '🦁', '🐙', '🦄'];
+export const TUG_REACH = 24; // net taps that win the rope
+export const TUG_GAP_MS = 60; // faster than this from one player is ignored (no auto-clickers)
 export const RACE_ROUNDS = 5;
 const ROOM_TTL_MS = 30 * 60 * 1000; // a room with no activity for half an hour is dropped
 
@@ -41,11 +51,51 @@ export function c4Winner(board) {
 const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
 export const rpsRound = (a, b) => (a === b ? -1 : BEATS[a] === b ? 0 : 1); // index of the winner, -1 draw
 
+/** Random fleet on a BS_SIZE grid: ships never touch the edge of another (they may not overlap). */
+export function placeFleet(random = Math.random) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const taken = new Set(); const fleet = []; let ok = true;
+    for (const len of BS_FLEET) {
+      let placed = false;
+      for (let tries = 0; tries < 200 && !placed; tries += 1) {
+        const horiz = random() < 0.5;
+        const r = Math.floor(random() * (horiz ? BS_SIZE : BS_SIZE - len + 1));
+        const c = Math.floor(random() * (horiz ? BS_SIZE - len + 1 : BS_SIZE));
+        const cells = Array.from({ length: len }, (_, k) => (horiz ? r * BS_SIZE + c + k : (r + k) * BS_SIZE + c));
+        if (cells.some((x) => taken.has(x))) continue;
+        cells.forEach((x) => taken.add(x)); fleet.push({ cells, hits: [] }); placed = true;
+      }
+      if (!placed) { ok = false; break; }
+    }
+    if (ok) return fleet;
+  }
+  return BS_FLEET.map((len, r) => ({ cells: Array.from({ length: len }, (_, k) => r * 2 * BS_SIZE + k), hits: [] })); // a stuck random source still gets a legal fleet
+}
+/** Fire at a cell of someone's fleet: { result: 'miss'|'hit'|'sunk', ship } */
+export function bsFire(fleet, cell) {
+  for (const ship of fleet) {
+    if (ship.cells.includes(cell)) {
+      if (!ship.hits.includes(cell)) ship.hits.push(cell);
+      return { result: ship.hits.length === ship.cells.length ? 'sunk' : 'hit', ship };
+    }
+  }
+  return { result: 'miss', ship: null };
+}
+export const bsAllSunk = (fleet) => fleet.every((s) => s.hits.length === s.cells.length);
+
 // ---------- room engine ----------
-const newState = (game, players) => {
+const newState = (game, players, { random = Math.random, clock = Date.now } = {}) => {
   if (game === 'ttt') return { board: Array(9).fill(null), turn: 0, winner: null, line: [] };
   if (game === 'c4') return { board: Array.from({ length: C4_ROWS }, () => Array(C4_COLS).fill(null)), turn: 0, winner: null, line: [] };
   if (game === 'rps') return { round: 1, picks: [null, null], last: null, score: [0, 0], winner: null };
+  if (game === 'bs') return { fleets: [placeFleet(random), placeFleet(random)], shots: [{}, {}], turn: 0, winner: null, last: null, seq: 0 };
+  if (game === 'pig') return { scores: players.map(() => 0), turn: 0, turnTotal: 0, roll: null, rollSeq: 0, winner: null, target: PIG_TARGET };
+  if (game === 'mem') {
+    const deck = [...MEM_SYMBOLS, ...MEM_SYMBOLS];
+    for (let i = deck.length - 1; i > 0; i -= 1) { const j = Math.floor(random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+    return { deck, matched: deck.map(() => null), up: [], reveal: null, seq: 0, scores: players.map(() => 0), turn: 0, winner: null };
+  }
+  if (game === 'tug') return { pos: 0, taps: [0, 0], lastTap: [0, 0], startAt: clock() + 3500, winner: null };
   return { round: 0, phase: 'wait', goAt: null, nextAt: null, scores: players.map(() => 0), tapped: {}, early: [], lastWinner: null, lastMs: null, winner: null };
 };
 
@@ -58,7 +108,7 @@ export function createGames({ clock = Date.now, random = Math.random, onChange =
 
   function begin(room) {
     room.status = 'playing';
-    room.state = newState(room.game, room.players);
+    room.state = newState(room.game, room.players, { random, clock });
     if (room.game === 'race') nextRound(room);
   }
   function nextRound(room) {
@@ -125,7 +175,12 @@ export function createGames({ clock = Date.now, random = Math.random, onChange =
     if (i < 0) return room;
     if (room.status === 'done') { (room.dismissed ||= new Set()).add(user.id); if (room.players.every((p) => room.dismissed.has(p.id))) { rooms.delete(id); onChange(room); } return room; }
     if (room.status === 'playing' && room.players.length === 2) { room.state.forfeit = user.id; finish(room, 1 - i); }
-    else if (room.status === 'playing') { room.players.splice(i, 1); room.state.scores.splice(i, 1); if (room.players.length < 2) finish(room, 0); }
+    else if (room.status === 'playing') {
+      room.players.splice(i, 1); room.state.scores.splice(i, 1);
+      if (room.state.turn !== undefined) { if (i < room.state.turn) room.state.turn -= 1; else if (i === room.state.turn) { room.state.turn %= room.players.length; room.state.turnTotal = 0; room.state.up = []; } }
+      if (room.game === 'mem') room.state.matched = room.state.matched.map((o) => (o === null ? null : o === i ? -1 : o > i ? o - 1 : o));
+      if (room.players.length < 2) finish(room, 0);
+    }
     else if (room.status === 'lobby') {
       room.players.splice(i, 1);
       if (!room.players.length) { rooms.delete(id); onChange(room); return room; }
@@ -179,6 +234,40 @@ export function createGames({ clock = Date.now, random = Math.random, onChange =
         s.picks = [null, null]; s.round += 1;
         if (s.score[0] === 2 || s.score[1] === 2) finish(room, s.score[0] === 2 ? 0 : 1);
       }
+    } else if (room.game === 'bs') {
+      if (s.turn !== me) throw bad('Not your turn');
+      if (!Number.isInteger(m.cell) || m.cell < 0 || m.cell >= BS_SIZE * BS_SIZE || s.shots[me][m.cell]) throw bad('Pick a square you have not fired at');
+      const foe = 1 - me; const out = bsFire(s.fleets[foe], m.cell);
+      s.shots[me][m.cell] = out.result === 'miss' ? 'miss' : 'hit';
+      s.seq += 1; s.last = { by: me, cell: m.cell, result: out.result, ship: out.result === 'sunk' ? out.ship.cells : null, seq: s.seq };
+      if (bsAllSunk(s.fleets[foe])) finish(room, me); else s.turn = foe;
+    } else if (room.game === 'pig') {
+      if (s.turn !== me) throw bad('Not your turn');
+      if (m.act === 'roll') {
+        const d = 1 + Math.floor(random() * 6); s.rollSeq += 1; s.roll = { by: me, d, seq: s.rollSeq, bust: d === 1 };
+        if (d === 1) { s.turnTotal = 0; s.turn = (me + 1) % room.players.length; } else s.turnTotal += d;
+      } else if (m.act === 'hold') {
+        if (s.turnTotal === 0) throw bad('Roll first');
+        s.scores[me] += s.turnTotal; s.turnTotal = 0; s.roll = { by: me, d: null, seq: (s.rollSeq += 1), bust: false, held: true };
+        if (s.scores[me] >= s.target) finish(room, me); else s.turn = (me + 1) % room.players.length;
+      } else throw bad('Roll or hold');
+    } else if (room.game === 'mem') {
+      if (s.turn !== me) throw bad('Not your turn');
+      if (!Number.isInteger(m.cell) || m.cell < 0 || m.cell >= s.deck.length || s.matched[m.cell] !== null || s.up.includes(m.cell)) throw bad('Pick a face-down card');
+      if (!s.up.length) { s.reveal = null; s.up = [m.cell]; } else {
+        const pair = [s.up[0], m.cell]; s.up = []; s.seq += 1;
+        const hit = s.deck[pair[0]] === s.deck[pair[1]];
+        s.reveal = { cells: pair, match: hit, by: me, seq: s.seq };
+        if (hit) { pair.forEach((c) => { s.matched[c] = me; }); s.scores[me] += 1; } else s.turn = (me + 1) % room.players.length;
+        if (s.matched.every((o) => o !== null)) { const best = Math.max(...s.scores); finish(room, s.scores.filter((x) => x === best).length === 1 ? s.scores.indexOf(best) : -1); }
+      }
+    } else if (room.game === 'tug') {
+      const now = clock();
+      if (now >= s.startAt && now - s.lastTap[me] >= TUG_GAP_MS) {
+        s.lastTap[me] = now; s.taps[me] += 1;
+        s.pos = s.taps[0] - s.taps[1];
+        if (s.pos >= TUG_REACH) finish(room, 0); else if (s.pos <= -TUG_REACH) finish(room, 1);
+      }
     } else if (room.game === 'race') {
       tick(room);
       if (s.phase === 'wait') { // too early: out for this round
@@ -199,6 +288,22 @@ export function createGames({ clock = Date.now, random = Math.random, onChange =
     const s = room.state && JSON.parse(JSON.stringify(room.state));
     if (s && room.game === 'rps') s.picks = s.picks.map((p, i) => (p ? (i === me ? p : true) : null)); // your pick, and only whether they have picked
     if (s && room.game === 'race') { delete s.tapped; if (s.phase === 'wait') s.goAt = null; else s.goAt = undefined; }
+    if (s && room.game === 'bs') {
+      const mine = me >= 0 ? me : 0;
+      s.mine = s.fleets[mine].map((x) => ({ cells: x.cells, hits: x.hits }));
+      s.foeSunk = s.fleets[1 - mine].filter((x) => x.hits.length === x.cells.length).map((x) => x.cells);
+      s.foeCells = room.status === 'done' ? s.fleets[1 - mine].map((x) => x.cells) : null; // the whole fleet is shown once it is over
+      s.mineShots = s.shots[mine]; s.theirShots = s.shots[1 - mine]; // what I fired / what was fired at me
+      delete s.fleets; delete s.shots;
+    }
+    if (s && room.game === 'mem') {
+      const faces = {};
+      s.matched.forEach((o, c) => { if (o !== null) faces[c] = s.deck[c]; });
+      s.up.forEach((c) => { faces[c] = s.deck[c]; });
+      s.reveal?.cells.forEach((c) => { faces[c] = s.deck[c]; });
+      s.faces = faces; delete s.deck;
+    }
+    if (s && room.game === 'tug') { s.startIn = Math.max(0, s.startAt - clock()); delete s.lastTap; delete s.startAt; }
     return { id: room.id, game: room.game, title: GAMES[room.game].name, hostId: room.hostId, players: room.players, status: room.status, state: s, you: me, min: GAMES[room.game].min, max: GAMES[room.game].max, now: clock(), rounds: RACE_ROUNDS };
   }
   /** Rooms this person can see: lobbies anyone can join, and the games they are in (a finished one stays for a few minutes). */

@@ -114,3 +114,84 @@ test('closing a finished game hides it for that player only', () => {
   g.leave(U('b'), room.id);
   assert.equal(g.rooms.size, 0);
 });
+
+test('battleship: fleets fit, hits and sinks, turns, hidden boards', async () => {
+  const { placeFleet, bsFire, bsAllSunk, BS_FLEET, BS_SIZE } = await import('../src/games.js');
+  let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let k = 0; k < 30; k += 1) {
+    const f = placeFleet(rnd); const all = f.flatMap((x) => x.cells);
+    assert.equal(new Set(all).size, BS_FLEET.reduce((a, b) => a + b, 0));
+    assert.ok(all.every((c) => c >= 0 && c < BS_SIZE * BS_SIZE));
+    f.forEach((x) => { const rows = new Set(x.cells.map((c) => Math.floor(c / BS_SIZE))); const cols = new Set(x.cells.map((c) => c % BS_SIZE)); assert.ok(rows.size === 1 || cols.size === 1); });
+  }
+  const fleet = [{ cells: [0, 1], hits: [] }];
+  assert.equal(bsFire(fleet, 5).result, 'miss');
+  assert.equal(bsFire(fleet, 0).result, 'hit');
+  assert.equal(bsFire(fleet, 1).result, 'sunk');
+  assert.ok(bsAllSunk(fleet));
+  const { g } = mk(); const room = g.create(U('a'), 'bs'); g.join(U('b'), room.id);
+  assert.throws(() => g.move(U('b'), room.id, { cell: 0 }), /Not your turn/);
+  const v = g.view(room, 'a');
+  assert.equal(v.state.fleets, undefined);
+  assert.equal(v.state.mine.length, BS_FLEET.length);
+  assert.equal(v.state.foeCells, null);
+  g.move(U('a'), room.id, { cell: 3 });
+  assert.throws(() => g.move(U('b'), room.id, { cell: 99 }), /have not fired/);
+  g.move(U('b'), room.id, { cell: 3 });
+  assert.throws(() => g.move(U('a'), room.id, { cell: 3 }), /have not fired/);
+  // sink everything: a wins and the enemy fleet is shown at the end
+  const foe = room.state.fleets[1].flatMap((x) => x.cells);
+  let a = 0; for (const c of foe) { while (room.state.turn !== 0) g.move(U('b'), room.id, { cell: [...Array(64).keys()].find((x) => !room.state.shots[1][x]) }); if (room.state.shots[0][c]) continue; g.move(U('a'), room.id, { cell: c }); a += 1; }
+  assert.equal(room.status, 'done'); assert.equal(room.state.winner, 0);
+  assert.ok(g.view(room, 'b').state.foeCells);
+});
+
+test('pig dice: a 1 loses the turn total, hold banks it, first to the target wins', () => {
+  const rolls = [3, 4, 1, 6, 6]; let i = 0;
+  const g = createGames({ clock: () => 1, random: () => (rolls[i++ % rolls.length] - 1) / 6 + 0.01 });
+  const room = g.create(U('a'), 'pig'); g.join(U('b'), room.id); g.join(U('c'), room.id);
+  assert.equal(room.status, 'lobby'); g.start(U('a'), room.id); i = 0;
+  assert.throws(() => g.move(U('b'), room.id, { act: 'roll' }), /Not your turn/);
+  assert.throws(() => g.move(U('a'), room.id, { act: 'hold' }), /Roll first/);
+  g.move(U('a'), room.id, { act: 'roll' }); g.move(U('a'), room.id, { act: 'roll' });
+  assert.equal(room.state.turnTotal, 7);
+  g.move(U('a'), room.id, { act: 'roll' }); // a 1
+  assert.equal(room.state.turnTotal, 0); assert.equal(room.state.turn, 1); assert.deepEqual(room.state.scores, [0, 0, 0]);
+  g.move(U('b'), room.id, { act: 'roll' }); g.move(U('b'), room.id, { act: 'hold' });
+  assert.equal(room.state.scores[1], 6); assert.equal(room.state.turn, 2);
+  room.state.scores[2] = 45; room.state.turn = 2; i = 3; // next roll is a 6... bank to win
+  g.move(U('c'), room.id, { act: 'roll' }); g.move(U('c'), room.id, { act: 'hold' });
+  assert.equal(room.status, 'done'); assert.equal(room.state.winner, 2);
+});
+
+test('memory duel: matches keep the turn, misses pass it, faces stay hidden', () => {
+  const { g } = mk(); const room = g.create(U('a'), 'mem'); g.join(U('b'), room.id); g.start(U('a'), room.id);
+  const deck = room.state.deck;
+  const view = g.view(room, 'a'); assert.equal(view.state.deck, undefined); assert.deepEqual(view.state.faces, {});
+  const first = 0; const mate = deck.findIndex((x, k) => k !== 0 && x === deck[0]); const other = deck.findIndex((x) => x !== deck[0]);
+  g.move(U('a'), room.id, { cell: first });
+  assert.equal(Object.keys(g.view(room, 'b').state.faces).length, 1);
+  assert.throws(() => g.move(U('a'), room.id, { cell: first }), /face-down/);
+  g.move(U('a'), room.id, { cell: mate });
+  assert.equal(room.state.turn, 0); assert.equal(room.state.scores[0], 1);
+  const free = deck.map((_, k) => k).filter((k) => room.state.matched[k] === null);
+  const x = free[0]; const y = free.find((k) => deck[k] !== deck[x]);
+  g.move(U('a'), room.id, { cell: x }); g.move(U('a'), room.id, { cell: y });
+  assert.equal(room.state.turn, 1);
+  assert.equal(Object.keys(g.view(room, 'b').state.faces).length, 4); // the pair a just missed is visible to everyone
+  g.move(U('b'), room.id, { cell: free.find((k) => k !== x && k !== y) });
+  assert.equal(room.state.reveal, null);
+  void other;
+});
+
+test('tug of war: waits for the start, ignores auto-clicking, pulls the rope', () => {
+  const { g, adv } = mk(); const room = g.create(U('a'), 'tug'); g.join(U('b'), room.id);
+  g.move(U('a'), room.id, { tap: 1 }); assert.equal(room.state.pos, 0); // not started
+  adv(4000);
+  g.move(U('a'), room.id, { tap: 1 }); g.move(U('a'), room.id, { tap: 1 });
+  assert.equal(room.state.pos, 1); // the second tap came too fast
+  adv(100); g.move(U('b'), room.id, { tap: 1 }); assert.equal(room.state.pos, 0);
+  for (let k = 0; k < 40 && room.status === 'playing'; k += 1) { adv(100); g.move(U('a'), room.id, { tap: 1 }); }
+  assert.equal(room.status, 'done'); assert.equal(room.state.winner, 0);
+  assert.equal(g.view(room, 'a').state.lastTap, undefined);
+});

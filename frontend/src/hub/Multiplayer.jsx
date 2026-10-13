@@ -3,14 +3,19 @@ import { useFun } from '@/fun/FunProvider';
 import { hasWebGL } from '@/fun/three/species';
 import { request, getToken } from '@/api/client';
 import { Panel, Err, primary, subtle } from './ui';
+import { Battleship, Pig, Memory, Tug } from './MultiGames';
 
 const GameStage = lazy(() => import('@/fun/three/MultiStages'));
-const ICON = { ttt: '❌', c4: '🔴', rps: '✊', race: '⚡' };
+const ICON = { ttt: '❌', c4: '🔴', rps: '✊', race: '⚡', bs: '🚢', pig: '🎲', mem: '🃏', tug: '🪢' };
 const BLURB = {
   ttt: 'Three in a row wins. Two players.',
   c4: 'Drop discs, connect four. Two players.',
   rps: 'Best of three. Picks stay secret until both have chosen.',
   race: 'Tap the moment the light turns green. Five rounds, 2 to 8 players. Tap early and you are out of that round.',
+  bs: 'Hunt the enemy fleet. Splashes, hits and sinking ships. Two players.',
+  pig: 'Roll a real 3D die and push your luck. A 1 wipes your turn. First to 50. 2 to 4 players.',
+  mem: 'Flip cards, match pairs, go again on a match. 2 to 4 players.',
+  tug: 'Tap as fast as you can to drag the rope to your side. Two players.',
 };
 const MARK = ['✕', '○'];
 const DISC = ['bg-rose-500', 'bg-yellow-300'];
@@ -67,6 +72,8 @@ function Status({ room }) {
     if (s.forfeit) return <p className="text-lg font-extrabold text-white">{w === me ? 'They left. You win! 🏆' : 'You left the game.'}</p>;
     return <p className="text-lg font-extrabold text-white">{w === -1 ? "It's a draw 🤝" : w === me ? 'You win! 🏆' : `${firstName(nameOf(room, w))} wins`}</p>;
   }
+  if (room.game === 'bs' || room.game === 'pig' || room.game === 'mem') return <p className="text-lg font-extrabold text-white">{s.turn === me ? 'Your turn' : `${firstName(nameOf(room, s.turn))}'s turn`}</p>;
+  if (room.game === 'tug') return <p className="text-lg font-extrabold text-white">Tug of war!</p>;
   if (room.game === 'ttt' || room.game === 'c4') return <p className="text-lg font-extrabold text-white">{s.turn === me ? 'Your turn' : `${firstName(nameOf(room, s.turn))} is thinking…`}</p>;
   if (room.game === 'rps') return <p className="text-lg font-extrabold text-white">Round {s.round} · {firstName(nameOf(room, 0))} {s.score[0]} – {s.score[1]} {firstName(nameOf(room, 1))}</p>;
   return <p className="text-lg font-extrabold text-white">Round {Math.min(s.round, room.rounds)} of {room.rounds}</p>;
@@ -171,7 +178,7 @@ function Invite({ room, act }) {
 function Room({ room, act }) {
   const { settings, celebrate } = useFun();
   const three = settings.view3d && hasWebGL();
-  const Board = { ttt: Ttt, c4: C4, rps: Rps, race: Race }[room.game];
+  const Board = { ttt: Ttt, c4: C4, rps: Rps, race: Race, bs: Battleship, pig: Pig, mem: Memory, tug: Tug }[room.game];
   const move = (m) => act(`/api/games/${room.id}/move`, m);
   const won = room.status === 'done' && room.state?.winner === room.you && !room.state?.forfeit;
   useEffect(() => { if (won) celebrate('party'); }, [won]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -185,10 +192,10 @@ function Room({ room, act }) {
           <div className="space-y-3">
             <ul className="flex flex-wrap gap-2">{room.players.map((p) => <li key={p.id} className="rounded-full border border-slate-600 px-3 py-1 text-sm font-bold text-slate-100">{firstName(p.name)}</li>)}</ul>
             <Invite room={room} act={act} />
-            {host && room.max > 2 && <button type="button" className={primary} disabled={room.players.length < room.min} onClick={() => act(`/api/games/${room.id}/start`)}>Start the race ({room.players.length} in)</button>}
+            {host && room.max > 2 && <button type="button" className={primary} disabled={room.players.length < room.min} onClick={() => act(`/api/games/${room.id}/start`)}>Start the game ({room.players.length} in)</button>}
           </div>
         )}
-        {room.status !== 'lobby' && three && (
+        {room.status !== 'lobby' && three && ['ttt', 'c4', 'rps', 'race'].includes(room.game) && (
           <Suspense fallback={<div className="h-64 rounded-2xl bg-slate-800/60" />}>
             <GameStage room={room} onMove={move} calm={settings.anim === 'calm'} />
           </Suspense>
