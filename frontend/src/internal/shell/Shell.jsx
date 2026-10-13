@@ -29,7 +29,6 @@ import { FloatingDoodles } from '@/internal/ui/FloatingDoodles';
 import { ThemeDialog } from '@/internal/ui/ThemeDialog';
 import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
-import { useNoticeToasts } from './useNoticeToasts';
 import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
 import { FunChip } from '../fun/FunChip';
 import HubPage from '@/hub/HubPage';
@@ -53,7 +52,7 @@ export function Shell() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const unreadChat = notices.filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous'))).length;
   const navigate = useNavigate();
-  useNoticeToasts();
+  // new-notice cards and desktop alerts are shown by <Alerts /> (App.jsx)
   const [themeOpen, setThemeOpen] = useState(false);
   const hasFun = person.role !== 'founder'; // everyone but founders gets the playful layer (3D scenes, hub, games, birds)
   const isManager = isManagerRole(person.role); // manager or founder: the main admins

@@ -177,3 +177,11 @@ Manual setup without the Blueprint: Web Service · Node · Build `npm run render
 
 - Google Sheets integration only stores the sheet ID/status; there is no live Google sync.
 - Uploaded files are served at unguessable `/uploads/<uuid>` URLs as attachments.
+
+
+## Alerts and desktop notifications
+
+Every notice (a task assigned to you, sent for review, approved, sent back, a chat message, a deadline) appears as an animated card in the app and, when you turn on desktop alerts, as a desktop / phone notification even if the tracker is closed (Web Push; a service worker in `frontend/public/sw.js`).
+
+- **Deadline alerts** run on the server every minute: an hour before the end of a task's working day, 15 minutes before, when it is overdue (the person who assigned it is told too), then once each morning while it stays open (`backend/src/deadlines.js`).
+- Environment (all optional): `WORK_TZ` (default `Asia/Kolkata`), `WORK_END_HOUR` (default `19`), `DEADLINE_ALERTS=off` to disable, and `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` for push. Without VAPID keys the server makes a pair once and keeps it in the database.

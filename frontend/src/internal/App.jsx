@@ -7,6 +7,7 @@ import { startSync } from './sync';
 import { FunLayer } from './fun/FunLayer';
 import { FunBridge } from './fun/FunBridge';
 import { PrefsSync } from './fun/PrefsSync';
+import { Alerts } from './shell/Alerts';
 
 /** Loads the signed-in person's data from the backend and keeps it in step; shows the app once the first load is done. */
 function Tracker({ user }) {
@@ -34,6 +35,7 @@ function Tracker({ user }) {
     <FunLayer>
       {!user.founder && <><FunBridge /><PrefsSync /></>}
       <Shell />
+      <Alerts />
     </FunLayer>
   );
 }
@@ -46,11 +48,6 @@ function Gate() {
 
 /** App root. The integrator mounts it inside a HashRouter and StrictMode. */
 export function App() {
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
-  }, []);
   return (
     <ErrorBoundary>
       <AuthProvider>

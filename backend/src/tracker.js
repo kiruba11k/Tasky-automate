@@ -3,6 +3,8 @@
 // Anonymous chat: the sender of a message is kept only as owner_id and is never returned; each person's alias lives in a
 // private "alias" document that only that person can read.
 
+import { dueAlerts, OPEN } from './deadlines.js';
+
 export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias'];
 const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
 const ROLES = ['founder', 'manager', 'pm', 'resource'];
@@ -48,7 +50,7 @@ export function mergePatch(target, patch) {
 const bornAt = (r) => (Number.isFinite(r.born) ? r.born : new Date(r.created_date).getTime());
 export const CHAT_TTL_MS = (Number(process.env.CHAT_TTL_MINUTES) || 24 * 60) * 60 * 1000; // chat messages and conversations live for one day (CHAT_TTL_MINUTES overrides, for testing)
 
-export function registerTracker(app, { store, wrap, isOwner = () => false, clock = Date.now }) {
+export function registerTracker(app, { store, wrap, isOwner = () => false, clock = Date.now, push = null, env = process.env }) {
   // Live updates: every connected tab is told when documents change, then asks for what it may see (/docs?since=).
   const listeners = new Set();
   const announce = (what = 'changed') => listeners.forEach((res) => { try { res.write(`data: ${what}\n\n`); } catch { listeners.delete(res); } });
@@ -74,6 +76,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     switch (doc.kind) {
       case 'notice': return d.to === u.id;
       case 'alias': return doc.key.startsWith(`${u.id}:`);
+      case 'config': return false; // server-only settings (push keys, push subscriptions, alert bookkeeping)
       case 'conv': return (d.memberIds || []).includes(u.id);
       case 'msg': return (await convMembers(d.convId)).includes(u.id);
       default: return true; // tasks, projects, daily, weekly and profiles are shared inside the team
@@ -183,6 +186,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: u.id });
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
       if (kind === 'task') await mirrorTask(key, data, false);
+      if (kind === 'notice' && !existing && data.to && data.to !== u.id && !data.read) pushNotice(data);
       results.push({ ...id, ok: true });
     }
     if (results.some((r) => r.ok)) announce();
@@ -218,6 +222,50 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
   }
   setTimeout(() => backfillMirrors().catch((e) => console.error('mirror backfill failed:', e)), 3000).unref?.();
 
+  const PUSH_TITLES = { chat: '💬 New message', deadline: '⏰ Deadline', task: '📋 Tasks' };
+  /** Sends a notice to the person's devices as a desktop / phone notification (fire and forget). */
+  function pushNotice(n) {
+    if (!push) return;
+    push.sendTo(n.to, { title: PUSH_TITLES[n.kind] || PUSH_TITLES.task, body: String(n.text || '').slice(0, 200), tag: n.id, kind: n.kind || 'task', url: '/' }).catch(() => {});
+  }
+
+  /**
+   * Deadline alerts: an hour before the end of a task's day, 15 minutes before, when it is overdue (the assigner is told too),
+   * then once a morning while it stays open. Each alert is a notice (so it shows in the app) and a push (so it reaches the desktop).
+   */
+  async function deadlineSweep() {
+    const tasks = (await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 })).filter((d) => !d.deleted && OPEN.includes(d.data?.status)).map((d) => d.data);
+    if (!tasks.length) return 0;
+    const stateDoc = (await store.list('TrackerDoc', { query: { kind: 'config', key: 'alerts' }, limit: 1 }))[0];
+    const sent = { ...(stateDoc?.data?.sent || {}) };
+    const users = await live();
+    const nameOf = (id) => (users.find((u) => u.id === id)?.full_name || 'Someone').split(' ')[0];
+    const alerts = dueAlerts({ tasks, nowMs: clock(), tz: env.WORK_TZ || 'Asia/Kolkata', endHour: Number(env.WORK_END_HOUR) || 19, sent, nameOf });
+    const now = new Date(clock()).toISOString();
+    const post = async (to, text, level, taskId) => {
+      const key = `dl-${taskId}-${level}-${to}`;
+      const n = { id: key, to, text, at: now, read: false, kind: 'deadline', taskId };
+      if (!(await find('notice', key))) await store.insert('TrackerDoc', { kind: 'notice', key, data: n, owner_id: 'system', deleted: false, born: clock() }, 'system');
+      pushNotice(n);
+    };
+    for (const a of alerts) {
+      sent[`${a.taskId}|${a.level}`] = clock();
+      await post(a.to, a.text, a.level, a.taskId);
+      if (a.alsoTell) await post(a.alsoTell.to, a.alsoTell.text, a.level, a.taskId);
+    }
+    if (alerts.length) {
+      for (const k of Object.keys(sent)) if (clock() - sent[k] > 7 * 86400000) delete sent[k];
+      if (stateDoc) await store.update('TrackerDoc', stateDoc.id, { data: { sent } });
+      else await store.insert('TrackerDoc', { kind: 'config', key: 'alerts', data: { sent }, owner_id: 'system', deleted: false, born: clock() }, 'system');
+      announce();
+    }
+    return alerts.length;
+  }
+  if (env.DEADLINE_ALERTS !== 'off') {
+    const dl = setInterval(() => deadlineSweep().catch((e) => console.error('deadline sweep failed:', e)), 60 * 1000);
+    dl.unref?.();
+  }
+
   /**
    * Chat is short lived: a message is deleted one day after it was sent, and a conversation (with everybody's aliases in it)
    * one day after its last message. This runs on the server, so it does not matter who has the page open.
@@ -251,5 +299,5 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
   timer.unref?.();
   setTimeout(() => sweepChat().catch(() => {}), 5000).unref?.();
 
-  return { announce, sweepChat };
+  return { announce, sweepChat, deadlineSweep };
 }

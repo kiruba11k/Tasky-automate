@@ -18,6 +18,7 @@
     "multer": "^2.4.0",
     "papaparse": "^5.7.0",
     "pg": "^8.23.1",
-    "read-excel-file": "^9.3.10"
+    "read-excel-file": "^9.3.10",
+    "web-push": "^3.6.7"
   }
 }
