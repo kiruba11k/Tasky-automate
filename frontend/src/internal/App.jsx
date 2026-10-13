@@ -20,7 +20,8 @@ function Tracker({ user }) {
       .then((s) => { if (dead) s.stop(); else { session = s; setState({ ready: true, error: '' }); } })
       .catch((e) => { if (!dead) setState({ ready: false, error: e.message || 'Could not load your data' }); });
     return () => { dead = true; session?.stop(); };
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]); // only a different person restarts the session, not a refreshed copy of the same user
   if (state.error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg p-4 text-center">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { LogOut, MessageCircle, Palette } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
@@ -47,7 +47,12 @@ const ROLE_GROUPS = [
 export function Shell() {
   const { me, notices, projects } = useStore();
   const { logout } = useAuth();
-  const person = PEOPLE.find((p) => p.id === me);
+  // The people list is replaced whenever someone is added or edited (and the store is briefly emptied when the session restarts);
+  // keep the last known person so the layout never has to render without one.
+  const found = PEOPLE.find((p) => p.id === me);
+  const lastPerson = useRef(null);
+  if (found) lastPerson.current = found;
+  const person = found || lastPerson.current || { id: me, name: '', role: 'resource', title: '', color: 'mint', history: [] };
   const [chatOpen, setChatOpen] = useState(false);
   const unreadChat = notices.filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous'))).length;
   const navigate = useNavigate();
