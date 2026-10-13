@@ -30,7 +30,7 @@ import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
 import { MobileNav } from './MobileNav';
 import { useFunMode } from '../fun/useFunMode';
-import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
+import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
 import { FunChip } from '../fun/FunChip';
 import HubPage from '@/hub/HubPage';
 import CastPage from '@/fun/CastPage';
@@ -78,8 +78,7 @@ export function Shell() {
         ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
         : [DASHBOARD_NAV, PROJECTS_NAV]),
     ...(hasFun ? [HUB_NAV] : []),
-    PROFILE_NAV,
-  ];
+  ]; // Profile lives in the top bar (your name), not in the side rail
   // projects waiting for an approver: shown on the page where they are decided
   const badgeFor = (item) => ((isManager ? (alsoWorks ? item === TEAM_NAV : item === DASHBOARD_NAV) : item === PROJECTS_NAV) ? pending : 0);
   const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: badgeFor(item) }))];
@@ -133,12 +132,21 @@ export function Shell() {
           </div>
           <div className="flex min-w-0 items-center gap-2">
             {hasFun && <FunChip />}
-            <div className="flex min-w-0 items-center gap-2 rounded-full bg-surface-2 py-1 pl-1 pr-1 text-xs sm:pr-3">
+            <NavLink
+              to="/profile"
+              end
+              aria-label={`Profile: ${fullName(me)}`}
+              title="Open your profile"
+              className={({ isActive }) =>
+                cx(
+                  'focus-ring flex min-w-0 items-center gap-2 rounded-full py-1 pl-1 pr-1 text-xs transition hover:bg-accent-soft sm:pr-3',
+                  isActive ? 'bg-accent-soft text-accent-ink' : 'bg-surface-2',
+                )
+              }
+            >
               <Avatar id={me} size="sm" />
-              <span className="hidden min-w-0 truncate font-semibold sm:inline">
-                {fullName(me)} · {person.title}
-              </span>
-            </div>
+              <span className="hidden min-w-0 truncate font-semibold sm:inline">{fullName(me)}</span>
+            </NavLink>
           </div>
         </header>
         {hasFun && <PageHero />}
