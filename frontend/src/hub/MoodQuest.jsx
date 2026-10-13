@@ -1,27 +1,40 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { emitFun } from '@/fun/bus';
 import { effects } from '@/fun/effects';
 import { Emoji } from '@/icons/Emoji';
 import { Panel, primary, subtle, today } from './ui';
-import { ALL, MAX_REROLLS, MOODS, addDays, pickChallenge, streakOf } from './moodQuestLogic';
+import { useStore } from '@/internal/store';
+import { ALL, MAX_REROLLS, MOODS, addDays, mergeQuest, normalizeQuest, pickChallenge, streakOf } from './moodQuestLogic';
 
 // Mood quest: say how today feels, get one small silly (or kind) challenge to match, do it, and collect a sticker.
-const keyOf = (u) => `tasky_mood_quest_${u}`;
-const read = (u) => { try { return JSON.parse(localStorage.getItem(keyOf(u)) || 'null') || { days: {}, stickers: [] }; } catch { return { days: {}, stickers: [] }; } };
+const keyOf = (u) => `tasky_mood_quest_${u}`; // this device's copy: used once to bring older progress into the profile
+const readLocal = (u) => { try { return JSON.parse(localStorage.getItem(keyOf(u)) || 'null'); } catch { return null; } };
 
 export default function MoodQuest() {
   const { user } = useAuth();
   const date = today();
-  const [state, setState] = useState(() => read(user?.id));
+  const me = useStore((st) => st.me);
+  const saved = useStore((st) => st.profiles[st.me]?.moodQuest);
+  const setProfile = useStore((st) => st.setProfile);
+  const state = useMemo(() => normalizeQuest(saved, date), [saved, date]);
   const day = state.days[date];
-  const save = useCallback((next) => { setState(next); try { localStorage.setItem(keyOf(user?.id), JSON.stringify(next)); } catch { /* ignore */ } }, [user?.id]);
+  const save = (next) => { setProfile(me, { moodQuest: next }); try { localStorage.setItem(keyOf(user?.id), JSON.stringify(next)); } catch { /* ignore */ } };
+  // Progress made before it was saved on the profile (on this device) is brought in once, so nothing is lost.
+  useEffect(() => {
+    const local = readLocal(user?.id);
+    if (!local) return;
+    const merged = mergeQuest(saved, local);
+    if (JSON.stringify(merged) !== JSON.stringify(normalizeQuest(saved, date))) setProfile(me, { moodQuest: merged });
+    try { localStorage.removeItem(keyOf(user?.id)); } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+  const stamp = () => Date.now();
 
-  const pickMood = (mood) => save({ ...state, days: { ...state.days, [date]: { mood, challenge: pickChallenge(mood)[0], rerolls: 0, done: false } } });
-  const another = () => save({ ...state, days: { ...state.days, [date]: { ...day, challenge: pickChallenge(day.mood, day.challenge)[0], rerolls: day.rerolls + 1 } } });
+  const pickMood = (mood) => save({ ...state, days: { ...state.days, [date]: { mood, challenge: pickChallenge(mood)[0], rerolls: 0, done: false, at: stamp() } } });
+  const another = () => save({ ...state, days: { ...state.days, [date]: { ...day, challenge: pickChallenge(day.mood, day.challenge)[0], rerolls: day.rerolls + 1, at: stamp() } } });
   const finish = () => {
-    const stickers = state.stickers.includes(day.challenge) ? state.stickers : [...state.stickers, day.challenge];
-    save({ days: { ...state.days, [date]: { ...day, done: true } }, stickers });
+    save({ days: { ...state.days, [date]: { ...day, done: true, at: stamp() } }, stickers: { ...state.stickers, [day.challenge]: state.stickers[day.challenge] || date } });
     effects.stars();
     emitFun({ type: 'quest' });
   };
@@ -55,7 +68,7 @@ export default function MoodQuest() {
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" className={primary} onClick={finish}>I did it!</button>
               <button type="button" className={subtle} onClick={another} disabled={day.rerolls >= MAX_REROLLS}>Another one{day.rerolls > 0 ? ` (${MAX_REROLLS - day.rerolls} left)` : ''}</button>
-              <button type="button" className={subtle} onClick={() => save({ ...state, days: Object.fromEntries(Object.entries(state.days).filter(([d]) => d !== date)) })}>Change my mood</button>
+              <button type="button" className={subtle} onClick={() => save({ ...state, days: { ...state.days, [date]: null } })}>Change my mood</button>
             </div>
           )}
         </div>
@@ -76,10 +89,10 @@ export default function MoodQuest() {
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Stickers {state.stickers.length}/{ALL.length}</div>
+          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Stickers {Object.keys(state.stickers).length}/{ALL.length}</div>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {ALL.map(([id, e]) => (
-              <span key={id} className={`grid h-8 w-8 place-items-center rounded-lg border-2 ${state.stickers.includes(id) ? 'border-yellow-400 bg-yellow-400/20' : 'border-dashed border-slate-700 text-slate-600'}`}>{state.stickers.includes(id) ? <Emoji e={e} size="1.1rem" /> : '?'}</span>
+              <span key={id} className={`grid h-8 w-8 place-items-center rounded-lg border-2 ${(id in state.stickers) ? 'border-yellow-400 bg-yellow-400/20' : 'border-dashed border-slate-700 text-slate-600'}`}>{(id in state.stickers) ? <Emoji e={e} size="1.1rem" /> : '?'}</span>
             ))}
           </div>
         </div>

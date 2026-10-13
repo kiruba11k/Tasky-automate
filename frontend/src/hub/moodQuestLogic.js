@@ -67,3 +67,24 @@ export function pickChallenge(mood, not, random = Math.random) {
   return list[Math.floor(random() * list.length)] || CHALLENGES[mood][0];
 }
 
+
+// ---- saved progress -----------------------------------------------------------------------------------------------------------
+// Kept on the person's profile (so it follows them to every device) as { days: { date: {...} }, stickers: { id: date } }.
+// Both parts are maps, so two devices adding different things at the same time both survive.
+
+/** Old shape (stickers as a list) or nothing -> the map shape. */
+export function normalizeQuest(q, today = '') {
+  const stickers = Array.isArray(q?.stickers) ? Object.fromEntries(q.stickers.map((id) => [id, today])) : { ...(q?.stickers || {}) };
+  return { days: Object.fromEntries(Object.entries(q?.days || {}).filter(([, rec]) => rec)), stickers }; // a day set to null was cleared
+}
+
+/** Everything from both: every sticker, and for each day the finished record (else the later one). */
+export function mergeQuest(a, b) {
+  const x = normalizeQuest(a); const y = normalizeQuest(b);
+  const days = { ...x.days };
+  for (const [d, rec] of Object.entries(y.days)) {
+    const mine = days[d];
+    if (!mine || (rec.done && !mine.done) || (rec.done === mine.done && (rec.at || 0) > (mine.at || 0))) days[d] = rec;
+  }
+  return { days, stickers: { ...y.stickers, ...x.stickers } };
+}
