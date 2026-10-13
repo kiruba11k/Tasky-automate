@@ -19,8 +19,8 @@ const COLLECTIONS = {
   daily: { kind: "daily", shape: "map" },
   weekly: { kind: "weekly", shape: "map" },
   profiles: { kind: "profile", shape: "map" },
-  // an alias is a plain string in the store, a small document on the server
-  aliases: { kind: "alias", shape: "map", wrap: (alias) => ({ alias }), unwrap: (doc) => doc.alias },
+  // my name in one chat: { alias: today's name, day: the day it was made, used: every name I have had in that chat }
+  aliases: { kind: "alias", shape: "map", wrap: (rec) => rec, unwrap: (doc) => (doc && typeof doc === "object" ? { alias: doc.alias, day: doc.day || "", used: Array.isArray(doc.used) ? doc.used : [doc.alias] } : { alias: String(doc), day: "", used: [String(doc)] }) },
 };
 const BY_KIND = Object.fromEntries(Object.entries(COLLECTIONS).map(([name, c]) => [c.kind, { name, ...c }]));
 const POLL_MS = 30000; // safety net only; changes arrive instantly over the live stream

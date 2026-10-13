@@ -935,7 +935,7 @@ export const useStore = create()(
           const state = get();
           const msg = state.msgs.find((m) => m.id === msgId);
           if (!msg) return;
-          const mineMsg = msg.from ? msg.from === state.me : state.aliases[`${state.me}:${msg.convId}`] === msg.alias;
+          const mineMsg = msg.from ? msg.from === state.me : (state.aliases[`${state.me}:${msg.convId}`]?.used ?? []).includes(msg.alias);
           if (!mineMsg) throw new Error("You can only delete your own messages.");
           set((s) => ({ msgs: s.msgs.filter((m) => m.id !== msgId) }));
         },
@@ -959,9 +959,18 @@ export const useStore = create()(
           if (!conv || !text.trim()) return;
           const named = conv.anonymous === false;
           const aliasKey = `${state.me}:${convId}`;
-          const alias = named ? displayName(state.me) : state.aliases[aliasKey] ?? randomAlias();
+          // Anonymous chats: my name changes every day (a new one the first time I write each day), and is never one already used in the chat.
+          const today = todayKey(0);
+          const mine = state.aliases[aliasKey];
+          let rec = mine;
+          if (!named && (!mine || mine.day !== today)) {
+            const seen = [...state.msgs.filter((m) => m.convId === convId).map((m) => m.alias), ...(mine?.used ?? [])];
+            const fresh = randomAlias(seen);
+            rec = { alias: fresh, day: today, used: [...new Set([...(mine?.used ?? []), fresh])] };
+          }
+          const alias = named ? displayName(state.me) : rec.alias;
           set((s) => ({
-            aliases: named ? s.aliases : { ...s.aliases, [aliasKey]: alias },
+            aliases: named ? s.aliases : { ...s.aliases, [aliasKey]: rec },
             msgs: [
               ...s.msgs,
               { id: newId(), convId, alias, ...(named ? { from: state.me } : {}), text: text.trim(), at: nowIso() },

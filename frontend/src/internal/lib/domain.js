@@ -852,15 +852,20 @@ export const emptyDaily = () => ({
 
 // -------------------------------------------------------------- misc
 
-const ALIAS_ANIMALS = ["Otter", "Panda", "Koala", "Heron", "Falcon", "Fox", "Lynx", "Robin"];
-const ALIAS_ADJECTIVES = ["Calm", "Sunny", "Brave", "Quiet", "Witty", "Kind", "Swift", "Merry"];
+const ALIAS_ANIMALS = ["Otter", "Panda", "Koala", "Heron", "Falcon", "Fox", "Lynx", "Robin", "Gecko", "Badger", "Walrus", "Puffin", "Moose", "Ibis", "Newt", "Yak", "Wombat", "Quail", "Marmot", "Tapir"];
+const ALIAS_ADJECTIVES = ["Calm", "Sunny", "Brave", "Quiet", "Witty", "Kind", "Swift", "Merry", "Cosmic", "Jolly", "Bold", "Gentle", "Nimble", "Plucky", "Breezy", "Cheery", "Dapper", "Zesty", "Mellow", "Spry"];
 
 /** `tU` */
 export { ALIAS_ANIMALS, ALIAS_ADJECTIVES };
 
 /** `rU` - random anonymous chat alias, e.g. "Calm Otter". */
-export const randomAlias = () =>
-  `${ALIAS_ADJECTIVES[Math.floor(Math.random() * 8)]} ${ALIAS_ANIMALS[Math.floor(Math.random() * 8)]}`;
+export function randomAlias(avoid = []) {
+  const taken = new Set(avoid);
+  const make = () => `${ALIAS_ADJECTIVES[Math.floor(Math.random() * ALIAS_ADJECTIVES.length)]} ${ALIAS_ANIMALS[Math.floor(Math.random() * ALIAS_ANIMALS.length)]}`;
+  let alias = make();
+  for (let i = 0; i < 60 && taken.has(alias); i += 1) alias = make(); // never the same name as someone else in the chat (or one of mine)
+  return alias;
+}
 
 /** `OP` - validate + normalise hours per person (0-12, quarter-hour steps). */
 export function validateHours(hours) {

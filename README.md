@@ -196,3 +196,7 @@ Email and password. The first time an added email signs in it has no password ye
 
 - **Task steps are enforced on the server** (`taskTransitionProblem` in `backend/src/tracker.js`): a task moves todo → in progress → in review → done / changes, only its reviewer approves or sends it back, and a finished task stays finished. A tab showing an out-of-date screen cannot approve a task that was just sent back (or approve twice); the change is refused with a plain message and the screen refreshes to the server's version.
 - **Project week and month numbers roll over on the server** every minute (`rollProject` in `backend/src/deadlines.js`, India time by default, `WORK_TZ`): last week's / month's counts move into the history and the new period starts from zero, once, for everybody.
+
+## Anonymous chat
+
+In an anonymous chat everyone, including you, is shown on the left with the same look, so nobody glancing at your screen can tell which messages are yours (named chats keep your messages on the right). Everyone's alias changes every day (a new one the first time you write each day, never one already used in that chat). Tap one of your own messages to get Delete; "Show my name" reveals today's alias for a few seconds.

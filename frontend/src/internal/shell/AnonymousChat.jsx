@@ -44,9 +44,12 @@ export function AnonymousChat({ onClose }) {
   const seen = useRef(null); // message ids already on screen: only newer ones animate in
   const active = myConvs.find((c) => c.id === activeId) ?? myConvs[0];
   const messages = msgs.filter((m) => m.convId === active?.id);
-  const myAlias = active ? aliases[`${me}:${active.id}`] : undefined;
+  const myNames = active ? aliases[`${me}:${active.id}`]?.used ?? [] : []; // every name I have written under in this chat (a new one each day)
+  const myAlias = active ? aliases[`${me}:${active.id}`]?.alias : undefined;
+  const [menuFor, setMenuFor] = useState(null); // anonymous chats: tap one of my own messages to reveal Delete
+  const [peek, setPeek] = useState(false);
   const named = active ? active.anonymous === false : false;
-  const isMine = (m) => (m.from ? m.from === me : m.alias === myAlias);
+  const isMine = (m) => (m.from ? m.from === me : myNames.includes(m.alias));
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -149,8 +152,12 @@ export function AnonymousChat({ onClose }) {
           <p className="text-xs text-muted">
             {named
               ? 'Messages show your name. Chats disappear a day after the last message.'
-              : '🎭 Anonymous: nobody, including management, can see who wrote what. Chats disappear a day after the last message.'}
-            {!named && myAlias && ` You appear as ${myAlias}.`}
+              : '🎭 Anonymous: nobody, including management, can see who wrote what. Everyone is shown on the left, and names change every day. Chats disappear a day after the last message.'}
+            {!named && (
+              <button type="button" className="focus-ring ml-1 rounded px-1 font-semibold text-accent-ink underline" onClick={() => { setPeek(true); setTimeout(() => setPeek(false), 5000); }}>
+                {peek ? `Today you are ${myAlias ?? 'given a new name when you write'}` : 'Show my name'}
+              </button>
+            )}
           </p>
         </header>
         <div className="chat-scroll relative flex-1 space-y-3 overflow-y-auto p-4">
@@ -160,18 +167,25 @@ export function AnonymousChat({ onClose }) {
             const mine = isMine(m);
             const big = EMOJI_ONLY.test(String(m.text).trim());
             const sender = m.from ? fullName(m.from) : m.alias;
+            // Named chats: my messages sit on the right. Anonymous chats: everyone, me included, looks the same and sits on the left,
+            // so nobody glancing at my screen can tell which messages are mine (tap one of my own to get Delete).
+            const right = mine && named;
+            const showDelete = mine && (named || menuFor === m.id);
             return (
-              <div key={m.id} className={cx('flex items-end gap-2', mine && 'justify-end', isNew(m) && (mine ? 'chat-in-right' : 'chat-in-left'))}>
+              <div key={m.id} className={cx('flex items-end gap-2', right && 'justify-end', isNew(m) && (right ? 'chat-in-right' : 'chat-in-left'))}>
                 {m.from && !mine && <Avatar id={m.from} size="sm" />}
-                <div className={cx('max-w-[75%] px-3 py-2', big ? 'chat-big' : 'rounded-2xl', !big && (mine ? 'bg-accent-soft chat-tail-right' : 'bg-surface-2 chat-tail-left'))}>
-                  <p className={cx('flex items-center gap-1 text-xs font-semibold text-muted', mine && 'justify-end')}>
-                    {!mine && <span className={m.from ? 'text-ink' : ''}>{sender}</span>}
-                    {!mine && ' · '}{timeAgo(m.at)}
-                    {mine && (
+                <div
+                  className={cx('max-w-[75%] px-3 py-2', big ? 'chat-big' : 'rounded-2xl', !big && (right ? 'bg-accent-soft chat-tail-right' : 'bg-surface-2 chat-tail-left'))}
+                  onClick={mine && !named ? () => setMenuFor((cur) => (cur === m.id ? null : m.id)) : undefined}
+                >
+                  <p className={cx('flex items-center gap-1 text-xs font-semibold text-muted', right && 'justify-end')}>
+                    {!(named && mine) && <span className={m.from ? 'text-ink' : ''}>{sender}</span>}
+                    {!(named && mine) && ' · '}{timeAgo(m.at)}
+                    {showDelete && (
                       <button
                         aria-label="Delete message"
                         className="focus-ring ml-1 rounded p-0.5 text-muted hover:text-ink"
-                        onClick={() => deleteMessage(m.id)}
+                        onClick={(e) => { e.stopPropagation(); deleteMessage(m.id); setMenuFor(null); }}
                       >
                         <Trash2 size={12} />
                       </button>
@@ -271,7 +285,7 @@ export function AnonymousChat({ onClose }) {
         </div>
         <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
           <input type="checkbox" className="mt-0.5" checked={anon} onChange={(e) => setAnon(e.target.checked)} />
-          <span><b>🎭 Anonymous</b><span className="block text-xs text-muted">Hide names: everyone gets a random alias, and nobody (not even management) sees who wrote what. Off means real names.</span></span>
+          <span><b>🎭 Anonymous</b><span className="block text-xs text-muted">Hide names: everyone gets a random alias that changes every day, and nobody (not even management) sees who wrote what. Off means real names.</span></span>
         </label>
         {picked.length > 1 && (
           <input
