@@ -80,3 +80,23 @@ export function loggedKpiExtras(projectId, tasks, daily, start, end) {
   });
   return out;
 }
+
+/**
+ * What the team planned for a project's week in "Weekly targets by project", added up over everyone's rows, as project numbers
+ * (messages, 2nd level, decks). Weekly records are kept by Monday while a project's weeks run from its start date, so each
+ * record belongs to the project week that contains its Wednesday.
+ */
+export function plannedWeekTargets(project, weekly, projectWeekStartKey) {
+  const out = {};
+  const end = addDays(projectWeekStartKey, 7);
+  Object.entries(weekly ?? {}).forEach(([key, record]) => {
+    const monday = key.split("|")[1];
+    const mid = addDays(monday, 2);
+    if (!(mid >= projectWeekStartKey && mid < end)) return;
+    (record.entries ?? []).forEach((row) => {
+      if (row.projectId !== project.id || !(row.qty > 0)) return;
+      (KPI_KEYS_BY_TYPE[row.task] ?? []).forEach((k) => { out[k] = (out[k] ?? 0) + row.qty; });
+    });
+  });
+  return out;
+}

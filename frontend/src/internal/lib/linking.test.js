@@ -62,3 +62,31 @@ test('where the time goes includes table time, without double counting tasks', (
   const t = timeBreakdown(state, { personId: ME, from: '2026-10-13', to: '2026-10-13' });
   assert.equal(t.totalMin, 90);
 });
+
+import { weekTargetFor, projectWeekStart } from './domain.js';
+import { plannedWeekTargets } from './entries.js';
+
+test('Tasks done counts work ticked off in the day tables, without doubling assigned tasks', () => {
+  const daily = { [`${ME}|2026-10-13`]: { entries: [row({ task: 'l1', qty: 30, doneQty: 30, estMin: 60, actualMin: 50 }), row({ task: 'deck', qty: 1 }), row({ task: 'l2', qty: 5, doneQty: 5 })] } };
+  const m = personMetrics([], daily, ME, '2026-10-13', '2026-10-13');
+  assert.equal(m.tasks, 2); // l1 and l2 are done, the deck is only planned
+  assert.equal(m.assigned, 3);
+  assert.equal(m.onTime, 100); // l1 took 50 min against an estimate of 60
+  const covered = personMetrics([task({ typeId: 'l1', status: 'done', doneQty: 30, minutes: 40, targetMinutes: 60 })], daily, ME, '2026-10-13', '2026-10-13');
+  assert.equal(covered.tasks, 2); // the l1 task and the l2 row, not the l1 row again
+});
+
+test('a project week with no saved plan takes its targets from what the team planned', () => {
+  const project = { id: P, startDate: '2026-10-07', weekPlans: {}, weekTarget: {}, metrics: [] };
+  const weekly = {
+    [`${ME}|2026-10-05`]: { entries: [row({ task: 'l1', qty: 100 }), row({ task: 'deck', qty: 2 })] },
+    'other|2026-10-05': { entries: [row({ task: 'l2', qty: 50 })] },
+    [`${ME}|2026-10-12`]: { entries: [row({ task: 'l1', qty: 999 })] }, // the next project week
+  };
+  const start = projectWeekStart(project, '2026-10-08');
+  assert.equal(start, '2026-10-07');
+  assert.deepEqual(plannedWeekTargets(project, weekly, start), { messages: 150, decks: 2, l2: 50 });
+  assert.deepEqual(weekTargetFor(project, '2026-10-08', weekly), { messages: 150, decks: 2, l2: 50 });
+  assert.deepEqual(weekTargetFor({ ...project, weekPlans: { '2026-10-07': { messages: 10 } } }, '2026-10-08', weekly), { messages: 10 }); // a saved plan wins
+  assert.equal(weekTargetFor(project, '2026-10-08'), project.weekTarget);
+});

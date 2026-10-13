@@ -250,7 +250,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (!(await canWrite(u, kind, key, prev, prev, [], true, existing))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
         // the data stays (it is never served) so that people who could see the document are told it is gone
         await store.update('TrackerDoc', existing.id, { deleted: true, data: prev, owner_id: u.id });
-        if (kind === 'task') await mirrorTask(key, prev, true);
+        if (kind === 'task') { await mirrorTask(key, prev, true); await syncEntryMirrors(prev.assigneeId, prev.date); }
         if (kind === 'conv') await purgeConv(key); // the group's messages and everybody's names in it go with it
         results.push({ ...id, ok: true });
         continue;
@@ -272,7 +272,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       // a conversation keeps its creator as owner, whoever edits it later (renaming, leaving)
       if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: kind === 'conv' && !existing.deleted ? existing.owner_id : u.id });
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
-      if (kind === 'task') await mirrorTask(key, data, false);
+      if (kind === 'task') { await mirrorTask(key, data, false); await syncEntryMirrors(data.assigneeId, data.date); }
+      if (kind === 'daily') { const [who, day] = key.split('|'); await syncEntryMirrors(who, day); }
       if (kind === 'notice' && !existing && data.to && data.to !== u.id && !data.read) pushNotice(data);
       results.push({ ...id, ok: true });
     }
@@ -304,7 +305,31 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     if (existing) await store.update('DailyTask', existing.id, rec);
     else await store.insert('DailyTask', rec);
   }
+  /**
+   * Work ticked off in a person's day tables counts for the fun layer (levels, streaks, quests) like an approved task does: each
+   * done row keeps one Completed DailyTask in step with it. A row is skipped where a submitted task already covers the same
+   * project and kind of work that day, so nothing is counted twice, and rows that are removed or unticked lose their record.
+   */
+  async function syncEntryMirrors(personId, date) {
+    if (!personId || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
+    const doc = await find('daily', `${personId}|${date}`);
+    const rows = doc && !doc.deleted && Array.isArray(doc.data?.entries) ? doc.data.entries : [];
+    const covered = new Set((await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 }))
+      .filter((d) => !d.deleted && d.data?.assigneeId === personId && d.data?.date === date && ['done', 'in_review'].includes(d.data?.status))
+      .map((d) => `${d.data.projectId}|${d.data.typeId}`));
+    const want = new Map();
+    rows.forEach((e) => { if (e.doneQty > 0 && e.task && !covered.has(`${e.projectId}|${e.task}`)) want.set(`entry:${personId}|${date}:${e.id}`, e); });
+    const have = (await store.list('DailyTask', { query: { user_id: personId, date }, limit: 1000 })).filter((r) => String(r.tracker_key || '').startsWith('entry:'));
+    for (const r of have) if (!want.has(r.tracker_key)) await store.remove('DailyTask', r.id);
+    for (const [key, e] of want) {
+      const name = String(e.custom || e.desc || e.task).slice(0, 120);
+      const rec = { tracker_key: key, user_id: personId, date, task: `Logged: ${name}`, expected_outcome: `${e.qty || e.doneQty} ${name}`, expected_time: Math.max(0.1, (Number(e.estMin) || 6) / 60), actual_time_taken: Math.max(0, (Number(e.actualMin) || 0) / 60), task_status: 'Completed', priority: 'Medium', file_source: 'manual' };
+      const old = have.find((r) => r.tracker_key === key);
+      if (old) await store.update('DailyTask', old.id, rec); else await store.insert('DailyTask', rec);
+    }
+  }
   async function backfillMirrors() {
+    for (const d of await store.list('TrackerDoc', { query: { kind: 'daily' }, limit: 100000 })) { const [who, day] = String(d.key).split('|'); await syncEntryMirrors(who, day); }
     for (const d of await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 })) await mirrorTask(d.key, d.data, !!d.deleted);
   }
   setTimeout(() => backfillMirrors().catch((e) => console.error('mirror backfill failed:', e)), 3000).unref?.();

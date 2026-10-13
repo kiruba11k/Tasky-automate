@@ -13,7 +13,7 @@ import {
   Mn as toMinutes,
 } from '@/internal/min';
 import { addDays, previousWeekday, weekStart } from '../lib/dates.js';
-import { canManageProject, computeStandardMinutes, emptyDaily, emptyWeekly } from '../lib/domain.js';
+import { canManageProject, computeStandardMinutes, emptyDaily, emptyWeekly, weekTargetFor } from '../lib/domain.js';
 import { WeekPlanner } from '../projects/WeekPlanner';
 import { DurationInput } from './DurationInput';
 import { formatDayClock } from './dateHelpers';
@@ -47,7 +47,7 @@ function useEntriesRecord(personId, kind, date) {
  * estimated time, then (after locking) actual time, achieved and remarks. `readOnly` is the manager's view of someone else's.
  */
 export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day' }) {
-  const { me, projects, daily } = useStore();
+  const { me, projects, daily, weekly } = useStore();
   const { key, record, previous, save } = useEntriesRecord(personId, kind, date);
   const stored = record.entries ?? [];
   const blocks = plan ?? (kind === 'day' ? record.plan : []);
@@ -212,6 +212,15 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day'
                   )}
                 </span>
               </div>
+              {kind === 'week' && (() => {
+                const target = weekTargetFor(project, date, weekly) ?? {};
+                const parts = project.metrics.filter((m) => target[m.id] > 0).map((m) => `${m.label} ${target[m.id]}`);
+                return parts.length ? (
+                  <p className="border-b border-line px-3 py-1.5 text-xs text-muted" data-project-targets>
+                    Project targets this week: <b className="text-ink">{parts.join(' · ')}</b>
+                  </p>
+                ) : null;
+              })()}
               {kind === 'week' && !readOnly && canManageProject(project, me) && (
                 <details className="border-b border-line px-3 py-2">
                   <summary className="cursor-pointer text-xs font-semibold text-accent-ink">

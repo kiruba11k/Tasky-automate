@@ -13,7 +13,7 @@ import {
   weekStart,
   WEEKDAY_SHORT,
 } from "./dates.js";
-import { entryAsTask, entriesBetween, weeklyDone, dayEntries } from "./entries.js";
+import { entryAsTask, entriesBetween, weeklyDone, dayEntries, plannedWeekTargets, CUSTOM_TASK } from "./entries.js";
 import {
   PEOPLE,
   TASK_TYPES,
@@ -120,12 +120,17 @@ export function projectWeekStart(project, date) {
   return addDays(project.startDate, Math.floor(days / 7) * 7);
 }
 
-/** `yf` - weekly target for the week containing `date` (the saved plan, else the default). Plans saved before weeks
- *  started on the project's start date are still found under their Monday. */
-export const weekTargetFor = (project, date) =>
-  project.weekPlans?.[projectWeekStart({ startDate: project.startDate ?? "" }, date)] ??
-  project.weekPlans?.[weekStart(date)] ??
-  project.weekTarget;
+/** `yf` - weekly target for the week containing `date`: the saved plan, else the default plus what the team planned in
+ *  "Weekly targets by project" (pass `weekly`, the store's weekly records, to include that). Plans saved before weeks started on
+ *  the project's start date are still found under their Monday. */
+export function weekTargetFor(project, date, weekly) {
+  const start = projectWeekStart({ startDate: project.startDate ?? "" }, date);
+  const saved = project.weekPlans?.[start] ?? project.weekPlans?.[weekStart(date)];
+  if (saved) return saved;
+  if (!weekly) return project.weekTarget;
+  const planned = plannedWeekTargets(project, weekly, start);
+  return Object.keys(planned).length ? { ...(project.weekTarget ?? {}), ...planned } : project.weekTarget;
+}
 
 /** The plan saved for the week containing `date`, if there is one (under the project's week start, or the Monday older plans used). */
 export const savedWeekPlan = (project, date) =>
@@ -712,6 +717,7 @@ export function personMetrics(tasks, daily, personId, from, to) {
   let onTimeCount = 0;
   let resubmits = 0;
   const taskMinutes = new Map(); // per day and project: time on submitted tasks
+  const coveredWork = new Set(); // day, project and kind of work that submitted tasks already count
   tasks.forEach((t) => {
     if (t.date < from || t.date > to) return;
     assigned++;
@@ -720,12 +726,27 @@ export function personMetrics(tasks, daily, personId, from, to) {
     submitted++;
     const bucket = `${t.date}|${t.projectId}`;
     taskMinutes.set(bucket, (taskMinutes.get(bucket) ?? 0) + (t.minutes ?? 0));
+    coveredWork.add(`${t.date}|${t.projectId}|${t.typeId}`);
     const ok = wasOnTime(t);
     if (ok !== null) {
       timed++;
       if (ok) onTimeCount++;
     }
   });
+  // work ticked off in the day tables counts as done too, unless a submitted task already covers that kind of work that day
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    dayEntries(daily, personId, d).forEach((e) => {
+      if (e.task === CUSTOM_TASK ? !e.custom?.trim() : !e.task) return;
+      if (coveredWork.has(`${d}|${e.projectId}|${e.task}`)) return;
+      assigned++;
+      if (!(e.doneQty > 0)) return;
+      submitted++;
+      if (e.estMin > 0 && e.actualMin > 0) {
+        timed++;
+        if (e.actualMin <= e.estMin) onTimeCount++;
+      }
+    });
+  }
   let extraMinutes = 0;
   const loggedMinutes = new Map(); // per day and project: actual time typed into the day tables
   for (let d = from; d <= to; d = addDays(d, 1)) {

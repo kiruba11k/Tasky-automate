@@ -15,6 +15,7 @@ import {
   tc as metricInPeriod,
 } from '@/internal/min';
 import { projectWeekStart, savedWeekPlan } from '@/internal/lib/domain';
+import { plannedWeekTargets } from '@/internal/lib/entries';
 import { ProgressBars } from './ProgressBars';
 import { ProgressTile } from './ProgressTile';
 import { weekOptions, monthOptions } from './weekOptions';
@@ -67,13 +68,16 @@ export function ProjectProgress({ p: project, compact }) {
   );
   const savedPlan = kind === 'week' ? savedWeekPlan(project, week) : undefined;
   const me = useStore((s) => s.me);
+  const weekly = useStore((s) => s.weekly);
   const canPlan = canPlanFor(project, me);
   const isDraft = kind === 'week' && !savedPlan && !project.weekLocked;
+  // what the team planned in Weekly targets by project stands in until the project's own weekly numbers are saved
+  const teamPlanned = kind === 'week' && !savedPlan && Object.keys(plannedWeekTargets(project, weekly, week)).length > 0;
   const targets =
     kind === 'week'
-      ? isDraft && !canPlan
+      ? isDraft && !canPlan && !teamPlanned
         ? undefined
-        : weeklyTargetFor(project, week)
+        : weeklyTargetFor(project, week, weekly)
       : project.monthLocked
         ? project.monthTarget
         : undefined;
@@ -140,6 +144,8 @@ export function ProjectProgress({ p: project, compact }) {
         {kind === 'week' &&
           (savedPlan ? (
             <Badge tone="mint">Using this week's saved plan</Badge>
+          ) : teamPlanned ? (
+            <Badge tone="sky">Targets from the team's weekly plans</Badge>
           ) : targets && isDraft ? (
             <Badge tone="butter">Draft target</Badge>
           ) : targets ? (

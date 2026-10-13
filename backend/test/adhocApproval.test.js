@@ -79,6 +79,23 @@ describe('send for approval: anyone sends their own unassigned work to a reviewe
     assert.equal((await put(tok.out, 'task', 'g6', give('out', { id: 'g6' }))).ok, false); // not on the project
     assert.equal((await put(tok.res, 'task', 'g1', { title: 'Pull list v2' })).ok, true); // the assigner can still edit it
   });
+  test('work ticked off in the day tables counts for the fun layer once, and not on top of a submitted task', async () => {
+    const admin = await login('boss@example.com');
+    const mirrors = async () => (await call('GET', '/api/entities/DailyTask', admin)).body.filter((r) => String(r.tracker_key || '').startsWith('entry:'));
+    const day = `${ids.res}|2026-10-14`;
+    const l1 = { id: 'r1', projectId: 'p1', task: 'l1', qty: 30, doneQty: 30, estMin: 60, actualMin: 50 };
+    const deck = { id: 'r2', projectId: 'p1', task: 'deck', qty: 1 };
+    assert.equal((await put(tok.res, 'daily', day, { entries: [l1, deck] })).ok, true);
+    let m = await mirrors(); assert.equal(m.length, 1); assert.equal(m[0].task_status, 'Completed'); assert.equal(m[0].user_id, ids.res);
+    assert.equal((await put(tok.res, 'daily', day, { entries: [l1, { ...deck, doneQty: 1 }] })).ok, true);
+    assert.equal((await mirrors()).length, 2);
+    assert.equal((await put(tok.res, 'daily', day, { entries: [{ ...l1, doneQty: undefined }, { ...deck, doneQty: 1 }] })).ok, true); // unticked
+    assert.equal((await mirrors()).length, 1);
+    // a submitted task for the same project and kind of work covers it
+    assert.equal((await put(tok.res, 'task', 'cover', { id: 'cover', status: 'todo', title: 'Decks', typeId: 'deck', date: '2026-10-14', assigneeId: ids.res, assignedById: ids.res, projectId: 'p1' })).ok, true);
+    assert.equal((await put(tok.res, 'task', 'cover', { status: 'in_review', reviewerId: ids.pm })).ok, true);
+    assert.equal((await mirrors()).length, 0);
+  });
   test('task rows of a day are saved by their owner only, and must be valid', async () => {
     const day = `${ids.res}|2026-10-13`;
     const row = { id: 'e1', projectId: 'p1', task: 'model', desc: '', qty: 4, estMin: 30 };

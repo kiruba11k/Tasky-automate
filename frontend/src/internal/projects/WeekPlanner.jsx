@@ -18,7 +18,7 @@ import { BIG_NUMBER_INPUT_CLASS } from './projectHelpers';
 /** Project number targets for one week (messages, responses, calls...). Weeks run in 7-day blocks from the project's start.
  *  `date` picks the week to open on (default: the current week). */
 export function WeekPlanner({ p, date }) {
-  const { saveWeekPlan, clearWeekPlan } = useStore();
+  const { saveWeekPlan, clearWeekPlan, weekly } = useStore();
   const weeks = useMemo(() => listPlanWeeks(p, 'plan'), [p]);
   const thisWeek = projectWeekStart(p, dayKey(0));
   const wanted = projectWeekStart(p, date ?? dayKey(0));
@@ -36,7 +36,7 @@ export function WeekPlanner({ p, date }) {
   );
   const week = weeks[index];
   const savedPlan = savedWeekPlan(p, selected);
-  const targets = weekTargetFor(p, selected);
+  const targets = weekTargetFor(p, selected, weekly) ?? {};
   const metrics = p.metrics.filter((m) => tracksPeriod(m, 'week'));
   const upcoming = weeks.filter((w) => w.start > thisWeek).slice(0, 4);
 
@@ -189,7 +189,7 @@ export function WeekPlanner({ p, date }) {
               <Button
                 tone="ghost"
                 className="border border-line"
-                onClick={() => startEditing(weekTargetFor(p, weeks[index - 1].start))}
+                onClick={() => startEditing(weekTargetFor(p, weeks[index - 1].start, weekly))}
               >
                 <Copy size={13} /> Copy week {weeks[index - 1].n}
               </Button>

@@ -19,18 +19,20 @@ import {
   lt as attempt,
   Ye as toast,
 } from '@/internal/min';
-import { savedWeekPlan } from '@/internal/lib/domain';
+import { savedWeekPlan, projectWeekStart } from '@/internal/lib/domain';
+import { plannedWeekTargets } from '@/internal/lib/entries';
 import { formatClock, BIG_NUMBER_INPUT_CLASS } from './projectHelpers';
 
 /** "This week's numbers" tab: locked read-only totals with an Edit mode for corrections. */
 export function WeekNumbers({ p, canEdit }) {
-  const { tasks, daily, setWeekValues, finalizeDay } = useStore();
+  const { tasks, daily, weekly, setWeekValues, finalizeDay } = useStore();
   const week = weekStart(0);
   const today = dayKey(0);
   const { counts, auto } = countWeek(p, tasks, daily, { kind: 'week', key: week });
   const me = useStore((s) => s.me);
   const isDraft = !savedWeekPlan(p, week) && !p.weekLocked;
-  const targets = isDraft && !canEditProject(p, me) ? undefined : weekTargetFor(p, week);
+  const teamPlanned = isDraft && Object.keys(plannedWeekTargets(p, weekly, projectWeekStart(p, week))).length > 0;
+  const targets = isDraft && !canEditProject(p, me) && !teamPlanned ? undefined : weekTargetFor(p, week, weekly);
   const endOfDaySentCount = (date) =>
     p.teamIds.filter((id) => !!daily[`${id}|${date}`]?.eodAt).length;
   const days = weekDays(p, week);
@@ -131,7 +133,7 @@ export function WeekNumbers({ p, canEdit }) {
       <div>
         {isDraft && targets && (
           <p className="mb-2">
-            <Badge tone="butter">Draft target</Badge>
+            <Badge tone={teamPlanned ? 'sky' : 'butter'}>{teamPlanned ? "Targets from the team's weekly plans" : 'Draft target'}</Badge>
           </p>
         )}
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
