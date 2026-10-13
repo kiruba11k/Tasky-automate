@@ -646,3 +646,80 @@ html[data-mode='light'] :is([class*='bg-yellow-300'], [class*='bg-yellow-400'], 
 @keyframes spin-flip { 0% { transform: perspective(600px) rotateY(90deg) scale(.8); opacity: 0; } 100% { transform: perspective(600px) rotateY(0) scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .ludo-can, .ludo-hit, .ludo-home, .spin-seat-target .spin-face, .spin-card { animation: none !important; } .ludo-token, .spin-bottle { transition-duration: .01s !important; } }
 .mg-ink { color: #0b1220 !important; }
+
+/* ======================= More motion for the multiplayer games ======================= */
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -12px; border-radius: 2px; animation: confetti-fall linear both; }
+@keyframes confetti-fall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(260px) rotate(var(--r)) translateX(30px); opacity: 0; } }
+.end-banner { position: relative; display: flex; align-items: center; gap: .6rem; overflow: hidden; border-radius: 14px; padding: .7rem 1rem; background: rgba(51, 65, 85, .75); color: #fff; font-size: 1.15rem; animation: bs-pop .4s ease-out both; }
+.end-banner b { color: #fff; } .end-won { background: linear-gradient(90deg, #b45309, #f59e0b); box-shadow: 0 0 24px rgba(245, 158, 11, .5); }
+.end-trophy { font-size: 1.8rem; display: inline-block; } .end-won .end-trophy { animation: end-trophy 1.2s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes end-trophy { 0% { transform: scale(0) rotate(-40deg); } 60% { transform: scale(1.5) rotate(12deg); } 100% { transform: scale(1) rotate(0); } }
+.pig-pop { display: inline-block; animation: pig-pop .45s cubic-bezier(.3, 1.8, .5, 1) both; }
+@keyframes pig-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+/* Battleship: a shell arcs in, then the splash or the blast */
+.bs-shell { position: absolute; left: 50%; top: 50%; width: 38%; height: 38%; margin: -19% 0 0 -19%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #475569 55%, #0f172a); z-index: 3; animation: bs-shell .5s cubic-bezier(.5, 0, .9, .5) both; pointer-events: none; }
+@keyframes bs-shell { 0% { transform: translate(0, -420%) scale(2.4); opacity: .9; } 85% { opacity: 1; } 100% { transform: translate(0, 0) scale(.5); opacity: 0; } }
+.bs-fire.bs-fresh { animation-delay: .48s; } .bs-ripple.bs-fresh i { animation-delay: .5s; } .bs-ripple.bs-fresh i:nth-child(2) { animation-delay: .7s; } .bs-ripple.bs-fresh i:nth-child(3) { animation-delay: .9s; }
+.bs-smoke { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.bs-smoke i { position: absolute; left: 40%; bottom: 40%; width: 36%; height: 36%; border-radius: 50%; background: rgba(15, 23, 42, .55); filter: blur(2px); opacity: 0; animation: bs-smoke 1.6s ease-out .55s both; }
+.bs-smoke i:nth-child(2) { left: 25%; animation-delay: .75s; } .bs-smoke i:nth-child(3) { left: 55%; animation-delay: .95s; }
+@keyframes bs-smoke { 0% { transform: translateY(0) scale(.4); opacity: .8; } 100% { transform: translateY(-260%) scale(2); opacity: 0; } }
+.bs-sunk { animation: bs-sink 1.2s ease-in both; }
+@keyframes bs-sink { 0% { transform: rotate(0) translateY(0); filter: none; } 40% { transform: rotate(-9deg) translateY(1px); } 100% { transform: rotate(0) translateY(0); filter: brightness(.6); } }
+.bs-sea-shake { animation: tasky-shake .55s ease-in-out .5s; }
+
+/* Pig: shadow breathes with the die */
+.die-shadow-roll { animation: die-shadow 1s cubic-bezier(.25, .8, .35, 1) both; }
+@keyframes die-shadow { 0% { transform: scale(.35); opacity: .15; } 55% { transform: scale(1.05); opacity: .55; } 70% { transform: scale(.7); opacity: .3; } 85% { transform: scale(1); opacity: .45; } 100% { transform: scale(1); opacity: .4; } }
+.pig-table::after { content: ''; position: absolute; inset: 0; border-radius: 14px; box-shadow: inset 0 0 40px rgba(0,0,0,.45); pointer-events: none; } .pig-table { position: relative; }
+
+/* Memory: deal-in and match sparkles */
+.mem-deal { animation: mem-deal .5s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes mem-deal { 0% { transform: translateY(-40px) rotate(-12deg) scale(.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.mem-card { position: relative; }
+.mem-spark { position: absolute; inset: 0; pointer-events: none; }
+.mem-spark i { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: #fde047; opacity: 0; animation: mem-spark .8s ease-out .5s both; }
+.mem-spark i:nth-child(1) { --a: 0deg; } .mem-spark i:nth-child(2) { --a: 60deg; } .mem-spark i:nth-child(3) { --a: 120deg; } .mem-spark i:nth-child(4) { --a: 180deg; } .mem-spark i:nth-child(5) { --a: 240deg; } .mem-spark i:nth-child(6) { --a: 300deg; }
+@keyframes mem-spark { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-34px) scale(.2); opacity: 0; } }
+
+/* Tug: dust, rope strain and the finish */
+.tug-rope { animation: tug-rope .16s ease-out; }
+@keyframes tug-rope { 0% { transform: translateY(2px) scaleY(1.5); } 100% { transform: none; } }
+.tug-dust { position: absolute; bottom: 26px; width: 22px; height: 22px; border-radius: 50%; background: rgba(120, 82, 36, .55); filter: blur(3px); animation: tug-dust .55s ease-out both; pointer-events: none; }
+@keyframes tug-dust { 0% { transform: translateX(0) scale(.4); opacity: .8; } 100% { transform: translateX(-26px) translateY(-14px) scale(1.7); opacity: 0; } }
+.tug-lost { animation: tug-lost 1s ease-in both; } .tug-won { animation: tasky-jump 1s ease-in-out infinite; }
+@keyframes tug-lost { 0% { translate: 0 0; rotate: 0deg; } 100% { translate: 0 10px; rotate: 78deg; } }
+
+/* Ludo: hops, poofs, bumps */
+.ludo-hop { animation: ludo-hop .5s cubic-bezier(.3, 1, .5, 1); z-index: 6 !important; }
+@keyframes ludo-hop { 0% { translate: 0 0; scale: 1; } 40% { translate: 0 -12px; scale: 1.5; } 100% { translate: 0 0; scale: 1; } }
+.ludo-poof { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 7; }
+.ludo-poof i { position: absolute; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: var(--tone); opacity: 0; animation: ludo-poof .7s ease-out .35s both; }
+.ludo-poof-hit i { width: 10px; height: 10px; margin: -5px; animation-duration: .9s; }
+.ludo-poof i:nth-child(1) { --a: 0deg; } .ludo-poof i:nth-child(2) { --a: 60deg; } .ludo-poof i:nth-child(3) { --a: 120deg; } .ludo-poof i:nth-child(4) { --a: 180deg; } .ludo-poof i:nth-child(5) { --a: 240deg; } .ludo-poof i:nth-child(6) { --a: 300deg; }
+@keyframes ludo-poof { 0% { transform: rotate(var(--a)) translateY(0); opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-26px) scale(.2); opacity: 0; } }
+.ludo-bump { animation: tasky-shake .45s ease-in-out .4s; }
+
+/* Spin: ripple under the bottle and the +1 */
+.spin-ripple { position: absolute; left: 50%; top: 50%; width: 30%; height: 30%; margin: -15% 0 0 -15%; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .5); opacity: 0; pointer-events: none; }
+.spin-ripple-on { animation: spin-ripple 3s ease-out both; }
+@keyframes spin-ripple { 0% { transform: scale(.4); opacity: .8; } 100% { transform: scale(2.6); opacity: 0; } }
+.spin-plus { position: absolute; top: -8px; font-size: 1.3rem; font-weight: 900; color: #fde047; text-shadow: 0 2px 2px #000; animation: spin-plus 1.4s ease-out both; }
+@keyframes spin-plus { 0% { transform: translateY(0) scale(.4); opacity: 0; } 25% { transform: translateY(-14px) scale(1.4); opacity: 1; } 100% { transform: translateY(-46px) scale(1); opacity: 0; } }
+
+/* The classic four: board polish when 3D is off */
+.ttt-mark { display: inline-block; animation: ttt-mark .35s cubic-bezier(.3, 1.8, .5, 1) both; }
+@keyframes ttt-mark { 0% { transform: scale(0) rotate(-90deg); } 100% { transform: scale(1) rotate(0); } }
+.ttt-win { animation: bs-flicker 1s ease-in-out infinite; }
+.c4-drop { animation: c4-drop calc(.18s + var(--drop) * .06s) cubic-bezier(.5, 0, 1, .6) both, c4-bounce .4s ease-out calc(.18s + var(--drop) * .06s) both; }
+@keyframes c4-drop { 0% { transform: translateY(calc(var(--drop) * -110% - 100%)); } 100% { transform: translateY(0); } }
+@keyframes c4-bounce { 0% { transform: translateY(0); } 40% { transform: translateY(-14%); } 100% { transform: translateY(0); } }
+.rps-btn { transition: transform .15s; } .rps-btn:enabled:hover { transform: translateY(-4px) rotate(-4deg); } .rps-picked { animation: rps-shake .6s ease-in-out 2; }
+@keyframes rps-shake { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px) rotate(8deg); } }
+.rps-last { animation: bs-pop .5s cubic-bezier(.3, 1.6, .5, 1) both; }
+.race-go { animation: race-go .5s ease-in-out infinite; } .race-wait { animation: race-wait 1.4s ease-in-out infinite; }
+@keyframes race-go { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, .7); } 50% { transform: scale(1.02); box-shadow: 0 0 0 14px rgba(52, 211, 153, 0); } }
+@keyframes race-wait { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
+@media (prefers-reduced-motion: reduce) { .confetti i, .end-won .end-trophy, .pig-pop, .bs-shell, .bs-smoke i, .bs-sunk, .bs-sea-shake, .die-shadow-roll, .mem-deal, .mem-spark i, .tug-rope, .tug-dust, .tug-lost, .tug-won, .ludo-hop, .ludo-poof i, .ludo-bump, .spin-ripple-on, .spin-plus, .ttt-mark, .ttt-win, .c4-drop, .rps-picked, .rps-last, .race-go, .race-wait { animation: none !important; } }

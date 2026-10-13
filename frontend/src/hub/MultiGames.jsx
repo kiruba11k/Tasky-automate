@@ -4,16 +4,34 @@ const firstName = (n) => String(n || '…').split(/[ @]/)[0];
 const url = (room, p) => `/api/games/${room.id}/${p}`;
 export const OWNER = ['#fb7185', '#38bdf8', '#fcd34d', '#34d399'];
 
+// ---------------------------------------------------------------- Shared: confetti and the end-of-game banner
+const CONFETTI = ['#fb7185', '#38bdf8', '#fcd34d', '#34d399', '#a78bfa', '#fb923c'];
+export function Confetti({ count = 44 }) {
+  const bits = useMemo(() => Array.from({ length: count }, (_, i) => ({ x: Math.random() * 100, d: Math.random() * 0.6, t: 1.8 + Math.random() * 1.6, r: Math.random() * 720 - 360, c: CONFETTI[i % CONFETTI.length], w: 6 + Math.random() * 6 })), [count]);
+  return <div className="confetti" aria-hidden="true">{bits.map((b, i) => <i key={i} style={{ left: `${b.x}%`, animationDelay: `${b.d}s`, animationDuration: `${b.t}s`, '--r': `${b.r}deg`, background: b.c, width: b.w, height: b.w * 1.6 }} />)}</div>;
+}
+export function EndBanner({ won, draw, text }) {
+  return (
+    <div className={`end-banner ${won ? 'end-won' : ''}`} role="status">
+      {won && <Confetti />}
+      <span className="end-trophy" aria-hidden="true">{won ? '🏆' : draw ? '🤝' : '🎮'}</span>
+      <b>{text}</b>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Battleship
 const N = 8;
-function Water({ onFire, shots, sunkSet, fresh, hulls, hitSet, label, hot }) {
+function Water({ shake, onFire, shots, sunkSet, fresh, hulls, hitSet, label, hot }) {
   return (
-    <div className={`bs-sea ${hot ? 'bs-sea-hot' : ''}`} role="group" aria-label={label}>
+    <div className={`bs-sea ${hot ? 'bs-sea-hot' : ''} ${shake ? 'bs-sea-shake' : ''}`} role="group" aria-label={label}>
       {Array.from({ length: N * N }, (_, c) => {
         const shot = shots?.[c]; const ship = hulls?.has(c);
         const isFresh = fresh === c;
         return (
           <button key={c} type="button" className={`bs-cell ${ship ? 'bs-ship' : ''} ${sunkSet?.has(c) ? 'bs-sunk' : ''}`} disabled={!onFire || Boolean(shot)} onClick={() => onFire?.(c)} aria-label={`${label} ${String.fromCharCode(65 + Math.floor(c / N))}${(c % N) + 1}${shot ? (shot === 'hit' ? ' hit' : ' miss') : ''}`}>
+            {isFresh && <span key={`s${fresh}`} className="bs-shell" />}
+            {isFresh && shot === 'hit' && <span key={`k${fresh}`} className="bs-smoke"><i /><i /><i /></span>}
             {(hitSet?.has(c) || shot === 'hit') && <span key={isFresh ? `f${fresh}` : 'h'} className={`bs-fire ${isFresh ? 'bs-fresh' : ''}`}>{sunkSet?.has(c) ? '💀' : '🔥'}</span>}
             {shot === 'miss' && <span key={isFresh ? `f${fresh}` : 'm'} className={`bs-ripple ${isFresh ? 'bs-fresh' : ''}`}><i /><i /><i /></span>}
           </button>
@@ -41,7 +59,7 @@ export function Battleship({ room, act }) {
       <div className={`bs-banner ${flash?.result === 'sunk' ? 'bs-banner-sunk' : flash?.result === 'hit' ? 'bs-banner-hit' : ''}`} key={flash?.seq || 'idle'} aria-live="polite">{msg || (mine ? 'Your turn. Fire at the enemy waters.' : playing ? `${firstName(room.players[s.turn]?.name)} is aiming…` : '')}</div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-300">Enemy waters</p>
-          <Water label="Enemy waters" hot={mine} shots={s.mineShots} onFire={mine ? (c) => act(url(room, 'move'), { cell: c }) : null} sunkSet={sunkFoe} hulls={foeAll} fresh={freshFoe} /></div>
+          <Water label="Enemy waters" hot={mine} shake={flash?.result === 'sunk'} shots={s.mineShots} onFire={mine ? (c) => act(url(room, 'move'), { cell: c }) : null} sunkSet={sunkFoe} hulls={foeAll} fresh={freshFoe} /></div>
         <div><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-300">Your fleet</p>
           <Water label="Your fleet" shots={s.theirShots} hulls={mineSet} hitSet={myHits} sunkSet={sunkMine} fresh={freshMine} /></div>
       </div>
@@ -62,7 +80,7 @@ export function Die({ value, seq, bust }) {
           <div key={k} className={`die-face die-${k}`}>{PIPS[n].map((p) => <i key={p} style={{ gridArea: `${Math.floor(p / 3) + 1} / ${(p % 3) + 1}` }} />)}</div>
         ))}
       </div>
-      <div className="die-shadow" />
+      <div key={`sh${seq}`} className={`die-shadow ${seq ? "die-shadow-roll" : ""}`} />
     </div>
   );
 }
@@ -77,7 +95,7 @@ export function Pig({ room, act }) {
         {room.players.map((p, i) => (
           <div key={p.id} className={`pig-score ${s.turn === i && playing ? 'pig-score-on' : ''}`} style={{ '--tone': OWNER[i] }}>
             <b className="block truncate text-sm mg-w">{firstName(p.name)}{i === me ? ' (you)' : ''}</b>
-            <span className="text-2xl font-extrabold mg-w">{s.scores[i]}</span>
+            <span key={s.scores[i]} className="pig-pop text-2xl font-extrabold mg-w">{s.scores[i]}</span>
             <div className="pig-bar"><div style={{ width: `${Math.min(100, (s.scores[i] / s.target) * 100)}%` }} /></div>
           </div>
         ))}
@@ -116,8 +134,8 @@ export function Memory({ room, act }) {
           const face = s.faces[c]; const up = face !== undefined;
           return (
             <button key={c} type="button" disabled={!mine || up} onClick={() => act(url(room, 'move'), { cell: c })} aria-label={up ? `Card ${c + 1} ${face}` : `Card ${c + 1} face down`}
-              className={`mem-card ${up ? 'mem-up' : ''} ${o !== null ? 'mem-won' : ''} ${miss?.has(c) ? 'mem-miss' : ''} ${win?.has(c) ? 'mem-pop' : ''}`} style={o !== null ? { '--tone': OWNER[o] ?? '#94a3b8' } : undefined}>
-              <span className="mem-inner"><span className="mem-back">?</span><span className="mem-front">{face}</span></span>
+              className={`mem-card mem-deal ${up ? 'mem-up' : ''} ${o !== null ? 'mem-won' : ''} ${miss?.has(c) ? 'mem-miss' : ''} ${win?.has(c) ? 'mem-pop' : ''}`} style={{ animationDelay: `${c * 45}ms`, ...(o !== null ? { '--tone': OWNER[o] ?? '#94a3b8' } : null) }}>
+              <span className="mem-inner"><span className="mem-back">?</span><span className="mem-front">{face}</span></span>{win?.has(c) && <span key={s.reveal.seq} className="mem-spark" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>}
             </button>
           );
         })}
@@ -157,9 +175,10 @@ export function Tug({ room, act }) {
     <div className="space-y-3">
       <div className="tug-scene">
         <div className="tug-mud" style={{ left: '12%' }} /><div className="tug-mud" style={{ right: '12%' }} />
-        <div className="tug-puller tug-left" style={{ left: `${8 + lean0 * 8}%`, transform: `rotate(${-8 - lean0 * 14}deg)` }}><Puller color={OWNER[0]} /><b>{firstName(room.players[0]?.name)}</b></div>
-        <div className="tug-rope"><div className="tug-flag" style={{ left: `${pct}%` }}>🚩</div></div>
-        <div className="tug-puller tug-right" style={{ right: `${8 + lean1 * 8}%`, transform: `rotate(${8 + lean1 * 14}deg) scaleX(-1)` }}><Puller color={OWNER[1]} /><b style={{ transform: 'scaleX(-1)' }}>{firstName(room.players[1]?.name)}</b></div>
+        <div className={`tug-puller tug-left ${s.winner === 1 ? 'tug-lost' : ''} ${s.winner === 0 ? 'tug-won' : ''}`} style={{ left: `${8 + lean0 * 8}%`, transform: `rotate(${-8 - lean0 * 14}deg)` }}><Puller color={OWNER[0]} /><b>{firstName(room.players[0]?.name)}</b></div>
+        <div key={`rope${s.taps[0] + s.taps[1]}`} className="tug-rope"><div className="tug-flag" style={{ left: `${pct}%` }}>🚩</div></div>
+        <div className={`tug-puller tug-right ${s.winner === 0 ? 'tug-lost' : ''} ${s.winner === 1 ? 'tug-won' : ''}`} style={{ right: `${8 + lean1 * 8}%`, transform: `rotate(${8 + lean1 * 14}deg) scaleX(-1)` }}><Puller color={OWNER[1]} /><b style={{ transform: 'scaleX(-1)' }}>{firstName(room.players[1]?.name)}</b></div>
+        {playing && live && <><span key={`d0${s.taps[0]}`} className="tug-dust" style={{ left: `${14 + lean0 * 8}%` }} /><span key={`d1${s.taps[1]}`} className="tug-dust" style={{ right: `${14 + lean1 * 8}%` }} /></>}
         {playing && !live && <div key={count} className="tug-count">{count}</div>}
         {live && s.taps[0] + s.taps[1] === 0 && <div className="tug-count tug-go">GO!</div>}
       </div>
@@ -188,16 +207,17 @@ export function Ludo({ room, act }) {
   const hit = new Set((s.last?.sent || []).map((x) => `${x.who}-${x.token}`));
   return (
     <div className="space-y-3">
-      <div className="ludo-board" role="group" aria-label="Ludo board">
+      <div key={s.last?.sent?.length ? `bump${s.last.seq}` : 'calm'} className={`ludo-board ${s.last?.sent?.length ? 'ludo-bump' : ''}`} role="group" aria-label="Ludo board">
         {s.offsets.map((o, w) => <div key={`y${w}`} className="ludo-yard" style={{ left: `${YARDS[slotOf(o)].x}%`, top: `${YARDS[slotOf(o)].y}%`, '--tone': OWNER[w], opacity: s.turn === w && playing ? 1 : .75 }} />)}
         {cells.map(({ c, x, y }) => <i key={c} className={`ludo-cell ${c % 13 === 0 ? 'ludo-start' : c % 13 === 8 ? 'ludo-safe' : ''}`} style={{ left: `${x}%`, top: `${y}%`, ...(c % 13 === 0 ? { '--tone': OWNER[s.offsets.indexOf(c)] || '#94a3b8' } : null) }} />)}
         {s.offsets.map((o, w) => [1, 2, 3, 4, 5].map((q) => { const pt = polar(RING - q * 5.2, ringAngle((o + 50) % 52)); return <i key={`h${w}-${q}`} className="ludo-cell ludo-lane" style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w] }} />; }))}
+        {s.last && (() => { const pt = tokenPos(s.offsets[s.last.by], s.last.to, 0); return <span key={`poof${s.last.seq}`} className={`ludo-poof ${s.last.sent.length ? 'ludo-poof-hit' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': s.last.sent.length ? '#ef4444' : OWNER[s.last.by] }} aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>; })()}
         <div className="ludo-center"><Die value={s.dice && !s.dice.stuck ? s.dice.d : s.dice?.d || null} seq={s.dice?.seq || 0} bust={Boolean(s.dice?.stuck)} /></div>
         {s.tokens.map((ts, w) => ts.map((p, k) => {
           const pt = tokenPos(s.offsets[w], p, k); const can = mine && s.turn === w && s.phase === 'move' && s.legal.includes(k);
           return (
             <button key={`${w}-${k}`} type="button" disabled={!can} onClick={() => act(url(room, 'move'), { act: 'move', token: k })} aria-label={`${firstName(room.players[w]?.name)} token ${k + 1}${can ? ', tap to move' : ''}`}
-              className={`ludo-token ${can ? 'ludo-can' : ''} ${p === 56 ? 'ludo-home' : ''} ${hit.has(`${w}-${k}`) ? 'ludo-hit' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w], zIndex: can ? 5 : 2 }} data-key={hit.has(`${w}-${k}`) ? s.seq : undefined} />
+              className={`ludo-token ${can ? 'ludo-can' : ''} ${p === 56 ? 'ludo-home' : ''} ${hit.has(`${w}-${k}`) ? 'ludo-hit' : ''} ${s.last && s.last.by === w && s.last.token === k ? 'ludo-hop' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w], zIndex: can ? 5 : 2 }} data-seq={s.last && s.last.by === w && s.last.token === k ? s.last.seq : undefined} />
           );
         }))}
       </div>
@@ -228,8 +248,9 @@ export function Spin({ room, act }) {
         {room.players.map((p, i) => { const pt = polar(40, (i * 360) / n - 90); return (
           <div key={p.id} className={`spin-seat ${s.turn === i && playing ? 'spin-seat-on' : ''} ${s.target === i && playing ? 'spin-seat-target' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[i % OWNER.length] }}>
             <span className="spin-face">{firstName(p.name).slice(0, 1).toUpperCase()}</span>
-            <b>{firstName(p.name)}{i === me ? ' (you)' : ''}</b><em>{s.scores[i]}</em>
+            <b>{firstName(p.name)}{i === me ? ' (you)' : ''}</b><em key={s.scores[i]} className="pig-pop">{s.scores[i]}</em>{s.last?.done && s.last.target === i && s.phase === 'spin' && <span key={`plus${s.rounds}`} className="spin-plus">+1</span>}
           </div>); })}
+        <div key={`rp${s.bottle.seq}`} className={`spin-ripple ${animated ? 'spin-ripple-on' : ''}`} aria-hidden="true" />
         <div className="spin-bottle" style={{ transform: `rotate(${s.bottle.angle}deg)`, transition: animated ? 'transform 3.2s cubic-bezier(.12, .7, .08, 1)' : 'none' }} aria-hidden="true">
           <svg viewBox="0 0 30 110" width="36" height="132"><path d="M11 2h8v6l-1 4c5 4 9 9 9 20v68c0 6-4 8-12 8s-12-2-12-8V32c0-11 4-16 9-20l-1-4z" fill="#16a34a" stroke="#0b1220" strokeWidth="2.5" /><rect x="3" y="48" width="24" height="26" fill="#fef9c3" stroke="#0b1220" strokeWidth="2" /><path d="M10 12h10" stroke="#fde047" strokeWidth="3" /><path d="M8 34v60" stroke="rgba(255,255,255,.45)" strokeWidth="3" strokeLinecap="round" /></svg>
         </div>

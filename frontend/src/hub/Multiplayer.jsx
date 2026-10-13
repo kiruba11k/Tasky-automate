@@ -3,7 +3,7 @@ import { useFun } from '@/fun/FunProvider';
 import { hasWebGL } from '@/fun/three/species';
 import { request, getToken } from '@/api/client';
 import { Panel, Err, primary, subtle } from './ui';
-import { Battleship, Pig, Memory, Tug, Ludo, Spin } from './MultiGames';
+import { Battleship, Pig, Memory, Tug, Ludo, Spin, EndBanner } from './MultiGames';
 
 const GameStage = lazy(() => import('@/fun/three/MultiStages'));
 const ICON = { ttt: '❌', c4: '🔴', rps: '✊', race: '⚡', bs: '🚢', pig: '🎲', mem: '🃏', tug: '🪢', ludo: '🎯', spin: '🍾' };
@@ -71,8 +71,8 @@ function Status({ room }) {
   if (room.status === 'lobby') return <p className="text-slate-300">Waiting for players ({room.players.length}/{room.max})…</p>;
   if (room.status === 'done') {
     const w = s.winner;
-    if (s.forfeit) return <p className="text-lg font-extrabold text-white">{w === me ? 'They left. You win! 🏆' : 'You left the game.'}</p>;
-    return <p className="text-lg font-extrabold text-white">{w === -1 ? "It's a draw 🤝" : w === me ? 'You win! 🏆' : `${firstName(nameOf(room, w))} wins`}</p>;
+    if (s.forfeit) return <EndBanner won={w === me} text={w === me ? 'They left. You win!' : 'You left the game.'} />;
+    return <EndBanner won={w === me} draw={w === -1} text={w === -1 ? "It's a draw" : w === me ? 'You win!' : `${firstName(nameOf(room, w))} wins`} />;
   }
   if (room.game === 'bs' || room.game === 'pig' || room.game === 'mem' || room.game === 'ludo' || room.game === 'spin') return <p className="text-lg font-extrabold text-white">{s.turn === me ? 'Your turn' : `${firstName(nameOf(room, s.turn))}'s turn`}</p>;
   if (room.game === 'tug') return <p className="text-lg font-extrabold text-white">Tug of war!</p>;
@@ -87,7 +87,7 @@ function Ttt({ room, act }) {
     <div className="mx-auto grid w-64 grid-cols-3 gap-2">
       {s.board.map((c, i) => (
         <button key={i} type="button" disabled={!mine || c !== null} onClick={() => act(`/api/games/${room.id}/move`, { cell: i })} aria-label={`Square ${i + 1}${c === null ? '' : c === 0 ? ' cross' : ' circle'}`}
-          className={`aspect-square rounded-xl border-2 border-slate-900 text-4xl font-extrabold ${s.line.includes(i) ? 'bg-emerald-400 text-ink' : 'bg-slate-800 text-white'} ${mine && c === null ? 'hover:bg-slate-700' : ''}`}>{c === null ? '' : MARK[c]}</button>
+          className={`aspect-square rounded-xl border-2 border-slate-900 text-4xl font-extrabold ${s.line.includes(i) ? 'bg-emerald-400 text-ink ttt-win' : 'bg-slate-800 text-white'} ${mine && c === null ? 'hover:bg-slate-700' : ''}`}>{c === null ? '' : <span key={`m${c}`} className="ttt-mark">{MARK[c]}</span>}</button>
       ))}
     </div>
   );
@@ -103,7 +103,7 @@ function C4({ room, act }) {
           <button key={c} type="button" disabled={!mine || s.board[0][c] !== null} onClick={() => act(`/api/games/${room.id}/move`, { col: c })} aria-label={`Drop in column ${c + 1}`}
             className="flex flex-col gap-1 rounded-lg p-0.5 enabled:hover:bg-blue-500/60 disabled:cursor-default">
             {s.board.map((row, r) => (
-              <span key={r} className={`block aspect-square rounded-full border-2 ${hot.has(`${r}-${c}`) ? 'border-white' : 'border-blue-900'} ${row[c] === null ? 'bg-slate-900' : DISC[row[c]]}`} />
+              <span key={`${r}-${row[c] === null ? 'e' : 'f'}`} style={{ '--drop': r + 1 }} className={`${row[c] === null ? '' : 'c4-drop'} block aspect-square rounded-full border-2 ${hot.has(`${r}-${c}`) ? 'border-white' : 'border-blue-900'} ${row[c] === null ? 'bg-slate-900' : DISC[row[c]]}`} />
             ))}
           </button>
         ))}
@@ -118,11 +118,11 @@ function Rps({ room, act }) {
   const s = room.state; const mine = s.picks[room.you];
   return (
     <div className="text-center space-y-3">
-      {s.last && <p className="text-slate-200">Last round: {firstName(nameOf(room, 0))} {RPS[s.last.picks[0]]} vs {RPS[s.last.picks[1]]} {firstName(nameOf(room, 1))} · {s.last.winner === -1 ? 'draw' : `${firstName(nameOf(room, s.last.winner))} scored`}</p>}
+      {s.last && <p key={s.round} className="rps-last text-slate-200">Last round: {firstName(nameOf(room, 0))} {RPS[s.last.picks[0]]} vs {RPS[s.last.picks[1]]} {firstName(nameOf(room, 1))} · {s.last.winner === -1 ? 'draw' : `${firstName(nameOf(room, s.last.winner))} scored`}</p>}
       <div className="flex justify-center gap-3">
         {Object.entries(RPS).map(([k, e]) => (
           <button key={k} type="button" disabled={room.status !== 'playing' || Boolean(mine)} onClick={() => act(`/api/games/${room.id}/move`, { pick: k })} aria-label={k}
-            className={`h-20 w-20 rounded-2xl border-2 border-slate-900 text-4xl ${mine === k ? 'bg-emerald-400' : 'bg-slate-800 enabled:hover:bg-slate-700'} disabled:opacity-60`}>{e}</button>
+            className={`rps-btn h-20 w-20 rounded-2xl border-2 border-slate-900 text-4xl ${mine === k ? 'bg-emerald-400 rps-picked' : 'bg-slate-800 enabled:hover:bg-slate-700'} disabled:opacity-60`}>{e}</button>
         ))}
       </div>
       <p className="text-sm text-slate-300">{room.status !== 'playing' ? '' : mine ? 'Locked in. Waiting for them…' : 'Pick one'}</p>
@@ -137,7 +137,7 @@ function Race({ room, act }) {
   return (
     <div className="space-y-3">
       <button type="button" onPointerDown={() => room.status === 'playing' && act(`/api/games/${room.id}/move`, { tap: 1 })} disabled={room.status !== 'playing'} aria-label="Reaction button"
-        className={`block h-40 w-full rounded-2xl border-2 border-slate-900 text-2xl font-extrabold transition-colors ${tone}`}>{label}</button>
+        className={`block h-40 w-full rounded-2xl border-2 border-slate-900 text-2xl font-extrabold transition-colors ${tone} ${room.status === 'playing' && s.phase === 'go' ? 'race-go' : room.status === 'playing' && s.phase === 'wait' && !out ? 'race-wait' : ''}`}>{label}</button>
       <ul className="flex flex-wrap gap-2">
         {room.players.map((p, i) => <li key={p.id} className={`rounded-full border px-3 py-1 text-sm font-bold ${i === me ? 'border-emerald-400 text-emerald-300' : 'border-slate-600 text-slate-200'}`}>{firstName(p.name)}{i === me ? ' (you)' : ''} · {s.scores[i]}{s.early.includes(i) ? ' · early' : ''}</li>)}
       </ul>
