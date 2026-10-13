@@ -195,3 +195,65 @@ test('tug of war: waits for the start, ignores auto-clicking, pulls the rope', (
   assert.equal(room.status, 'done'); assert.equal(room.state.winner, 0);
   assert.equal(g.view(room, 'a').state.lastTap, undefined);
 });
+
+test('ludo: sixes bring tokens out, captures, safe squares, exact finish, extra roll on six', async () => {
+  const { ludoMoves, ludoMove, ludoSafe, ludoCell, LUDO_HOME } = await import('../src/games.js');
+  assert.deepEqual(ludoMoves([-1, -1, -1, -1], 3), []);
+  assert.deepEqual(ludoMoves([-1, 10, 56, 54], 6), [0, 1]);
+  assert.deepEqual(ludoMoves([55, 56, -1, -1], 1), [0]); // 55 + 1 = home, exact
+  assert.ok(ludoSafe(0) && ludoSafe(8) && ludoSafe(21) && !ludoSafe(5));
+  const st = { offsets: [0, 26], tokens: [[3, -1, -1, -1], [-1, -1, -1, -1]] };
+  st.tokens[1][0] = 33; // player 1's cell = (26 + 33) % 52 = 7
+  const out = ludoMove(st, 0, 0, 4); // 3 -> 7 captures
+  assert.equal(ludoCell(0, 7), 7); assert.deepEqual(out.sent, [{ who: 1, token: 0 }]); assert.equal(st.tokens[1][0], -1);
+  st.tokens[1][1] = 34; // cell 8 is a safe square: no capture
+  st.tokens[0][0] = 4; const safe = ludoMove(st, 0, 0, 4); assert.deepEqual(safe.sent, []); assert.equal(st.tokens[1][1], 34);
+  assert.equal(LUDO_HOME, 56);
+  // engine: a scripted game of rolls
+  const rolls = [6, 3, 2]; let i = 0;
+  const g = createGames({ clock: () => 1, random: () => (rolls[i++ % rolls.length] - 1) / 6 + 0.01 });
+  const room = g.create(U('a'), 'ludo'); g.join(U('b'), room.id); g.start(U('a'), room.id); i = 0;
+  assert.throws(() => g.move(U('b'), room.id, { act: 'roll' }), /Not your turn/);
+  assert.throws(() => g.move(U('a'), room.id, { act: 'move', token: 0 }), /can move/);
+  g.move(U('a'), room.id, { act: 'roll' }); // 6
+  assert.deepEqual(room.state.legal, [0, 1, 2, 3]);
+  assert.throws(() => g.move(U('a'), room.id, { act: 'roll' }), /Move a token/);
+  g.move(U('a'), room.id, { act: 'move', token: 2 });
+  assert.equal(room.state.tokens[0][2], 0); assert.equal(room.state.turn, 0); // six: roll again
+  g.move(U('a'), room.id, { act: 'roll' }); // 3
+  g.move(U('a'), room.id, { act: 'move', token: 2 });
+  assert.equal(room.state.tokens[0][2], 3); assert.equal(room.state.turn, 1);
+  g.move(U('b'), room.id, { act: 'roll' }); // 2: nothing out of the yard
+  assert.equal(room.state.dice.stuck, true); assert.equal(room.state.turn, 0);
+});
+
+test('spin the bottle: spin, truth or dare, the spinner decides, scores and a winner', () => {
+  const { g } = mk(); const room = g.create(U('a'), 'spin'); g.join(U('b'), room.id); g.join(U('c'), room.id); g.start(U('a'), room.id);
+  const s = room.state; assert.equal(s.totalRounds, 6);
+  assert.throws(() => g.move(U('b'), room.id, { act: 'spin' }), /Not your turn/);
+  g.move(U('a'), room.id, { act: 'spin' });
+  assert.ok(s.target === 1 || s.target === 2); assert.ok(s.bottle.angle >= 1080);
+  const t = s.target; const tu = ['a', 'b', 'c'][t];
+  assert.throws(() => g.move(U('a'), room.id, { act: 'choose', kind: 'dare' }), /Not your pick/);
+  g.move(U(tu), room.id, { act: 'choose', kind: 'dare' });
+  assert.equal(s.card.kind, 'dare'); assert.equal(g.view(room, 'a').state.used, undefined);
+  assert.throws(() => g.move(U(tu), room.id, { act: 'done' }), /spinner decides/);
+  g.move(U('a'), room.id, { act: 'done' });
+  assert.equal(s.scores[t], 1); assert.equal(s.turn, 1); assert.equal(s.phase, 'spin');
+  for (let k = 0; k < 5; k += 1) { const sp = ['a', 'b', 'c'][s.turn]; g.move(U(sp), room.id, { act: 'spin' }); g.move(U(['a', 'b', 'c'][s.target]), room.id, { act: 'choose', kind: 'truth' }); g.move(U(sp), room.id, { act: 'skip' }); }
+  assert.equal(room.status, 'done'); assert.equal(room.state.winner, t);
+});
+
+test('leaderboard: wins and games played are counted per game and ranked', async () => {
+  const { applyResult, rankings } = await import('../src/games.js');
+  const stats = { players: {} };
+  const room = (game, winner) => ({ game, players: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], state: { winner } });
+  applyResult(stats, room('ttt', 0)); applyResult(stats, room('ttt', 1)); applyResult(stats, room('c4', 1)); applyResult(stats, room('c4', -1));
+  const all = rankings(stats);
+  assert.deepEqual(all.map((r) => [r.id, r.wins, r.played]), [['b', 2, 4], ['a', 1, 4]]);
+  assert.deepEqual(rankings(stats, 'ttt').map((r) => [r.id, r.wins]), [['a', 1], ['b', 1]]);
+  assert.equal(rankings(stats, 'rps').length, 0);
+  const { g } = mk(); const seen = []; const g2 = createGames({ clock: () => 1, random: () => 0.5, onResult: (r) => seen.push(r.game) });
+  const r2 = g2.create(U('a'), 'ttt'); g2.join(U('b'), r2.id); g2.leave(U('a'), r2.id); g2.leave(U('b'), r2.id);
+  assert.deepEqual(seen, ['ttt']); void g;
+});

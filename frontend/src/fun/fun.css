@@ -621,3 +621,28 @@ html[data-mode='light'] :is([class*='bg-yellow-300'], [class*='bg-yellow-400'], 
 
 .mg-w { color: #fff !important; }
 .pig-score { color: #fff; }
+
+.ludo-board { position: relative; width: 100%; max-width: 30rem; aspect-ratio: 1; margin: 0 auto; border-radius: 20px; border: 2px solid #0b1220; background: radial-gradient(circle at 50% 50%, #fef3c7 0 12%, #fde68a 12% 100%); overflow: hidden; }
+.ludo-yard { position: absolute; width: 26%; height: 26%; transform: translate(-50%, -50%); border-radius: 18px; background: color-mix(in srgb, var(--tone) 55%, white); border: 3px solid var(--tone); transition: opacity .3s; }
+.ludo-cell { position: absolute; width: 3.6%; height: 3.6%; transform: translate(-50%, -50%); border-radius: 50%; background: #fff; border: 1.5px solid #92400e; }
+.ludo-start { background: var(--tone); } .ludo-safe { background: #fde047; }
+.ludo-lane { background: color-mix(in srgb, var(--tone) 60%, white); border-color: var(--tone); }
+.ludo-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.62); width: 96px; height: 120px; pointer-events: none; opacity: .95; }
+.ludo-token { position: absolute; width: 5.4%; height: 5.4%; transform: translate(-50%, -50%); border-radius: 50%; padding: 0; background: radial-gradient(circle at 35% 30%, #fff 0 12%, var(--tone) 40%); border: 2px solid #0b1220; box-shadow: 0 2px 0 rgba(0,0,0,.4); transition: left .45s cubic-bezier(.3, 1.3, .5, 1), top .45s cubic-bezier(.3, 1.3, .5, 1); }
+.ludo-token:disabled { cursor: default; }
+.ludo-can { cursor: pointer; animation: ludo-pulse .8s ease-in-out infinite; box-shadow: 0 0 0 3px #fde047, 0 0 12px #fde047; }
+@keyframes ludo-pulse { 0%, 100% { scale: 1; } 50% { scale: 1.3; } }
+.ludo-hit { animation: tasky-shake .5s ease-in-out; } .ludo-home { animation: bs-flicker 1.4s ease-in-out infinite; }
+
+.spin-table { position: relative; width: 100%; max-width: 26rem; aspect-ratio: 1; margin: 0 auto; border-radius: 50%; background: radial-gradient(circle, #7c2d12 0 45%, #9a3412 46% 100%); border: 3px solid #0b1220; box-shadow: inset 0 0 40px rgba(0,0,0,.4); }
+.spin-bottle { position: absolute; left: 50%; top: 50%; width: 36px; height: 132px; margin: -66px 0 0 -18px; transform-origin: 50% 50%; will-change: transform; filter: drop-shadow(0 6px 4px rgba(0,0,0,.4)); }
+.spin-bottle svg { display: block; transform: rotate(0deg); }
+.spin-seat { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 1px; width: 5.2rem; font-size: .72rem; color: #fff; text-align: center; }
+.spin-seat b { max-width: 5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; text-shadow: 0 1px 2px #000; } .spin-seat em { font-style: normal; font-weight: 900; color: #fde047; text-shadow: 0 1px 2px #000; }
+.spin-face { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 50%; background: var(--tone); border: 3px solid #0b1220; font-weight: 900; font-size: 1.1rem; color: #0b1220; transition: transform .3s, box-shadow .3s; }
+.spin-seat-on .spin-face { box-shadow: 0 0 0 3px #fff, 0 0 14px #fff; } .spin-seat-target .spin-face { animation: ludo-pulse .7s ease-in-out infinite; box-shadow: 0 0 0 4px #fde047, 0 0 18px #fde047; }
+.spin-card { max-width: 24rem; margin: 0 auto; border-radius: 16px; border: 3px solid #0b1220; padding: .8rem 1rem; background: #e0f2fe; color: #0b1220; animation: spin-flip .7s cubic-bezier(.3, 1.3, .5, 1) both; box-shadow: 0 6px 0 rgba(0,0,0,.35); }
+.spin-card-dare { background: #ffe4e6; } .spin-card p { font-size: 1.05rem; font-weight: 800; color: #0b1220; } .spin-card-kind { display: block; font-size: .7rem; font-weight: 900; letter-spacing: .08em; color: #475569; }
+@keyframes spin-flip { 0% { transform: perspective(600px) rotateY(90deg) scale(.8); opacity: 0; } 100% { transform: perspective(600px) rotateY(0) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ludo-can, .ludo-hit, .ludo-home, .spin-seat-target .spin-face, .spin-card { animation: none !important; } .ludo-token, .spin-bottle { transition-duration: .01s !important; } }
+.mg-ink { color: #0b1220 !important; }

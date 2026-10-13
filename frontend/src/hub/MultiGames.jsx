@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const firstName = (n) => String(n || '…').split(/[ @]/)[0];
 const url = (room, p) => `/api/games/${room.id}/${p}`;
@@ -53,7 +53,7 @@ export function Battleship({ room, act }) {
 // ---------------------------------------------------------------- Pig dice
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 const FACE_TURN = { 1: [0, 0], 6: [0, 180], 2: [0, -90], 5: [0, 90], 3: [-90, 0], 4: [90, 0] };
-function Die({ value, seq, bust }) {
+export function Die({ value, seq, bust }) {
   const [rx, ry] = FACE_TURN[value] || [-25, 25];
   return (
     <div className="die-stage" aria-label={value ? `Rolled a ${value}` : 'Die'}>
@@ -93,7 +93,7 @@ export function Pig({ room, act }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" disabled={!mine} onClick={() => act(url(room, 'move'), { act: 'roll' })} className="rounded-lg border-2 border-slate-900 bg-rose-500 px-5 py-2 font-extrabold mg-w enabled:hover:bg-rose-400 disabled:opacity-50">Roll</button>
-        <button type="button" disabled={!mine || s.turnTotal === 0} onClick={() => act(url(room, 'move'), { act: 'hold' })} className="rounded-lg border-2 border-slate-900 bg-emerald-400 px-5 py-2 font-extrabold text-ink enabled:hover:bg-emerald-300 disabled:opacity-50">Hold ({s.turnTotal})</button>
+        <button type="button" disabled={!mine || s.turnTotal === 0} onClick={() => act(url(room, 'move'), { act: 'hold' })} className="rounded-lg border-2 border-slate-900 bg-emerald-400 px-5 py-2 font-extrabold mg-ink enabled:hover:bg-emerald-300 disabled:opacity-50">Hold ({s.turnTotal})</button>
         <span className="text-sm text-slate-300">{playing ? (mine ? 'Your turn. Push your luck or bank it.' : `${firstName(room.players[s.turn]?.name)} is rolling…`) : ''}</span>
       </div>
       <p className="text-xs text-slate-400">First to {s.target} wins. Keep rolling to add up points, but a 1 wipes out everything you rolled this turn.</p>
@@ -165,6 +165,93 @@ export function Tug({ room, act }) {
       </div>
       <button type="button" onPointerDown={tap} disabled={!live} aria-label="Pull" className="tug-btn">{live ? 'PULL! (tap fast or press space)' : playing ? 'Get ready…' : 'Game over'}</button>
       <p className="text-sm text-slate-300">{firstName(room.players[0]?.name)} {s.taps[0]} taps · {s.taps[1]} taps {firstName(room.players[1]?.name)}{me === 0 ? ' · you pull to the left' : me === 1 ? ' · you pull to the right' : ''}</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Ludo
+const RING = 36;
+const rad = (deg) => (deg * Math.PI) / 180;
+const polar = (r, deg) => ({ x: 50 + r * Math.cos(rad(deg)), y: 50 + r * Math.sin(rad(deg)) });
+const ringAngle = (cell) => (cell / 52) * 360 - 90;
+const YARDS = [{ x: 15, y: 15 }, { x: 85, y: 15 }, { x: 85, y: 85 }, { x: 15, y: 85 }];
+const slotOf = (offset) => offset / 13; // 0 top-left ... 3 bottom-left
+function tokenPos(offset, p, k) {
+  if (p === -1) { const y = YARDS[slotOf(offset)]; return { x: y.x + (k % 2 ? 4.5 : -4.5), y: y.y + (k > 1 ? 4.5 : -4.5) }; }
+  if (p <= 50) return polar(RING, ringAngle((offset + p) % 52));
+  if (p < 56) return polar(RING - (p - 50) * 5.2, ringAngle((offset + 50) % 52));
+  return polar(3.5, 45 + k * 90 + slotOf(offset) * 20);
+}
+export function Ludo({ room, act }) {
+  const s = room.state; const me = room.you; const playing = room.status === 'playing'; const mine = playing && s.turn === me;
+  const cells = useMemo(() => Array.from({ length: 52 }, (_, c) => ({ c, ...polar(RING, ringAngle(c)) })), []);
+  const hit = new Set((s.last?.sent || []).map((x) => `${x.who}-${x.token}`));
+  return (
+    <div className="space-y-3">
+      <div className="ludo-board" role="group" aria-label="Ludo board">
+        {s.offsets.map((o, w) => <div key={`y${w}`} className="ludo-yard" style={{ left: `${YARDS[slotOf(o)].x}%`, top: `${YARDS[slotOf(o)].y}%`, '--tone': OWNER[w], opacity: s.turn === w && playing ? 1 : .75 }} />)}
+        {cells.map(({ c, x, y }) => <i key={c} className={`ludo-cell ${c % 13 === 0 ? 'ludo-start' : c % 13 === 8 ? 'ludo-safe' : ''}`} style={{ left: `${x}%`, top: `${y}%`, ...(c % 13 === 0 ? { '--tone': OWNER[s.offsets.indexOf(c)] || '#94a3b8' } : null) }} />)}
+        {s.offsets.map((o, w) => [1, 2, 3, 4, 5].map((q) => { const pt = polar(RING - q * 5.2, ringAngle((o + 50) % 52)); return <i key={`h${w}-${q}`} className="ludo-cell ludo-lane" style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w] }} />; }))}
+        <div className="ludo-center"><Die value={s.dice && !s.dice.stuck ? s.dice.d : s.dice?.d || null} seq={s.dice?.seq || 0} bust={Boolean(s.dice?.stuck)} /></div>
+        {s.tokens.map((ts, w) => ts.map((p, k) => {
+          const pt = tokenPos(s.offsets[w], p, k); const can = mine && s.turn === w && s.phase === 'move' && s.legal.includes(k);
+          return (
+            <button key={`${w}-${k}`} type="button" disabled={!can} onClick={() => act(url(room, 'move'), { act: 'move', token: k })} aria-label={`${firstName(room.players[w]?.name)} token ${k + 1}${can ? ', tap to move' : ''}`}
+              className={`ludo-token ${can ? 'ludo-can' : ''} ${p === 56 ? 'ludo-home' : ''} ${hit.has(`${w}-${k}`) ? 'ludo-hit' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w], zIndex: can ? 5 : 2 }} data-key={hit.has(`${w}-${k}`) ? s.seq : undefined} />
+          );
+        }))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!mine || s.phase !== 'roll'} onClick={() => act(url(room, 'move'), { act: 'roll' })} className="rounded-lg border-2 border-slate-900 bg-rose-500 px-5 py-2 font-extrabold mg-w enabled:hover:bg-rose-400 disabled:opacity-50">Roll the die</button>
+        <span className="text-sm text-slate-300" aria-live="polite">{!playing ? '' : s.dice?.stuck && s.dice.by === me ? `You rolled ${s.dice.d}. No move, next player.` : mine ? (s.phase === 'move' ? `You rolled ${s.dice.d}. Tap a glowing token.` : 'Your turn. Roll the die.') : `${firstName(room.players[s.turn]?.name)} is playing…`}</span>
+      </div>
+      <ul className="flex flex-wrap gap-2">{room.players.map((p, i) => <li key={p.id} className="rounded-full border-2 px-3 py-1 text-sm font-bold text-white" style={{ borderColor: OWNER[i] }}>{firstName(p.name)}{i === me ? ' (you)' : ''} · {s.tokens[i].filter((x) => x === 56).length}/4 home</li>)}</ul>
+      <p className="text-xs text-slate-400">Roll a 6 to bring a token out. Land on another colour to send it back to its yard (the star and start squares are safe). A 6 gives another roll. Reach the centre with an exact count.</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Spin the bottle
+export function Spin({ room, act }) {
+  const s = room.state; const me = room.you; const playing = room.status === 'playing'; const n = room.players.length;
+  const first = useRef(s.bottle.seq); const animated = s.bottle.seq !== first.current;
+  const [ready, setReady] = useState(true);
+  useEffect(() => {
+    if (s.phase !== 'choose' || s.bottle.seq === first.current) { setReady(true); return undefined; }
+    setReady(false); const t = setTimeout(() => setReady(true), 3400); return () => clearTimeout(t);
+  }, [s.phase, s.bottle.seq]);
+  const spinner = room.players[s.turn]; const target = s.target !== null ? room.players[s.target] : null;
+  const act2 = (a, extra) => act(url(room, 'move'), { act: a, ...extra });
+  return (
+    <div className="space-y-3">
+      <div className="spin-table">
+        {room.players.map((p, i) => { const pt = polar(40, (i * 360) / n - 90); return (
+          <div key={p.id} className={`spin-seat ${s.turn === i && playing ? 'spin-seat-on' : ''} ${s.target === i && playing ? 'spin-seat-target' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[i % OWNER.length] }}>
+            <span className="spin-face">{firstName(p.name).slice(0, 1).toUpperCase()}</span>
+            <b>{firstName(p.name)}{i === me ? ' (you)' : ''}</b><em>{s.scores[i]}</em>
+          </div>); })}
+        <div className="spin-bottle" style={{ transform: `rotate(${s.bottle.angle}deg)`, transition: animated ? 'transform 3.2s cubic-bezier(.12, .7, .08, 1)' : 'none' }} aria-hidden="true">
+          <svg viewBox="0 0 30 110" width="36" height="132"><path d="M11 2h8v6l-1 4c5 4 9 9 9 20v68c0 6-4 8-12 8s-12-2-12-8V32c0-11 4-16 9-20l-1-4z" fill="#16a34a" stroke="#0b1220" strokeWidth="2.5" /><rect x="3" y="48" width="24" height="26" fill="#fef9c3" stroke="#0b1220" strokeWidth="2" /><path d="M10 12h10" stroke="#fde047" strokeWidth="3" /><path d="M8 34v60" stroke="rgba(255,255,255,.45)" strokeWidth="3" strokeLinecap="round" /></svg>
+        </div>
+      </div>
+      {playing && (
+        <div className="min-h-[7rem] space-y-2 text-center">
+          {s.phase === 'spin' && (s.turn === me ? <button type="button" onClick={() => act2('spin')} className="rounded-lg border-2 border-slate-900 bg-emerald-400 px-6 py-2 font-extrabold mg-ink hover:bg-emerald-300">Spin the bottle!</button> : <p className="text-slate-200">{firstName(spinner?.name)} is about to spin…</p>)}
+          {s.phase === 'choose' && !ready && <p className="text-slate-200">Spinning…</p>}
+          {s.phase === 'choose' && ready && (s.target === me ? (
+            <div className="space-y-2"><p className="font-extrabold text-white">It landed on you! Truth or dare?</p><div className="flex justify-center gap-3">
+              <button type="button" onClick={() => act2('choose', { kind: 'truth' })} className="rounded-lg border-2 border-slate-900 bg-sky-400 px-5 py-2 font-extrabold mg-ink hover:bg-sky-300">Truth</button>
+              <button type="button" onClick={() => act2('choose', { kind: 'dare' })} className="rounded-lg border-2 border-slate-900 bg-rose-500 px-5 py-2 font-extrabold mg-w hover:bg-rose-400">Dare</button></div></div>
+          ) : <p className="text-slate-200">It landed on {firstName(target?.name)}. Waiting for their pick…</p>)}
+          {s.phase === 'task' && s.card && (
+            <div key={s.bottle.seq} className={`spin-card ${s.card.kind === 'dare' ? 'spin-card-dare' : ''}`}><span className="spin-card-kind">{s.card.kind === 'dare' ? 'DARE' : 'TRUTH'} for {s.target === me ? 'you' : firstName(target?.name)}</span><p>{s.card.text}</p></div>
+          )}
+          {s.phase === 'task' && (s.turn === me ? <div className="flex flex-wrap items-center justify-center gap-2"><span className="text-sm text-slate-200">Did {firstName(target?.name)} do it?</span>
+            <button type="button" onClick={() => act2('done')} className="rounded-lg border-2 border-slate-900 bg-emerald-400 px-4 py-1.5 font-extrabold mg-ink hover:bg-emerald-300">Yes, +1</button>
+            <button type="button" onClick={() => act2('skip')} className="rounded-lg border-2 border-slate-900 bg-slate-300 px-4 py-1.5 font-extrabold mg-ink hover:bg-slate-200">Skipped</button></div> : <p className="text-sm text-slate-300">{firstName(spinner?.name)} will say when it is done.</p>)}
+        </div>
+      )}
+      <p className="text-center text-xs text-slate-400">Round {Math.min(s.rounds + 1, s.totalRounds)} of {s.totalRounds}. The spinner judges the dare. Everyone keeps it friendly and work-safe; skip anything you would rather not do.{s.last ? ` Last: ${s.last.done ? 'done' : 'skipped'}.` : ''}</p>
     </div>
   );
 }

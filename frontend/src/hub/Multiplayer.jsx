@@ -3,10 +3,10 @@ import { useFun } from '@/fun/FunProvider';
 import { hasWebGL } from '@/fun/three/species';
 import { request, getToken } from '@/api/client';
 import { Panel, Err, primary, subtle } from './ui';
-import { Battleship, Pig, Memory, Tug } from './MultiGames';
+import { Battleship, Pig, Memory, Tug, Ludo, Spin } from './MultiGames';
 
 const GameStage = lazy(() => import('@/fun/three/MultiStages'));
-const ICON = { ttt: '❌', c4: '🔴', rps: '✊', race: '⚡', bs: '🚢', pig: '🎲', mem: '🃏', tug: '🪢' };
+const ICON = { ttt: '❌', c4: '🔴', rps: '✊', race: '⚡', bs: '🚢', pig: '🎲', mem: '🃏', tug: '🪢', ludo: '🎯', spin: '🍾' };
 const BLURB = {
   ttt: 'Three in a row wins. Two players.',
   c4: 'Drop discs, connect four. Two players.',
@@ -16,6 +16,8 @@ const BLURB = {
   pig: 'Roll a real 3D die and push your luck. A 1 wipes your turn. First to 50. 2 to 4 players.',
   mem: 'Flip cards, match pairs, go again on a match. 2 to 4 players.',
   tug: 'Tap as fast as you can to drag the rope to your side. Two players.',
+  ludo: 'Race four tokens round the board, roll a 6 to start, send rivals home. 2 to 4 players.',
+  spin: 'Spin the bottle, then truth or dare (work-safe). The spinner judges. 2 to 8 players.',
 };
 const MARK = ['✕', '○'];
 const DISC = ['bg-rose-500', 'bg-yellow-300'];
@@ -72,7 +74,7 @@ function Status({ room }) {
     if (s.forfeit) return <p className="text-lg font-extrabold text-white">{w === me ? 'They left. You win! 🏆' : 'You left the game.'}</p>;
     return <p className="text-lg font-extrabold text-white">{w === -1 ? "It's a draw 🤝" : w === me ? 'You win! 🏆' : `${firstName(nameOf(room, w))} wins`}</p>;
   }
-  if (room.game === 'bs' || room.game === 'pig' || room.game === 'mem') return <p className="text-lg font-extrabold text-white">{s.turn === me ? 'Your turn' : `${firstName(nameOf(room, s.turn))}'s turn`}</p>;
+  if (room.game === 'bs' || room.game === 'pig' || room.game === 'mem' || room.game === 'ludo' || room.game === 'spin') return <p className="text-lg font-extrabold text-white">{s.turn === me ? 'Your turn' : `${firstName(nameOf(room, s.turn))}'s turn`}</p>;
   if (room.game === 'tug') return <p className="text-lg font-extrabold text-white">Tug of war!</p>;
   if (room.game === 'ttt' || room.game === 'c4') return <p className="text-lg font-extrabold text-white">{s.turn === me ? 'Your turn' : `${firstName(nameOf(room, s.turn))} is thinking…`}</p>;
   if (room.game === 'rps') return <p className="text-lg font-extrabold text-white">Round {s.round} · {firstName(nameOf(room, 0))} {s.score[0]} – {s.score[1]} {firstName(nameOf(room, 1))}</p>;
@@ -178,7 +180,7 @@ function Invite({ room, act }) {
 function Room({ room, act }) {
   const { settings, celebrate } = useFun();
   const three = settings.view3d && hasWebGL();
-  const Board = { ttt: Ttt, c4: C4, rps: Rps, race: Race, bs: Battleship, pig: Pig, mem: Memory, tug: Tug }[room.game];
+  const Board = { ttt: Ttt, c4: C4, rps: Rps, race: Race, bs: Battleship, pig: Pig, mem: Memory, tug: Tug, ludo: Ludo, spin: Spin }[room.game];
   const move = (m) => act(`/api/games/${room.id}/move`, m);
   const won = room.status === 'done' && room.state?.winner === room.you && !room.state?.forfeit;
   useEffect(() => { if (won) celebrate('party'); }, [won]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -207,10 +209,38 @@ function Room({ room, act }) {
   );
 }
 
+/** Wins and games played, overall or per game. Refreshes when a game ends. */
+function Leaderboard({ games, version }) {
+  const [game, setGame] = useState('');
+  const [data, setData] = useState(null);
+  useEffect(() => { let off = false; request('GET', `/api/games/leaderboard${game ? `?game=${game}` : ''}`).then((d) => { if (!off) setData(d); }).catch(() => {}); return () => { off = true; }; }, [game, version]);
+  const medal = ['🥇', '🥈', '🥉'];
+  return (
+    <Panel title="🏆 Leaderboard" hint="Wins across every game. Ties are broken by win rate.">
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {[['', 'All games'], ...Object.entries(games).map(([id, g]) => [id, g.name])].map(([id, label]) => (
+          <button key={id || 'all'} type="button" aria-pressed={game === id} onClick={() => setGame(id)} className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${game === id ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300' : 'border-slate-600 text-slate-300 hover:bg-slate-800'}`}>{label}</button>
+        ))}
+      </div>
+      {data && data.rows.length === 0 && <p className="text-sm text-slate-300">No games finished yet. Win one to take the top spot.</p>}
+      <ol className="space-y-1.5">
+        {(data?.rows || []).map((r) => (
+          <li key={r.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${r.id === data.you ? 'border-emerald-400 bg-emerald-400/10' : 'border-slate-700'}`}>
+            <span className="w-7 text-center text-lg font-extrabold text-white">{medal[r.rank - 1] || r.rank}</span>
+            <span className="min-w-0 flex-1 truncate font-bold text-white">{firstName(r.name)}{r.id === data.you ? ' (you)' : ''}</span>
+            <span className="text-sm font-extrabold text-white">{r.wins} <span className="font-normal text-slate-300">wins · {r.played} played</span></span>
+          </li>
+        ))}
+      </ol>
+    </Panel>
+  );
+}
+
 /** Play against teammates in real time: pick a game, invite people or join an open lobby. */
 export default function Multiplayer() {
   const { games, rooms, error, act } = useGames();
   const mine = rooms.find((r) => r.you >= 0);
+  const finished = rooms.filter((r) => r.status === 'done').length; // a game ending bumps this, so the table refreshes
   const open = rooms.filter((r) => r.you < 0 && r.status === 'lobby');
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -240,6 +270,7 @@ export default function Multiplayer() {
           ))}
         </ul>
       </Panel>
+      <div className="lg:col-span-2"><Leaderboard games={games} version={`${finished}-${mine?.status || ''}`} /></div>
     </div>
   );
 }
