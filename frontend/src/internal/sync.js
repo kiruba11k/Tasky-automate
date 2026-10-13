@@ -4,7 +4,7 @@
 import { request, getToken } from "@/api/client";
 import { useStore, emptyState } from "./store.js";
 import { diffPatch } from "./lib/diffPatch.js";
-import { rollProjectPeriods } from "./lib/domain.js";
+import { rollProjectPeriods, canManageProject } from "./lib/domain.js";
 import { isAdminTier, roleOf } from "./lib/constants.js";
 import { setPeople } from "./lib/people.js";
 import { toast } from "./kit/toast.js";
@@ -73,12 +73,20 @@ export async function startSync(user) {
           if (!replace && pending.has(id)) continue; // my unsaved change wins until it is saved
           const coll = get(c.name);
           // A new week or month started: show the project's counters rolled over. Saved with the next manager edit.
-          if (d.kind === "project" && !d.deleted) d.data = rollProjectPeriods({ admins: [], finalized: {}, pastWeeks: [], pastMonths: [], ...d.data });
+          let savedAs = null; // what the server holds, when a roll-over is only on screen so far
+          if (d.kind === "project" && !d.deleted) {
+            const raw = { admins: [], finalized: {}, pastWeeks: [], pastMonths: [], ...d.data };
+            d.data = rollProjectPeriods(raw);
+            // The server normally rolls the week over itself; if this screen got there first, a project manager's next edit also saves
+            // the roll-over (otherwise the first number typed in a new week would be filed under last week by the next person to load).
+            // Everyone else keeps it as already saved: they may only record finalized days.
+            if (d.data !== raw && canManageProject(d.data, user.id)) savedAs = raw;
+          }
           if (d.deleted) {
             synced.delete(id);
             if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll.splice(i, 1); } else delete coll[d.key];
           } else {
-            synced.set(id, clone(d.data));
+            synced.set(id, clone(savedAs ?? d.data));
             if (c.shape === "list") { const i = coll.findIndex((x) => x.id === d.key); if (i >= 0) coll[i] = d.data; else coll.push(d.data); } else coll[d.key] = c.unwrap ? c.unwrap(d.data) : d.data;
           }
         }

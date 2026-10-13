@@ -32,3 +32,21 @@ export function dueAlerts({ tasks, nowMs, tz = 'Asia/Kolkata', endHour = 19, sen
   }
   return out;
 }
+
+// ---- project weeks and months -------------------------------------------------------------------------------------------------
+// A project keeps this week's and this month's numbers; when a new week or month begins they move into the history (pastWeeks /
+// pastMonths) and start again from zero. The server does this, so it happens once, for everybody, and is saved.
+
+export const mondayOf = (date) => { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+
+/** The project's data with the week and month rolled over for `today` (yyyy-mm-dd), or the same object when nothing changed. */
+export function rollProject(p, today) {
+  const thisWeek = mondayOf(today);
+  const thisMonth = today.slice(0, 7);
+  let out = p;
+  if (!out.weekOf) out = { ...out, weekOf: thisWeek };
+  else if (out.weekOf !== thisWeek) out = { ...out, pastWeeks: [{ start: out.weekOf, counts: out.week || {} }, ...(out.pastWeeks || []).filter((w) => w.start !== out.weekOf)], week: {}, weekOf: thisWeek };
+  if (!out.monthOf) out = { ...out, monthOf: thisMonth };
+  else if (out.monthOf !== thisMonth) out = { ...out, pastMonths: [{ month: out.monthOf, counts: out.month || {} }, ...(out.pastMonths || []).filter((m) => m.month !== out.monthOf)], month: {}, monthOf: thisMonth };
+  return out;
+}

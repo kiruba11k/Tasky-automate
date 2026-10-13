@@ -94,6 +94,10 @@ export const useStore = create()(
         return project;
       };
       /** Only the task's reviewer (a resource's project manager) may approve it, send it back or pass the review on. */
+      const requireWaiting = (task) => {
+        if (task.status !== "in_review")
+          throw new Error(task.status === "done" ? "This task was already approved." : "This task is no longer waiting for review (it was just handled).");
+      };
       const requireReviewer = (task) => {
         if (task.reviewerId !== get().me)
           throw new Error(`Only ${displayName(task.reviewerId)}, who reviews this task, can do that.`);
@@ -240,6 +244,7 @@ export const useStore = create()(
         approve: (id) => {
           const task = requireTask(id);
           requireReviewer(task);
+          requireWaiting(task);
           const at = nowIso();
           patchTask(id, {
             status: "done",
@@ -252,6 +257,7 @@ export const useStore = create()(
         sendBack: (id, text) => {
           const task = requireTask(id);
           requireReviewer(task);
+          requireWaiting(task);
           if (!text.trim()) throw new Error("Feedback cannot be empty.");
           const at = nowIso();
           patchTask(id, {
@@ -375,6 +381,7 @@ export const useStore = create()(
         forwardReview: (id, toId, note) => {
           const task = requireTask(id);
           requireReviewer(task);
+          requireWaiting(task);
           if (!toId || toId === get().me) throw new Error("Choose someone else to forward to.");
           const at = nowIso();
           patchTask(id, {

@@ -3,7 +3,7 @@
 // Anonymous chat: the sender of a message is kept only as owner_id and is never returned; each person's alias lives in a
 // private "alias" document that only that person can read.
 
-import { dueAlerts, OPEN } from './deadlines.js';
+import { dueAlerts, OPEN, rollProject, wallClock } from './deadlines.js';
 
 export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias'];
 const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
@@ -35,6 +35,19 @@ export const publicPerson = (u) => ({
   history: [],
 });
 const withApprovers = (users, isOwner) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id), owner: isOwner(u), tracked: u.does_tasks === true })); };
+
+// A task only moves along these steps, so two people (or two tabs) acting on a stale screen cannot undo each other:
+// an approval cannot overwrite a send-back that happened a moment earlier, and a finished task stays finished.
+const TASK_STEPS = { todo: ['in_progress', 'in_review'], in_progress: ['todo', 'in_review'], changes: ['in_progress', 'in_review', 'todo'], in_review: ['done', 'changes'], done: [] };
+/** Why this change of a task's status must be refused, or null. `prev` is the saved task, `next` the task after the change. */
+export function taskTransitionProblem(prev, next, userId) {
+  if (!prev || !next || prev.status === next.status || !(prev.status in TASK_STEPS) || !(next.status in TASK_STEPS)) return null; // only real statuses are judged
+  if (!(TASK_STEPS[prev.status] || []).includes(next.status)) {
+    return prev.status === 'done' ? 'This task was already approved, so your change was not saved.' : `This task is no longer ${prev.status.replace('_', ' ')} (someone else just changed it), so your change was not saved.`;
+  }
+  if (prev.status === 'in_review' && prev.reviewerId && prev.reviewerId !== userId) return `Only the task's reviewer can ${next.status === 'done' ? 'approve' : 'send back'} it.`;
+  return null;
+}
 
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
 export function mergePatch(target, patch) {
@@ -182,6 +195,10 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       const data = mergePatch(prev || {}, patch);
       if (JSON.stringify(data).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Document too large' }); continue; }
       const changed = Object.keys(patch);
+      if (kind === 'task') {
+        const why = taskTransitionProblem(prev, data, u.id);
+        if (why) { results.push({ ...id, ok: false, error: why }); continue; }
+      }
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
       if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: u.id });
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
@@ -261,6 +278,23 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     }
     return alerts.length;
   }
+  /** Moves every project's week / month numbers into the history when a new week or month has begun (see rollProject). */
+  async function rollProjects() {
+    const today = wallClock(clock(), env.WORK_TZ || 'Asia/Kolkata').date;
+    let n = 0;
+    for (const d of await store.list('TrackerDoc', { query: { kind: 'project' }, limit: 100000 })) {
+      if (d.deleted || !d.data) continue;
+      const rolled = rollProject(d.data, today);
+      if (rolled !== d.data) { await store.update('TrackerDoc', d.id, { data: rolled }); n += 1; }
+    }
+    if (n) announce();
+    return n;
+  }
+  if (env.DEADLINE_ALERTS !== 'off') {
+    const rp = setInterval(() => rollProjects().catch((e) => console.error('project roll failed:', e)), 60 * 1000);
+    rp.unref?.();
+    setTimeout(() => rollProjects().catch(() => {}), 4000).unref?.();
+  }
   if (env.DEADLINE_ALERTS !== 'off') {
     const dl = setInterval(() => deadlineSweep().catch((e) => console.error('deadline sweep failed:', e)), 60 * 1000);
     dl.unref?.();
@@ -299,5 +333,5 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
   timer.unref?.();
   setTimeout(() => sweepChat().catch(() => {}), 5000).unref?.();
 
-  return { announce, sweepChat, deadlineSweep };
+  return { announce, sweepChat, deadlineSweep, rollProjects };
 }

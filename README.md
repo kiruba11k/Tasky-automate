@@ -190,3 +190,9 @@ Every notice (a task assigned to you, sent for review, approved, sent back, a ch
 ## Signing in
 
 Email and password. The first time an added email signs in it has no password yet, so it goes to a "choose your password" step (8+ characters) and is signed in; from the second time on the email needs that password. Passwords are stored as salted scrypt hashes in a server-only document (never returned by any API). The main admin (`ADMIN_EMAIL`) can reset someone's password from Manage people; they choose a new one at their next sign-in. People who were already signed in are asked to choose a password once. Set `REQUIRE_PASSWORD=off` to go back to email-only sign-in (the backend tests do this).
+
+
+## Keeping numbers right when people work at the same time
+
+- **Task steps are enforced on the server** (`taskTransitionProblem` in `backend/src/tracker.js`): a task moves todo → in progress → in review → done / changes, only its reviewer approves or sends it back, and a finished task stays finished. A tab showing an out-of-date screen cannot approve a task that was just sent back (or approve twice); the change is refused with a plain message and the screen refreshes to the server's version.
+- **Project week and month numbers roll over on the server** every minute (`rollProject` in `backend/src/deadlines.js`, India time by default, `WORK_TZ`): last week's / month's counts move into the history and the new period starts from zero, once, for everybody.

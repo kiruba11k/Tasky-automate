@@ -33,3 +33,17 @@ test('alerts: an hour before, 15 minutes before, overdue (and the assigner is to
 test('done, deleted-less and unassigned tasks never alert', () => {
   assert.equal(dueAlerts({ tasks: [task({ status: 'done' }), task({ status: 'in_review' }), task({ assigneeId: undefined })], nowMs: at('2026-10-13T12:40:00Z') }).length, 0);
 });
+
+import { mondayOf, rollProject } from '../src/deadlines.js';
+
+test('a new week or month moves the numbers into the history, once', () => {
+  assert.equal(mondayOf('2026-10-14'), '2026-10-12');
+  assert.equal(mondayOf('2026-10-12'), '2026-10-12');
+  assert.equal(mondayOf('2026-10-18'), '2026-10-12'); // Sunday belongs to the week before
+  const p = { week: { sent: 10 }, month: { sent: 30 }, weekOf: '2026-10-05', monthOf: '2026-09', pastWeeks: [], pastMonths: [] };
+  const r = rollProject(p, '2026-10-14');
+  assert.deepEqual(r.week, {}); assert.equal(r.weekOf, '2026-10-12'); assert.deepEqual(r.pastWeeks, [{ start: '2026-10-05', counts: { sent: 10 } }]);
+  assert.deepEqual(r.month, {}); assert.equal(r.monthOf, '2026-10'); assert.deepEqual(r.pastMonths, [{ month: '2026-09', counts: { sent: 30 } }]);
+  assert.equal(rollProject(r, '2026-10-16'), r); // same week and month: untouched (same object)
+  assert.equal(rollProject({ week: {}, month: {} }, '2026-10-14').weekOf, '2026-10-12'); // a project without markers gets them
+});
