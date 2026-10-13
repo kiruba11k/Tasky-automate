@@ -39,12 +39,16 @@ import {
 /** Route "/assign": build a list of tasks and assign them to teammates. */
 export function AssignTasks() {
   const { me, tasks, projects, assignMany } = useStore();
-  const isManager = isAdminTier(PEOPLE.find((G) => G.id === me)?.role);
-  const myProjects = projects.filter((G) => G.status === 'active' && canAssignOnProject(G, me));
+  const myRole = PEOPLE.find((G) => G.id === me)?.role;
+  const isManager = isAdminTier(myRole);
+  const isResource = myRole === 'resource'; // a resource may hand tasks to anyone, on a project they are on
+  const myProjects = projects.filter(
+    (G) => G.status === 'active' && (canAssignOnProject(G, me) || (isResource && G.teamIds.includes(me))),
+  );
   const [projectId, setProjectId] = useState(myProjects[0]?.id ?? '');
   const project = myProjects.find((G) => G.id === projectId) ?? myProjects[0];
   const teammates = PEOPLE.filter(
-    (G) => G.id !== me && (G.role !== 'founder' || G.tracked) && (isManager || project?.teamIds.includes(G.id)),
+    (G) => G.id !== me && (G.role !== 'founder' || G.tracked) && (isManager || isResource || project?.teamIds.includes(G.id)),
   );
   const [pickedAssignee, setPickedAssignee] = useState('');
   const [typeIdState, setTypeId] = useState('l1');
@@ -98,7 +102,7 @@ export function AssignTasks() {
     return (
       <Card>
         <p className="py-8 text-center text-muted">
-          You'll be able to assign tasks once you own or help run (as a project admin) an approved project.
+          {isResource ? "You'll be able to assign tasks once you are on an approved project." : "You'll be able to assign tasks once you own or help run (as a project admin) an approved project."}
         </p>
       </Card>
     );

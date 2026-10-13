@@ -137,6 +137,14 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     return (await live()).some((x) => x.id === data.reviewerId);
   }
 
+  /** A team member's own assignment: a new to-do from them, for anyone, on an active project they are on. */
+  async function assignOk(u, data) {
+    if (!data || data.assignedById !== u.id || data.status !== 'todo' || data.reviewerId || data.adhoc || data.approvedAt || (data.reviews || []).length) return false;
+    if (!(await live()).some((x) => x.id === data.assigneeId)) return false;
+    const project = (await find('project', data.projectId))?.data;
+    return !!project && project.status === 'active' && (project.pmId === u.id || (project.teamIds || []).includes(u.id) || (project.admins || []).includes(u.id));
+  }
+
   /** May `u` write `data` to this document? `prev` is the stored data (undefined for a new document). */
   async function canWrite(u, kind, key, data, prev, changed = [], deleting = false, existing = null) {
     const mine = (id) => id === u.id;
@@ -144,8 +152,9 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       case 'task': {
         const t = prev || data;
         if (!prev) {
-          if (lead(u) && (mine(data.assignedById) || leadership(u))) return true; // only managers and PMs give out tasks
-          return adhocApprovalOk(u, data); // ...but anyone may send their own unassigned work for approval
+          if (lead(u) && (mine(data.assignedById) || leadership(u))) return true; // managers and PMs give out tasks
+          if (await adhocApprovalOk(u, data)) return true; // anyone may send their own unassigned work for approval
+          return assignOk(u, data); // and a resource may hand a task to anyone, on a project they are on
         }
         if (deleting) return lead(u) || mine(prev.assignedById); // the assignee cannot delete their own task
         // Review rules. A task is approved (done) or sent back (changes) only by its reviewer. Work by a resource is always

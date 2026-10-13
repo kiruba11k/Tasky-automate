@@ -69,6 +69,16 @@ describe('send for approval: anyone sends their own unassigned work to a reviewe
     assert.equal((await put(tok.other, 'task', 'a1', { status: 'done' })).ok, false);
     assert.equal((await put(tok.pm, 'task', 'a1', { status: 'done' })).ok, true);
   });
+  test('a resource hands a task to anyone on a project they are on, but not on others or in other states', async () => {
+    const give = (who, extra = {}) => ({ id: 'g1', status: 'todo', title: 'Pull list', assigneeId: ids.other, assignedById: ids[who], projectId: 'p1', ...extra });
+    assert.equal((await put(tok.res, 'task', 'g1', give('res'))).ok, true);
+    assert.equal((await put(tok.res, 'task', 'g2', give('res', { id: 'g2', assignedById: ids.pm }))).ok, false); // in someone else's name
+    assert.equal((await put(tok.res, 'task', 'g3', give('res', { id: 'g3', status: 'done' }))).ok, false);
+    assert.equal((await put(tok.res, 'task', 'g4', give('res', { id: 'g4', reviewerId: ids.res }))).ok, false);
+    assert.equal((await put(tok.res, 'task', 'g5', give('res', { id: 'g5', assigneeId: 'nobody' }))).ok, false);
+    assert.equal((await put(tok.out, 'task', 'g6', give('out', { id: 'g6' }))).ok, false); // not on the project
+    assert.equal((await put(tok.res, 'task', 'g1', { title: 'Pull list v2' })).ok, true); // the assigner can still edit it
+  });
   test('task rows of a day are saved by their owner only, and must be valid', async () => {
     const day = `${ids.res}|2026-10-13`;
     const row = { id: 'e1', projectId: 'p1', task: 'model', desc: '', qty: 4, estMin: 30 };
