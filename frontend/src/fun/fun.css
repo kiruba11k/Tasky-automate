@@ -153,11 +153,11 @@ body.calm .theme-pattern { opacity: .55; }
 html[data-mode='light'] :is(
   [class*='bg-blue-'], [class*='bg-purple-'], [class*='bg-green-'], [class*='bg-emerald-'], [class*='bg-red-'], [class*='bg-orange-'], [class*='bg-pink-'], [class*='bg-indigo-'],
   [class*='bg-accent-'], [class*='from-blue-'], [class*='from-accent-'], [class*='from-emerald-'], [class*='from-green-'], [class*='to-purple-'], .nav-pill.active, .approved-stamp
-):not([class*='/10']):not([class*='/20']):not([class*='/30']) :is(.text-white, svg),
+):not([class*='/10']):not([class*='/20']):not([class*='/30']):not([class*='-soft']) :is(.text-white, svg),
 html[data-mode='light'] :is(
   [class*='bg-blue-'], [class*='bg-purple-'], [class*='bg-green-'], [class*='bg-emerald-'], [class*='bg-red-'], [class*='bg-orange-'], [class*='bg-pink-'], [class*='bg-indigo-'],
   [class*='bg-accent-'], [class*='from-blue-'], [class*='from-accent-'], [class*='from-emerald-'], [class*='from-green-'], [class*='to-purple-'], .nav-pill.active
-):not([class*='/10']):not([class*='/20']):not([class*='/30']).text-white { color: #fff; }
+):not([class*='/10']):not([class*='/20']):not([class*='/30']):not([class*='-soft']).text-white { color: #fff; }
 
 /* ======================= Cat & mouse critters ======================= */
 .crit { overflow: visible; filter: drop-shadow(1px 2px 0 rgba(0,0,0,.28)); }

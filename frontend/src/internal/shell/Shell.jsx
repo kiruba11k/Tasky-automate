@@ -101,8 +101,8 @@ export function Shell() {
             end
             className={({ isActive }) =>
               cx(
-                'focus-ring relative flex w-16 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center text-[11px] font-semibold leading-tight',
-                isActive ? 'bg-accent-soft text-accent-ink' : 'text-muted hover:bg-surface-2',
+                'focus-ring relative flex w-16 flex-col items-center [&>svg]:transition-transform justify-center gap-1 rounded-xl px-1 py-2 text-center text-[11px] font-semibold leading-tight',
+                isActive ? 'bg-accent-soft text-accent-ink shadow-md [&>svg]:scale-125 [&>svg]:-translate-y-0.5' : 'text-muted hover:bg-surface-2',
               )
             }
           >
