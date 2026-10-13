@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Star } from 'lucide-react';
 
 const firstName = (n) => String(n || '…').split(/[ @]/)[0];
 const url = (room, p) => `/api/games/${room.id}/${p}`;
@@ -189,44 +190,95 @@ export function Tug({ room, act }) {
 }
 
 // ---------------------------------------------------------------- Ludo
-const RING = 36;
-const rad = (deg) => (deg * Math.PI) / 180;
-const polar = (r, deg) => ({ x: 50 + r * Math.cos(rad(deg)), y: 50 + r * Math.sin(rad(deg)) });
-const ringAngle = (cell) => (cell / 52) * 360 - 90;
-const YARDS = [{ x: 15, y: 15 }, { x: 85, y: 15 }, { x: 85, y: 85 }, { x: 15, y: 85 }];
-const slotOf = (offset) => offset / 13; // 0 top-left ... 3 bottom-left
+// The classic board: a 15 x 15 grid with a cross-shaped track, four coloured yards in the corners, a coloured home column
+// for each colour and the home triangles in the middle. The server numbers the track 0..51 clockwise from red's start square
+// (red 0, green 13, yellow 26, blue 39); a token goes 0..50 round the track, 51..55 up its home column, 56 = home.
+const LUDO_COLORS = ['#ef4444', '#22c55e', '#facc15', '#3b82f6']; // red, green, yellow, blue: top-left, top-right, bottom-right, bottom-left
+const LUDO_NAMES = ['Red', 'Green', 'Yellow', 'Blue'];
+const path = (...runs) => runs.flat();
+const col = (c, r0, r1) => Array.from({ length: Math.abs(r1 - r0) + 1 }, (_, i) => [r0 + Math.sign(r1 - r0) * i, c]); // down/up a column
+const row = (r, c0, c1) => Array.from({ length: Math.abs(c1 - c0) + 1 }, (_, i) => [r, c0 + Math.sign(c1 - c0) * i]); // along a row
+/** [row, col] of the 52 track squares, clockwise from red's start (6,1). */
+const TRACK = path(row(6, 1, 5), col(6, 5, 0), [[0, 7]], [[0, 8]], col(8, 1, 5), row(6, 9, 14), [[7, 14]], [[8, 14]], row(8, 13, 9), col(8, 9, 14), [[14, 7]], [[14, 6]], col(6, 13, 9), row(8, 5, 0), [[7, 0]], [[6, 0]]);
+/** The five squares of each colour's home column, from the track towards the middle. */
+const HOME_COLUMNS = [row(7, 1, 5), col(7, 1, 5), row(7, 13, 9), col(7, 13, 9)];
+const YARD_ORIGINS = [[0, 0], [0, 9], [9, 9], [9, 0]]; // [row, col] of each 6 x 6 yard
+const HOME_SPOTS = [[7.5, 6.55], [6.55, 7.5], [7.5, 8.45], [8.45, 7.5]]; // [y, x] where finished tokens sit, by colour
+const STARS = new Set([8, 21, 34, 47]); // the safe star squares (the start squares are safe too)
+const slotOf = (offset) => offset / 13;
+/** Where a token is, in board-square units (the middle of the square it stands on): { x, y }. */
 function tokenPos(offset, p, k) {
-  if (p === -1) { const y = YARDS[slotOf(offset)]; return { x: y.x + (k % 2 ? 4.5 : -4.5), y: y.y + (k > 1 ? 4.5 : -4.5) }; }
-  if (p <= 50) return polar(RING, ringAngle((offset + p) % 52));
-  if (p < 56) return polar(RING - (p - 50) * 5.2, ringAngle((offset + 50) % 52));
-  return polar(3.5, 45 + k * 90 + slotOf(offset) * 20);
+  const slot = slotOf(offset);
+  if (p === -1) { const [r, c] = YARD_ORIGINS[slot]; return { x: c + (k % 2 ? 4.2 : 1.8), y: r + (k > 1 ? 4.2 : 1.8) }; }
+  if (p <= 50) { const [r, c] = TRACK[(offset + p) % 52]; return { x: c + 0.5, y: r + 0.5 }; }
+  if (p < 56) { const [r, c] = HOME_COLUMNS[slot][p - 51]; return { x: c + 0.5, y: r + 0.5 }; }
+  const [y, x] = HOME_SPOTS[slot]; const sideways = (k - 1.5) * 0.22;
+  return slot % 2 === 0 ? { x, y: y + sideways } : { x: x + sideways, y };
 }
+const pct = (n) => `${(n / 15) * 100}%`;
+
+function LudoBoard({ room, act }) {
+  const s = room.state; const me = room.you; const playing = room.status === 'playing';
+  const mine = playing && s.turn === me;
+  const used = new Set(s.offsets.map(slotOf));
+  const hit = new Set((s.last?.sent || []).map((x) => `${x.who}-${x.token}`));
+  // tokens sharing a square are fanned out a little so each stays visible
+  const spots = []; const crowd = {};
+  s.tokens.forEach((ts, w) => ts.forEach((p, k) => { const pt = tokenPos(s.offsets[w], p, k); const id = `${pt.x}|${pt.y}`; (crowd[id] ||= []).push(`${w}-${k}`); spots.push({ w, k, p, pt, id }); }));
+  const fan = (spot) => { const group = crowd[spot.id]; if (group.length < 2 || spot.p === -1 || spot.p === 56) return spot.pt; const i = group.indexOf(`${spot.w}-${spot.k}`); return { x: spot.pt.x + (i - (group.length - 1) / 2) * 0.28, y: spot.pt.y + (i % 2 ? 0.12 : -0.12) }; };
+  const squares = [];
+  TRACK.forEach(([r, c], i) => {
+    const start = i % 13 === 0; const slot = i / 13;
+    squares.push({ key: `t${i}`, r, c, tone: start ? LUDO_COLORS[slot] : null, star: STARS.has(i), dim: start && !used.has(slot) });
+  });
+  HOME_COLUMNS.forEach((cells, slot) => cells.forEach(([r, c], i) => squares.push({ key: `h${slot}-${i}`, r, c, tone: LUDO_COLORS[slot], lane: true, dim: !used.has(slot) })));
+  return (
+    <div key={s.last?.sent?.length ? `bump${s.last.seq}` : 'calm'} className={`ludo-board ${s.last?.sent?.length ? 'ludo-bump' : ''}`} role="group" aria-label="Ludo board">
+      {YARD_ORIGINS.map(([r, c], slot) => (
+        <div key={`y${slot}`} className={`ludo-yard ${used.has(slot) ? '' : 'ludo-off'} ${used.has(slot) && s.offsets[s.turn] === slot * 13 && playing ? 'ludo-yard-on' : ''}`} style={{ left: pct(c), top: pct(r), '--tone': LUDO_COLORS[slot] }}>
+          <span className="ludo-yard-in" />
+          {[[1.8, 1.8], [1.8, 4.2], [4.2, 1.8], [4.2, 4.2]].map(([yy, xx], k) => <b key={k} className="ludo-spot" style={{ left: `${(xx / 6) * 100}%`, top: `${(yy / 6) * 100}%` }} />)}
+        </div>
+      ))}
+      {squares.map((q) => (
+        <i key={q.key} className={`ludo-sq ${q.lane ? 'ludo-lane' : ''} ${q.dim ? 'ludo-off' : ''}`} style={{ left: pct(q.c), top: pct(q.r), ...(q.tone ? { '--tone': q.tone } : null) }}>
+          {q.star && <Star size={11} className="ludo-star" aria-hidden="true" />}
+        </i>
+      ))}
+      <svg className="ludo-middle" viewBox="0 0 3 3" aria-hidden="true">
+        <polygon points="0,0 1.5,1.5 0,3" fill={LUDO_COLORS[0]} opacity={used.has(0) ? 1 : 0.3} />
+        <polygon points="0,0 3,0 1.5,1.5" fill={LUDO_COLORS[1]} opacity={used.has(1) ? 1 : 0.3} />
+        <polygon points="3,0 3,3 1.5,1.5" fill={LUDO_COLORS[2]} opacity={used.has(2) ? 1 : 0.3} />
+        <polygon points="0,3 3,3 1.5,1.5" fill={LUDO_COLORS[3]} opacity={used.has(3) ? 1 : 0.3} />
+      </svg>
+      {s.last && (() => { const pt = tokenPos(s.offsets[s.last.by], s.last.to, 0); return <span key={`poof${s.last.seq}`} className={`ludo-poof ${s.last.sent.length ? 'ludo-poof-hit' : ''}`} style={{ left: pct(pt.x), top: pct(pt.y), '--tone': s.last.sent.length ? '#ef4444' : LUDO_COLORS[slotOf(s.offsets[s.last.by])] }} aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>; })()}
+      {spots.map((spot) => {
+        const { w, k, p } = spot; const pt = fan(spot); const slot = slotOf(s.offsets[w]);
+        const can = mine && s.turn === w && s.phase === 'move' && s.legal.includes(k);
+        return (
+          <button key={`${w}-${k}`} type="button" disabled={!can} onClick={() => act(url(room, 'move'), { act: 'move', token: k })} aria-label={`${LUDO_NAMES[slot]} (${firstName(room.players[w]?.name)}) token ${k + 1}${can ? ', tap to move' : ''}`}
+            className={`ludo-token ${can ? 'ludo-can' : ''} ${p === 56 ? 'ludo-home' : ''} ${hit.has(`${w}-${k}`) ? 'ludo-hit' : ''} ${s.last && s.last.by === w && s.last.token === k ? 'ludo-hop' : ''}`}
+            style={{ left: pct(pt.x), top: pct(pt.y), '--tone': LUDO_COLORS[slot], zIndex: can ? 5 : 2 }} />
+        );
+      })}
+    </div>
+  );
+}
+
 export function Ludo({ room, act }) {
   const s = room.state; const me = room.you; const playing = room.status === 'playing'; const mine = playing && s.turn === me;
-  const cells = useMemo(() => Array.from({ length: 52 }, (_, c) => ({ c, ...polar(RING, ringAngle(c)) })), []);
-  const hit = new Set((s.last?.sent || []).map((x) => `${x.who}-${x.token}`));
   return (
     <div className="space-y-3">
-      <div key={s.last?.sent?.length ? `bump${s.last.seq}` : 'calm'} className={`ludo-board ${s.last?.sent?.length ? 'ludo-bump' : ''}`} role="group" aria-label="Ludo board">
-        {s.offsets.map((o, w) => <div key={`y${w}`} className="ludo-yard" style={{ left: `${YARDS[slotOf(o)].x}%`, top: `${YARDS[slotOf(o)].y}%`, '--tone': OWNER[w], opacity: s.turn === w && playing ? 1 : .75 }} />)}
-        {cells.map(({ c, x, y }) => <i key={c} className={`ludo-cell ${c % 13 === 0 ? 'ludo-start' : c % 13 === 8 ? 'ludo-safe' : ''}`} style={{ left: `${x}%`, top: `${y}%`, ...(c % 13 === 0 ? { '--tone': OWNER[s.offsets.indexOf(c)] || '#94a3b8' } : null) }} />)}
-        {s.offsets.map((o, w) => [1, 2, 3, 4, 5].map((q) => { const pt = polar(RING - q * 5.2, ringAngle((o + 50) % 52)); return <i key={`h${w}-${q}`} className="ludo-cell ludo-lane" style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w] }} />; }))}
-        {s.last && (() => { const pt = tokenPos(s.offsets[s.last.by], s.last.to, 0); return <span key={`poof${s.last.seq}`} className={`ludo-poof ${s.last.sent.length ? 'ludo-poof-hit' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': s.last.sent.length ? '#ef4444' : OWNER[s.last.by] }} aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>; })()}
-        <div className="ludo-center"><Die value={s.dice && !s.dice.stuck ? s.dice.d : s.dice?.d || null} seq={s.dice?.seq || 0} bust={Boolean(s.dice?.stuck)} /></div>
-        {s.tokens.map((ts, w) => ts.map((p, k) => {
-          const pt = tokenPos(s.offsets[w], p, k); const can = mine && s.turn === w && s.phase === 'move' && s.legal.includes(k);
-          return (
-            <button key={`${w}-${k}`} type="button" disabled={!can} onClick={() => act(url(room, 'move'), { act: 'move', token: k })} aria-label={`${firstName(room.players[w]?.name)} token ${k + 1}${can ? ', tap to move' : ''}`}
-              className={`ludo-token ${can ? 'ludo-can' : ''} ${p === 56 ? 'ludo-home' : ''} ${hit.has(`${w}-${k}`) ? 'ludo-hit' : ''} ${s.last && s.last.by === w && s.last.token === k ? 'ludo-hop' : ''}`} style={{ left: `${pt.x}%`, top: `${pt.y}%`, '--tone': OWNER[w], zIndex: can ? 5 : 2 }} data-seq={s.last && s.last.by === w && s.last.token === k ? s.last.seq : undefined} />
-          );
-        }))}
+      <LudoBoard room={room} act={act} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="ludo-dice"><Die value={s.dice ? s.dice.d : null} seq={s.dice?.seq || 0} bust={Boolean(s.dice?.stuck)} /></div>
+        <div className="space-y-2">
+          <button type="button" disabled={!mine || s.phase !== 'roll'} onClick={() => act(url(room, 'move'), { act: 'roll' })} className="rounded-lg border-2 border-slate-900 bg-rose-500 px-5 py-2 font-extrabold mg-w enabled:hover:bg-rose-400 disabled:opacity-50">Roll the die</button>
+          <p className="text-sm text-slate-300" aria-live="polite">{!playing ? '' : s.dice?.stuck && s.dice.by === me ? `You rolled ${s.dice.d}. No move, next player.` : mine ? (s.phase === 'move' ? `You rolled ${s.dice.d}. Tap a glowing token.` : 'Your turn. Roll the die.') : `${firstName(room.players[s.turn]?.name)} (${LUDO_NAMES[slotOf(s.offsets[s.turn])]}) is playing…`}</p>
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={!mine || s.phase !== 'roll'} onClick={() => act(url(room, 'move'), { act: 'roll' })} className="rounded-lg border-2 border-slate-900 bg-rose-500 px-5 py-2 font-extrabold mg-w enabled:hover:bg-rose-400 disabled:opacity-50">Roll the die</button>
-        <span className="text-sm text-slate-300" aria-live="polite">{!playing ? '' : s.dice?.stuck && s.dice.by === me ? `You rolled ${s.dice.d}. No move, next player.` : mine ? (s.phase === 'move' ? `You rolled ${s.dice.d}. Tap a glowing token.` : 'Your turn. Roll the die.') : `${firstName(room.players[s.turn]?.name)} is playing…`}</span>
-      </div>
-      <ul className="flex flex-wrap gap-2">{room.players.map((p, i) => <li key={p.id} className="rounded-full border-2 px-3 py-1 text-sm font-bold text-white" style={{ borderColor: OWNER[i] }}>{firstName(p.name)}{i === me ? ' (you)' : ''} · {s.tokens[i].filter((x) => x === 56).length}/4 home</li>)}</ul>
-      <p className="text-xs text-slate-400">Roll a 6 to bring a token out. Land on another colour to send it back to its yard (the star and start squares are safe). A 6 gives another roll. Reach the centre with an exact count.</p>
+      <ul className="flex flex-wrap gap-2">{room.players.map((p, i) => <li key={p.id} className="rounded-full border-2 px-3 py-1 text-sm font-bold text-white" style={{ borderColor: LUDO_COLORS[slotOf(s.offsets[i])] }}>{LUDO_NAMES[slotOf(s.offsets[i])]} · {firstName(p.name)}{i === me ? ' (you)' : ''} · {s.tokens[i].filter((x) => x === 56).length}/4 home</li>)}</ul>
+      <p className="text-xs text-slate-400">Roll a 6 to bring a token out of your yard onto your coloured start square. Go clockwise round the track, then up your own coloured column to the middle with an exact count. Landing on another colour sends it back to its yard, except on the start squares and the stars. A 6 gives another roll.</p>
     </div>
   );
 }

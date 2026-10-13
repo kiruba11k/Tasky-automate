@@ -622,13 +622,6 @@ html[data-mode='light'] :is([class*='bg-yellow-300'], [class*='bg-yellow-400'], 
 .mg-w { color: #fff !important; }
 .pig-score { color: #fff; }
 
-.ludo-board { position: relative; width: 100%; max-width: 30rem; aspect-ratio: 1; margin: 0 auto; border-radius: 20px; border: 2px solid #0b1220; background: radial-gradient(circle at 50% 50%, #fef3c7 0 12%, #fde68a 12% 100%); overflow: hidden; }
-.ludo-yard { position: absolute; width: 26%; height: 26%; transform: translate(-50%, -50%); border-radius: 18px; background: color-mix(in srgb, var(--tone) 55%, white); border: 3px solid var(--tone); transition: opacity .3s; }
-.ludo-cell { position: absolute; width: 3.6%; height: 3.6%; transform: translate(-50%, -50%); border-radius: 50%; background: #fff; border: 1.5px solid #92400e; }
-.ludo-start { background: var(--tone); } .ludo-safe { background: #fde047; }
-.ludo-lane { background: color-mix(in srgb, var(--tone) 60%, white); border-color: var(--tone); }
-.ludo-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.62); width: 96px; height: 120px; pointer-events: none; opacity: .95; }
-.ludo-token { position: absolute; width: 5.4%; height: 5.4%; transform: translate(-50%, -50%); border-radius: 50%; padding: 0; background: radial-gradient(circle at 35% 30%, #fff 0 12%, var(--tone) 40%); border: 2px solid #0b1220; box-shadow: 0 2px 0 rgba(0,0,0,.4); transition: left .45s cubic-bezier(.3, 1.3, .5, 1), top .45s cubic-bezier(.3, 1.3, .5, 1); }
 .ludo-token:disabled { cursor: default; }
 .ludo-can { cursor: pointer; animation: ludo-pulse .8s ease-in-out infinite; box-shadow: 0 0 0 3px #fde047, 0 0 12px #fde047; }
 @keyframes ludo-pulse { 0%, 100% { scale: 1; } 50% { scale: 1.3; } }
@@ -723,3 +716,19 @@ html[data-mode='light'] :is([class*='bg-yellow-300'], [class*='bg-yellow-400'], 
 @keyframes race-go { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, .7); } 50% { transform: scale(1.02); box-shadow: 0 0 0 14px rgba(52, 211, 153, 0); } }
 @keyframes race-wait { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
 @media (prefers-reduced-motion: reduce) { .confetti i, .end-won .end-trophy, .pig-pop, .bs-shell, .bs-smoke i, .bs-sunk, .bs-sea-shake, .die-shadow-roll, .mem-deal, .mem-spark i, .tug-rope, .tug-dust, .tug-lost, .tug-won, .ludo-hop, .ludo-poof i, .ludo-bump, .spin-ripple-on, .spin-plus, .ttt-mark, .ttt-win, .c4-drop, .rps-picked, .rps-last, .race-go, .race-wait { animation: none !important; } }
+
+/* Ludo: the classic 15 x 15 board */
+.ludo-board { position: relative; width: 100%; max-width: 32rem; aspect-ratio: 1; margin: 0 auto; border-radius: 14px; border: 3px solid #0b1220; background: #fffdf6; overflow: hidden; box-shadow: 0 6px 0 rgba(0,0,0,.25); }
+.ludo-yard { position: absolute; width: 40%; height: 40%; background: var(--tone); border: 1px solid #0b1220; transition: box-shadow .3s, filter .3s; }
+.ludo-yard-in { position: absolute; inset: 14%; background: #fff; border-radius: 18px; box-shadow: inset 0 0 0 2px rgba(0,0,0,.12); }
+.ludo-spot { position: absolute; width: 17%; height: 17%; transform: translate(-50%, -50%); border-radius: 50%; background: color-mix(in srgb, var(--tone) 35%, white); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 70%, black); }
+.ludo-yard-on { box-shadow: inset 0 0 0 5px #fde047; }
+.ludo-off { filter: grayscale(1); opacity: .45; }
+.ludo-sq { position: absolute; width: calc(100% / 15); height: calc(100% / 15); background: #fff; border: 1px solid #1e293b; box-sizing: border-box; display: grid; place-items: center; }
+.ludo-sq[style*='--tone'] { background: var(--tone); }
+.ludo-lane { background: color-mix(in srgb, var(--tone) 80%, white); }
+.ludo-star { color: #475569; fill: #fde047; stroke: #92400e; }
+.ludo-middle { position: absolute; left: 40%; top: 40%; width: 20%; height: 20%; }
+.ludo-token { position: absolute; width: 5.2%; height: 5.2%; transform: translate(-50%, -50%); border-radius: 50%; padding: 0; background: radial-gradient(circle at 35% 30%, #fff 0 14%, var(--tone) 45%, color-mix(in srgb, var(--tone) 60%, black)); border: 2px solid #0b1220; box-shadow: 0 2px 0 rgba(0,0,0,.45); transition: left .5s cubic-bezier(.3, 1.3, .5, 1), top .5s cubic-bezier(.3, 1.3, .5, 1); }
+.ludo-token:disabled { cursor: default; }
+.ludo-dice { width: 96px; height: 120px; flex: none; }
