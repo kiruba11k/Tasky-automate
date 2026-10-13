@@ -116,3 +116,26 @@ body { font-size: 14px; }
 .chat-picker-tab-on { background: rgb(var(--c-accent-soft)); color: rgb(var(--c-accent-ink)); }
 .chat-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: .15rem; padding: .5rem; max-height: 13.5rem; overflow-y: auto; }
 @media (max-width: 767px) { .chat-picker-grid { grid-template-columns: repeat(6, 1fr); } }
+
+/* Back-to-top rocket: a cartoon rocket that idles, then warms up, trails smoke and blasts off */
+.scroll-rocket { position: fixed; z-index: 90; right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(90px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; border: 2px solid rgb(var(--c-line)); background: rgb(var(--c-surface)); box-shadow: 0 6px 18px rgb(var(--c-ink) / .18); animation: sr-in .4s cubic-bezier(.34, 1.56, .64, 1) both; }
+.scroll-rocket:hover .scroll-rocket-body { animation: sr-hover .5s ease-in-out infinite; }
+.scroll-rocket-body { display: grid; place-items: center; }
+.scroll-rocket-body svg { transform: rotate(0deg); filter: drop-shadow(0 2px 2px rgb(0 0 0 / .25)); }
+.scroll-rocket-flame { position: absolute; bottom: -4px; left: 50%; width: 12px; height: 0; transform: translateX(-50%); border-radius: 50% 50% 50% 50% / 15% 15% 85% 85%; background: linear-gradient(to bottom, #fde047, #f97316 55%, rgba(239, 68, 68, 0)); transform-origin: top; }
+.scroll-rocket:hover .scroll-rocket-flame { height: 10px; animation: sr-flicker .12s linear infinite alternate; }
+.scroll-rocket-go { animation: sr-launch 1.6s cubic-bezier(.55, 0, .9, .35) both; border-color: #f97316; }
+.scroll-rocket-go .scroll-rocket-flame { height: 34px; width: 16px; animation: sr-flicker .08s linear infinite alternate; }
+.scroll-rocket-smoke { position: absolute; left: 50%; top: 100%; width: 0; height: 0; }
+.scroll-rocket-smoke i { position: absolute; width: 22px; height: 22px; margin: 0 0 0 -11px; border-radius: 50%; background: rgb(var(--c-muted) / .55); filter: blur(2px); opacity: 0; animation: sr-smoke .9s ease-out both; }
+.scroll-rocket-smoke i:nth-child(1) { animation-delay: .35s; } .scroll-rocket-smoke i:nth-child(2) { animation-delay: .5s; left: -8px; } .scroll-rocket-smoke i:nth-child(3) { animation-delay: .65s; left: 8px; } .scroll-rocket-smoke i:nth-child(4) { animation-delay: .8s; } .scroll-rocket-smoke i:nth-child(5) { animation-delay: .95s; left: -6px; }
+@keyframes sr-in { from { transform: scale(.2) translateY(20px); opacity: 0; } }
+@keyframes sr-hover { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes sr-flicker { to { transform: translateX(-50%) scaleY(1.35); opacity: .85; } }
+@keyframes sr-launch {
+  0% { transform: translate(0, 0) rotate(0); } 8% { transform: translate(-2px, 1px) rotate(-3deg); } 16% { transform: translate(2px, -1px) rotate(3deg); } 24% { transform: translate(-2px, 1px) rotate(-3deg); }
+  30% { transform: translate(0, 0) scale(1.05); } 100% { transform: translateY(-125vh) scale(1.35); }
+}
+@keyframes sr-smoke { 0% { transform: translateY(0) scale(.4); opacity: .7; } 100% { transform: translateY(70px) scale(2.2); opacity: 0; } }
+@media (max-width: 767px) { .scroll-rocket { width: 44px; height: 44px; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
+@media (prefers-reduced-motion: reduce) { .scroll-rocket, .scroll-rocket-go, .scroll-rocket:hover .scroll-rocket-body, .scroll-rocket-flame, .scroll-rocket-smoke i { animation: none !important; } }

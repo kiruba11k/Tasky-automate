@@ -11,7 +11,6 @@ import Seasons from './Seasons';
 import CastParty from './CastParty';
 import TeamParade from './TeamParade';
 import BusyRunner from './BusyRunner';
-import RocketTop from './RocketTop';
 import IdleSaver from './IdleSaver';
 import LevelUp from './LevelUp';
 import BirdPost from './BirdPost';
@@ -391,7 +390,6 @@ function FunProviderFull({ children }) {
       <CelebrationWatcher />
       <WellnessWatcher />
       <CursorPal />
-      <RocketTop />
       <IdleSaver />
       <HighFive />
       <DayRhythm onParade={() => setParadeOpen(true)} />

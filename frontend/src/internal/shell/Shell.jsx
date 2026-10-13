@@ -29,6 +29,7 @@ import { ThemeDialog } from '@/internal/ui/ThemeDialog';
 import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
 import { MobileNav } from './MobileNav';
+import ScrollRocket from './ScrollRocket';
 import { useFunMode } from '../fun/useFunMode';
 import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
 import { FunChip } from '../fun/FunChip';
@@ -196,6 +197,7 @@ export function Shell() {
         onTheme={() => setThemeOpen(true)}
         onLogout={logout}
       />
+      <ScrollRocket />
       <ThemeDialog open={themeOpen} onClose={() => setThemeOpen(false)} />
       {!hasFun && <Mascot />}
       <Toaster />

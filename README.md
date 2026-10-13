@@ -205,3 +205,5 @@ Groups: any member can rename a group (the pencil in the chat header; a short no
 
 Mood quest progress (today's mood and challenge, streak, stickers) is saved on the person's profile, so it follows them to every device and updates live. Progress that only existed in one browser's storage is merged in the first time that browser opens the page.
 Water jar glasses are saved on the profile too (one entry per glass, so two devices adding glasses at once both count) and update live; a count kept in one browser's storage is brought in the first time that browser opens the page.
+
+The back-to-top **rocket** (cartoon art) shows for everyone, founders included, once you have scrolled down a while: press it and it shakes, lights its flame, trails smoke and blasts off while the page scrolls to the top (instant when reduced motion is on).
