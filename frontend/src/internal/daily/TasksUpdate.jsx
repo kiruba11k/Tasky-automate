@@ -29,6 +29,7 @@ import { PendingHint } from './PendingHint';
 import { CustomRowsEditor } from './CustomRowsEditor';
 import { ProjectNumbersEditor } from './ProjectNumbersEditor';
 import { WeekCards } from './WeekCards';
+import { dayLoggedMinutes } from '../lib/domain';
 import { EntriesLog } from './EntriesLog';
 import { EntriesProgress } from './EntriesProgress';
 import { buildDayRows } from './progressRows';
@@ -96,7 +97,7 @@ export function TasksUpdate() {
   );
   const submittedTasks = useMemo(() => dayTasks.filter(isSubmittedWithTime), [dayTasks]);
   const eodSent = !!record.eodAt;
-  const hours = computeDayHours({ plan, extra, eodAt: record.eodAt });
+  const hours = computeDayHours({ plan, extra, eodAt: record.eodAt, entries: record.entries });
   const viewRows = useMemo(
     () => buildDayRows(tasks, projects, me, date, daily[key]),
     [tasks, projects, me, date, daily, key],
@@ -175,7 +176,7 @@ export function TasksUpdate() {
             <h2 className="text-base font-bold">Plan your day</h2>
             <HoursStats t={hours} sent={eodSent} />
           </div>
-          <DayTimeline blocks={plan} extra={nonEmptyExtras(extra)} lunch={lunch} loggedMinutes={submittedTasks.reduce((sum, t) => sum + (t.minutes ?? 0), 0)} />
+          <DayTimeline blocks={plan} extra={nonEmptyExtras(extra)} lunch={lunch} loggedMinutes={dayLoggedMinutes(tasks, daily, me, date)} />
           <div className="mt-5 space-y-2">
             {plan.length === 0 && (
               <p className="text-sm text-muted">
@@ -582,13 +583,13 @@ export function TasksUpdate() {
                 label="End of day"
                 empty="No tasks or targets for this day."
               />
-              <TimeTable plan={record.plan} extra={record.extra ?? []} sent />
+              <TimeTable plan={record.plan} extra={record.extra ?? []} entries={record.entries ?? []} sent />
               <NoteLine label="How it went" text={record.eodNote} />
             </>
           }
         >
           <EntriesProgress personId={me} date={date} kind="day" />
-          <TimeTable plan={plan} extra={nonEmptyExtras(extra)} sent={false} />
+          <TimeTable plan={plan} extra={nonEmptyExtras(extra)} entries={record.entries ?? []} sent={false} />
           <TaskSummary tasks={submittedTasks} mode="submitted" />
           <TargetsTable
             rows={viewRows.rows}

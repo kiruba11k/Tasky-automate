@@ -13,6 +13,7 @@ import {
   weekStart,
   WEEKDAY_SHORT,
 } from "./dates.js";
+import { entryAsTask, entriesBetween, weeklyDone, dayEntries } from "./entries.js";
 import {
   PEOPLE,
   TASK_TYPES,
@@ -420,9 +421,22 @@ export const percent = (actual, target) =>
 /**
  * `bR` - per task-type target (qty) vs actual (doneQty of submitted tasks)
  * rows for an assignee (or everyone) between two dates.
+ *
+ * With `opts.daily` (the day records) the rows people logged in "Daily update" count too, and with `opts.weeklyEntries`
+ * (that week's "Weekly targets by project" rows) the week's own targets and achieved numbers do. Where assigned tasks and
+ * logged rows cover the same person, day, project and kind of work the larger one is used, never the sum.
  */
 export function targetVsActualRows(tasks, assigneeId, from, to, opts = {}) {
-  const rows = new Map();
+  const buckets = new Map();
+  const bucket = (day, projectId, k) => {
+    const id = `${day}|${projectId}|${k.key}`;
+    let b = buckets.get(id);
+    if (!b) {
+      b = { k, projectId, tasksT: 0, tasksA: 0, rowsT: 0, rowsA: 0 };
+      buckets.set(id, b);
+    }
+    return b;
+  };
   tasks.forEach((t) => {
     if (
       (assigneeId && t.assigneeId !== assigneeId) ||
@@ -432,18 +446,45 @@ export function targetVsActualRows(tasks, assigneeId, from, to, opts = {}) {
       (opts.includeHistoric === false && t.historic)
     )
       return;
-    const k = taskBreakdownKey(t);
-    const row = rows.get(k.key) ?? {
-      key: k.key,
-      label: k.label,
-      unit: k.unit,
-      target: 0,
-      actual: 0,
-      pct: 0,
-      order: k.order,
-    };
-    row.target += t.qty;
-    if (isSubmitted(t)) row.actual += t.doneQty ?? 0;
+    const b = bucket(t.date, t.projectId, taskBreakdownKey(t));
+    b.tasksT += t.qty;
+    if (isSubmitted(t)) b.tasksA += t.doneQty ?? 0;
+  });
+  const projectOf = (id) => opts.projects?.find((p) => p.id === id);
+  if (opts.daily && assigneeId) {
+    entriesBetween(opts.daily, assigneeId, from, to).forEach(({ date, entry }) => {
+      if (opts.projectId && entry.projectId !== opts.projectId) return;
+      const b = bucket(date, entry.projectId, taskBreakdownKey(entryAsTask(entry, projectOf(entry.projectId))));
+      b.rowsT += entry.qty ?? 0;
+      b.rowsA += entry.doneQty ?? 0;
+    });
+  }
+  // day by day the larger of tasks and logged rows, then added up per project and kind of work
+  const perKind = new Map();
+  buckets.forEach((b) => {
+    const id = `${b.projectId}|${b.k.key}`;
+    const cur = perKind.get(id) ?? { k: b.k, target: 0, actual: 0 };
+    cur.target += Math.max(b.tasksT, b.rowsT);
+    cur.actual += Math.max(b.tasksA, b.rowsA);
+    perKind.set(id, cur);
+  });
+  if (opts.weeklyEntries && assigneeId) {
+    const monday = weekStart(from);
+    opts.weeklyEntries.forEach((entry) => {
+      if (opts.projectId && entry.projectId !== opts.projectId) return;
+      const k = taskBreakdownKey(entryAsTask(entry, projectOf(entry.projectId)));
+      const id = `${entry.projectId}|${k.key}`;
+      const cur = perKind.get(id) ?? { k, target: 0, actual: 0 };
+      cur.target = Math.max(cur.target, entry.qty ?? 0);
+      cur.actual = Math.max(cur.actual, weeklyDone(entry, assigneeId, monday, opts.daily ?? {}) ?? 0);
+      perKind.set(id, cur);
+    });
+  }
+  const rows = new Map();
+  perKind.forEach(({ k, target, actual }) => {
+    const row = rows.get(k.key) ?? { key: k.key, label: k.label, unit: k.unit, target: 0, actual: 0, pct: 0, order: k.order };
+    row.target += target;
+    row.actual += actual;
     rows.set(k.key, row);
   });
   return [...rows.values()]
@@ -471,9 +512,9 @@ export function buildSnapshot(rows, customTargets = [], customActuals = [], at =
 }
 
 /** `Ih` - end-of-day snapshot for one person and day. */
-export function dailySnapshot(tasks, personId, day, daily, at) {
+export function dailySnapshot(tasks, personId, day, daily, at, ctx = {}) {
   return buildSnapshot(
-    targetVsActualRows(tasks, personId, day, day),
+    targetVsActualRows(tasks, personId, day, day, { daily: { [`${personId}|${day}`]: daily }, projects: ctx.projects }),
     daily.sodCustom ?? [],
     daily.eodCustom ?? [],
     at,
@@ -481,10 +522,10 @@ export function dailySnapshot(tasks, personId, day, daily, at) {
 }
 
 /** `Bw` - end-of-week snapshot for one person and week. */
-export function weeklySnapshot(tasks, personId, week, weekly, at) {
+export function weeklySnapshot(tasks, personId, week, weekly, at, ctx = {}) {
   const monday = weekStart(week);
   return buildSnapshot(
-    targetVsActualRows(tasks, personId, monday, addDays(monday, 6)),
+    targetVsActualRows(tasks, personId, monday, addDays(monday, 6), { daily: ctx.daily, projects: ctx.projects, weeklyEntries: weekly.entries }),
     weekly.targetsCustom ?? [],
     weekly.eowCustom ?? [],
     at,
@@ -512,7 +553,7 @@ export function dailyReport(state, personId, day) {
     sentAt: daily?.eodAt,
   };
   if (daily?.eodSnapshot) return { ...info, rows: snapshotRows(daily.eodSnapshot) };
-  const live = dailySnapshot(state.tasks, personId, day, daily ?? {});
+  const live = dailySnapshot(state.tasks, personId, day, daily ?? {}, undefined, { projects: state.projects });
   return { ...info, rows: daily?.eodAt ? snapshotRows(live) : blankActuals(snapshotRows(live)) };
 }
 
@@ -527,7 +568,7 @@ export function weeklyReport(state, personId, week) {
     sentAt: weekly?.eowAt,
   };
   if (weekly?.eowSnapshot) return { ...info, rows: snapshotRows(weekly.eowSnapshot) };
-  const live = weeklySnapshot(state.tasks, personId, monday, weekly ?? { targetsCustom: [], eowCustom: [] });
+  const live = weeklySnapshot(state.tasks, personId, monday, weekly ?? { targetsCustom: [], eowCustom: [] }, undefined, { daily: state.daily, projects: state.projects });
   return { ...info, rows: weekly?.eowAt ? snapshotRows(live) : blankActuals(snapshotRows(live)) };
 }
 
@@ -558,16 +599,48 @@ export function projectEodStatus(project, state, day = todayKey(0)) {
   return { sent, pending: project.teamIds.filter((id) => !sent.includes(id)) };
 }
 
-/** `zw` - planned / actual / extra minutes for one daily entry. */
+/** Minutes logged on a day: per project the larger of the submitted tasks' time and the time typed in that day's tables. */
+export function dayLoggedMinutes(tasks, daily, personId, date) {
+  const taskMin = new Map();
+  tasks.forEach((t) => {
+    if (t.assigneeId === personId && t.date === date && isSubmitted(t) && t.minutes) taskMin.set(t.projectId, (taskMin.get(t.projectId) ?? 0) + t.minutes);
+  });
+  const rowMin = new Map();
+  dayEntries(daily, personId, date).forEach((e) => {
+    if (e.actualMin > 0) rowMin.set(e.projectId, (rowMin.get(e.projectId) ?? 0) + e.actualMin);
+  });
+  let total = 0;
+  new Set([...taskMin.keys(), ...rowMin.keys()]).forEach((id) => {
+    total += Math.max(taskMin.get(id) ?? 0, rowMin.get(id) ?? 0);
+  });
+  return total;
+}
+
+/**
+ * `zw` - planned / actual / extra minutes for one daily entry. Actual time typed into a project's day table wins over the
+ * time block's actual for that project (the block's own actual, or the planned time once the day is sent, is the fallback).
+ */
 export function dayHours(daily) {
   if (!daily) return { plannedMin: 0, actualMin: 0, extraMin: 0, sent: false };
   let planned = 0;
-  let actual = 0;
+  let loose = 0;
+  const byProject = new Map();
   (daily.plan ?? []).forEach((block) => {
     if (block.id === "lunch") return;
     const mins = Math.max(0, clockToMinutes(block.end) - clockToMinutes(block.start));
     planned += mins;
-    actual += block.actualMinutes ?? (daily.eodAt ? mins : 0);
+    const done = block.actualMinutes ?? (daily.eodAt ? mins : 0);
+    const pid = block.custom ? (block.custom.projectId ?? block.projectId) : block.projectId;
+    if (pid) byProject.set(pid, (byProject.get(pid) ?? 0) + done);
+    else loose += done;
+  });
+  const logged = new Map();
+  (daily.entries ?? []).forEach((e) => {
+    if (e.actualMin > 0) logged.set(e.projectId, (logged.get(e.projectId) ?? 0) + e.actualMin);
+  });
+  let actual = loose;
+  new Set([...byProject.keys(), ...logged.keys()]).forEach((pid) => {
+    actual += logged.has(pid) ? logged.get(pid) : (byProject.get(pid) ?? 0);
   });
   const extra = (daily.extra ?? []).reduce((sum, x) => sum + (x.minutes || 0), 0);
   return { plannedMin: planned, actualMin: actual, extraMin: extra, sent: !!daily.eodAt };
@@ -637,15 +710,16 @@ export function personMetrics(tasks, daily, personId, from, to) {
   let submitted = 0;
   let timed = 0;
   let onTimeCount = 0;
-  let minutes = 0;
   let resubmits = 0;
+  const taskMinutes = new Map(); // per day and project: time on submitted tasks
   tasks.forEach((t) => {
     if (t.date < from || t.date > to) return;
     assigned++;
     resubmits += t.resubmits ?? 0;
     if (!isSubmitted(t)) return;
     submitted++;
-    minutes += t.minutes ?? 0;
+    const bucket = `${t.date}|${t.projectId}`;
+    taskMinutes.set(bucket, (taskMinutes.get(bucket) ?? 0) + (t.minutes ?? 0));
     const ok = wasOnTime(t);
     if (ok !== null) {
       timed++;
@@ -653,9 +727,18 @@ export function personMetrics(tasks, daily, personId, from, to) {
     }
   });
   let extraMinutes = 0;
+  const loggedMinutes = new Map(); // per day and project: actual time typed into the day tables
   for (let d = from; d <= to; d = addDays(d, 1)) {
     extraMinutes += (daily[`${personId}|${d}`]?.extra ?? []).reduce((s, x) => s + (x.minutes || 0), 0);
+    dayEntries(daily, personId, d).forEach((e) => {
+      if (e.actualMin > 0) loggedMinutes.set(`${d}|${e.projectId}`, (loggedMinutes.get(`${d}|${e.projectId}`) ?? 0) + e.actualMin);
+    });
   }
+  // hours logged: per day and project the larger of the submitted tasks' time and the time typed in the day tables
+  let minutes = 0;
+  new Set([...taskMinutes.keys(), ...loggedMinutes.keys()]).forEach((id) => {
+    minutes += Math.max(taskMinutes.get(id) ?? 0, loggedMinutes.get(id) ?? 0);
+  });
   return {
     onTime: timed ? Math.round((onTimeCount / timed) * 100) : null,
     tasks: submitted,
@@ -802,6 +885,13 @@ export function timeBreakdown(state, range) {
     entry.minutes += minutes;
     map.set(id, entry);
   };
+  // per person, day and project the larger of the submitted tasks' time and the time typed into the day tables
+  const seen = new Map();
+  const slot = (person, day, pid) => {
+    const id = `${person}|${day}|${pid}`;
+    if (!seen.has(id)) seen.set(id, { pid, tasks: [], rows: [], taskMin: 0, rowMin: 0 });
+    return seen.get(id);
+  };
   state.tasks.forEach((t) => {
     if (
       !people.includes(t.assigneeId) ||
@@ -811,12 +901,38 @@ export function timeBreakdown(state, range) {
       !t.minutes
     )
       return;
-    add(byProject, t.projectId, projectName(t.projectId), t.minutes);
-    const type = TASK_TYPES.find((x) => x.id === t.typeId);
-    if (type) add(byType, type.id, type.name, t.minutes);
-    else {
-      const k = taskBreakdownKey(t);
-      add(byType, k.key, k.label, t.minutes);
+    const b = slot(t.assigneeId, t.date, t.projectId);
+    b.tasks.push(t);
+    b.taskMin += t.minutes;
+  });
+  people.forEach((id) => {
+    entriesBetween(state.daily ?? {}, id, range.from, range.to).forEach(({ date, entry }) => {
+      if (!(entry.actualMin > 0)) return;
+      const b = slot(id, date, entry.projectId);
+      b.rows.push(entry);
+      b.rowMin += entry.actualMin;
+    });
+  });
+  seen.forEach((b) => {
+    const project = state.projects?.find((p) => p.id === b.pid);
+    if (b.taskMin >= b.rowMin) {
+      b.tasks.forEach((t) => {
+        add(byProject, t.projectId, projectName(t.projectId), t.minutes);
+        const type = TASK_TYPES.find((x) => x.id === t.typeId);
+        if (type) add(byType, type.id, type.name, t.minutes);
+        else {
+          const k = taskBreakdownKey(t);
+          add(byType, k.key, k.label, t.minutes);
+        }
+      });
+    } else {
+      b.rows.forEach((e) => {
+        add(byProject, b.pid, projectName(b.pid), e.actualMin);
+        const k = taskBreakdownKey(entryAsTask(e, project));
+        const type = TASK_TYPES.find((x) => x.id === e.task);
+        if (type) add(byType, type.id, type.name, e.actualMin);
+        else add(byType, k.key, k.label, e.actualMin);
+      });
     }
   });
   people.forEach((id) => {

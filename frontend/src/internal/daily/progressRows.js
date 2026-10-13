@@ -1,3 +1,4 @@
+import { entryAsTask } from '../lib/entries.js';
 import {
   Fw as taskTypeOf,
   qV as dayProgress,
@@ -16,9 +17,15 @@ export const ROW_KIND_ORDER = { task: 0, block: 1, custom: 2, number: 3 };
 /** Percentage of `target` reached by `value`, or null without a target. */
 export const percentOf = (value, target) => (target > 0 ? Math.round((value / target) * 100) : null);
 
-/** Sum assigned minutes and quantity per task type for one person over a date range. */
-export function sumAssignedByType(tasks, personId, from, to) {
+/** Sum assigned minutes and quantity per task type for one person over a date range. `rows` are logged table rows to add (their estimate counts as target time). */
+export function sumAssignedByType(tasks, personId, from, to, rows = [], projects = []) {
   const map = new Map();
+  rows.forEach((e) => {
+    if (!e.estMin) return;
+    const key = taskTypeOf(entryAsTask(e, projects.find((p) => p.id === e.projectId))).key;
+    const cur = map.get(key) ?? { min: 0, qty: 0 };
+    map.set(key, { min: cur.min + e.estMin, qty: cur.qty + (e.qty || 0) });
+  });
   tasks.forEach((t) => {
     if (t.assigneeId !== personId || t.date < from || t.date > to) return;
     const key = taskTypeOf(t).key;
@@ -55,9 +62,9 @@ export const toDisplayRows = (rows, assignedByType, sent) =>
 
 /** Rows (targets vs actuals) for one person on one day. */
 export function buildDayRows(tasks, projects, personId, date, record, kinds) {
-  const progress = dayProgress({ tasks, daily: record ? { [`${personId}|${date}`]: record } : {} }, personId, date);
+  const progress = dayProgress({ tasks, projects, daily: record ? { [`${personId}|${date}`]: record } : {} }, personId, date);
   const sent = progress.sent;
-  const rows = toDisplayRows(progress.rows, sumAssignedByType(tasks, personId, date, date), sent);
+  const rows = toDisplayRows(progress.rows, sumAssignedByType(tasks, personId, date, date, record?.entries ?? [], projects), sent);
   (record?.plan ?? []).forEach((block) => {
     const custom = block.custom;
     if (!custom) return;
@@ -123,10 +130,10 @@ export function buildDayRows(tasks, projects, personId, date, record, kinds) {
 }
 
 /** Rows (targets vs actuals) for one person for the week starting `weekDate`. */
-export function buildWeekRows(tasks, personId, weekDate, record, kinds, daily) {
+export function buildWeekRows(tasks, personId, weekDate, record, kinds, daily, projects = []) {
   const mon = weekStart(weekDate);
-  const progress = weekProgress({ tasks, weekly: record ? { [`${personId}|${mon}`]: record } : {} }, personId, mon);
-  let rows = toDisplayRows(progress.rows, sumAssignedByType(tasks, personId, mon, addDays(mon, 6)), progress.sent);
+  const progress = weekProgress({ tasks, projects, daily: daily ?? {}, weekly: record ? { [`${personId}|${mon}`]: record } : {} }, personId, mon);
+  let rows = toDisplayRows(progress.rows, sumAssignedByType(tasks, personId, mon, addDays(mon, 6), record?.entries ?? [], projects), progress.sent);
   let soFar = false;
   if (!progress.sent && daily) {
     const totals = new Map();

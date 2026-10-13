@@ -13,7 +13,7 @@ import {
   Mn as toMinutes,
 } from '@/internal/min';
 import { addDays, previousWeekday, weekStart } from '../lib/dates.js';
-import { canManageProject, emptyDaily, emptyWeekly } from '../lib/domain.js';
+import { canManageProject, computeStandardMinutes, emptyDaily, emptyWeekly } from '../lib/domain.js';
 import { WeekPlanner } from '../projects/WeekPlanner';
 import { DurationInput } from './DurationInput';
 import { formatDayClock } from './dateHelpers';
@@ -103,6 +103,19 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day'
   }, [kind, blocks, extras, shown, projects, personId]);
 
   const update = (id, patch) => setRows((list) => list.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  // The estimate follows the project's standard time for the task and target (per 10 prospects, per message...) until it is typed by hand.
+  const standardFor = (row, qty) => {
+    const project = projects.find((p) => p.id === row.projectId);
+    if (!project || !row.task || row.task === CUSTOM_TASK || !(qty > 0)) return null;
+    const builtIn = !row.task.startsWith('std:');
+    return computeStandardMinutes(project, builtIn ? row.task : 'custom', qty, undefined, builtIn ? undefined : row.task.slice(4));
+  };
+  const reestimate = (row, patch) => {
+    const next = { ...row, ...patch };
+    if (next.estManual) return patch;
+    const std = standardFor(next, next.qty);
+    return std ? { ...patch, estMin: std, estAuto: true } : patch;
+  };
   const fillFromPrevious = (pid) => {
     const source = previous.filter((r) => r.projectId === pid);
     if (!source.length) {
@@ -240,7 +253,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day'
                           <td className="px-2 py-1.5">
                             {editable ? (
                               <>
-                                <select aria-label="Task" className={TEXT} value={r.task} onChange={(e) => update(r.id, { task: e.target.value })}>
+                                <select aria-label="Task" className={TEXT} value={r.task} onChange={(e) => update(r.id, reestimate(r, { task: e.target.value }))}>
                                   <option value="">Pick a task</option>
                                   {taskChoices(project).map((t) => (
                                     <option key={t.id} value={t.id}>
@@ -273,14 +286,14 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day'
                           </td>
                           <td className="px-2 py-1.5">
                             {editable ? (
-                              <input aria-label="Target" type="number" min={0} className={NUMBER} placeholder="30" value={r.qty ?? ''} onChange={(e) => update(r.id, { qty: parseQty(e.target.value) })} />
+                              <input aria-label="Target" type="number" min={0} className={NUMBER} placeholder="30" value={r.qty ?? ''} onChange={(e) => update(r.id, reestimate(r, { qty: parseQty(e.target.value) }))} />
                             ) : (
                               <span className="tabular-nums">{r.qty ?? '·'}</span>
                             )}
                           </td>
                           <td className="px-2 py-1.5">
                             {editable ? (
-                              <DurationInput label="Estimated time" className="w-24" placeholder="1h" value={r.estMin || undefined} onChange={(m) => update(r.id, { estMin: m ?? 0 })} />
+                              <DurationInput label="Estimated time" className="w-24" placeholder="1h" value={r.estMin || undefined} onChange={(m) => update(r.id, { estMin: m ?? 0, estManual: m != null, estAuto: false })} />
                             ) : (
                               <span className="tabular-nums">{formatMinutes(r.estMin)}</span>
                             )}

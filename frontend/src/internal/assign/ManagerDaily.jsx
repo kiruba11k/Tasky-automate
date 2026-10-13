@@ -53,7 +53,7 @@ export function ManagerDaily() {
           };
         }
         const entry = weekly[`${id}|${weekKey}`];
-        const { rows, sent } = weeklyRowsFor(tasks, id, weekKey, entry);
+        const { rows, sent } = weeklyRowsFor(tasks, id, weekKey, entry, undefined, daily, projects);
         const hours = weeklyHours(daily, id, weekKey);
         return {
           id,

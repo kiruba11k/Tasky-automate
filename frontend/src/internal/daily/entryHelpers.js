@@ -1,5 +1,6 @@
 import { TASK_TYPES } from '../lib/constants.js';
-import { addDays, weekStart } from '../lib/dates.js';
+import { weekStart } from '../lib/dates.js';
+import { weeklyDone } from '../lib/entries.js';
 
 /** Value of the "Custom..." choice in a task picker. */
 export const CUSTOM_TASK = '__custom';
@@ -31,13 +32,7 @@ export const sameWork = (a, b) =>
 export const parseQty = (text) => (text.trim() === '' ? undefined : Math.max(0, Math.round(+text || 0)));
 
 /** Achieved count of a weekly row: what was typed, otherwise the sum of the matching daily rows from that week's days. */
-export function weeklyAchieved(entry, personId, monday, daily) {
-  if (entry.doneQty != null) return entry.doneQty;
-  const matches = [0, 1, 2, 3, 4]
-    .flatMap((i) => daily[`${personId}|${addDays(monday, i)}`]?.entries ?? [])
-    .filter((row) => sameWork(row, entry) && row.doneQty != null);
-  return matches.length ? matches.reduce((sum, row) => sum + (row.doneQty ?? 0), 0) : undefined;
-}
+export const weeklyAchieved = weeklyDone;
 
 /** The saved rows for a day, or for the week that contains `date`. */
 export function savedEntries(kind, personId, date, daily, weekly) {

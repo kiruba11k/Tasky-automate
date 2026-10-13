@@ -1,10 +1,19 @@
 import { oe as cx, We as formatMinutes, Se as useStore, Mn as toMinutes, pu as projectColor } from '@/internal/min';
 
 /** Planned vs actual time per block, with extra-hours entries slotted in by start time. */
-export function TimeTable({ plan, extra, sent }) {
+export function TimeTable({ plan, extra, sent, entries = [] }) {
   const projects = useStore((s) => s.projects);
   const blocks = [...plan].filter((b) => b.id !== 'lunch').sort((a, b) => a.start.localeCompare(b.start));
   if (!blocks.length && !extra.length) return null;
+  // Actual time typed in a project's day table is spread over that project's blocks in proportion to their planned time.
+  const typed = new Map();
+  entries.forEach((e) => { if (e.actualMin > 0) typed.set(e.projectId, (typed.get(e.projectId) ?? 0) + e.actualMin); });
+  const plannedBy = new Map();
+  blocks.forEach((b) => { const pid = b.custom ? (b.custom.projectId ?? b.projectId) : b.projectId; plannedBy.set(pid, (plannedBy.get(pid) ?? 0) + Math.max(0, toMinutes(b.end) - toMinutes(b.start))); });
+  const typedActual = (b, planned) => {
+    const pid = b.custom ? (b.custom.projectId ?? b.projectId) : b.projectId;
+    return typed.has(pid) && plannedBy.get(pid) ? Math.round((planned / plannedBy.get(pid)) * typed.get(pid)) : undefined;
+  };
   // Extra hours with a start time sit in the timeline order; the ones without one go last.
   const rows = [...blocks.map((b) => ({ at: b.start, b })), ...extra.map((x) => ({ at: x.start ?? '99', x }))].sort((a, b) =>
     a.at.localeCompare(b.at),
@@ -57,7 +66,7 @@ export function TimeTable({ plan, extra, sent }) {
           }
           const b = row.b;
           const planned = Math.max(0, toMinutes(b.end) - toMinutes(b.start));
-          const actual = b.actualMinutes ?? (sent ? planned : undefined);
+          const actual = typedActual(b, planned) ?? b.actualMinutes ?? (sent ? planned : undefined);
           const project = projects.find((p) => p.id === b.projectId);
           return (
             <tr key={b.id} className="border-b border-line/70">

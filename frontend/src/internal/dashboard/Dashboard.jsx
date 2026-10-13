@@ -15,6 +15,7 @@ import {
 import { QuoteOfTheDay } from './QuoteOfTheDay';
 import { Spotlight } from './Spotlight';
 import { lunchFor } from '../lib/dates';
+import { dayLoggedMinutes } from '../lib/domain';
 import { DayPlanStrip } from './DayPlanStrip';
 import { ReviewQueue } from './ReviewQueue';
 import { ReviewedByYou } from './ReviewedByYou';
@@ -53,9 +54,7 @@ export function Dashboard() {
     : carried.every((t) => t.date === carried[0]?.date) && carried[0]
       ? formatDate(carried[0].date)
       : 'earlier days';
-  const loggedMinutes = myTasks
-    .filter((t) => t.date === today && t.minutes)
-    .reduce((sum, t) => sum + (t.minutes ?? 0), 0);
+  const loggedMinutes = dayLoggedMinutes(tasks, daily, me, today);
   const onTime = onTimeSummary(tasks.filter((t) => t.assigneeId === me));
   const plan = daily[`${me}|${today}`]?.plan ?? [];
 

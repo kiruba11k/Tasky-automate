@@ -131,7 +131,7 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [], lunch = { star
         ))}
       </div>
       <p className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted">
-        <span>Logged {formatMinutes(loggedMinutes)} on submitted tasks</span>
+        <span>Logged {formatMinutes(loggedMinutes)} (submitted tasks and your day tables)</span>
         <span>
           <span className="mr-1 inline-block h-2 w-2 rounded-full bg-coral-strong" />
           {remaining}

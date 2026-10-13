@@ -474,7 +474,7 @@ export const useStore = create()(
           const record = { ...emptyWeekly(), ...get().weekly[key], ...patch };
           if ("eowAt" in patch) {
             if (patch.eowAt)
-              record.eowSnapshot = weeklySnapshot(get().tasks, personId, monday, record, patch.eowAt);
+              record.eowSnapshot = weeklySnapshot(get().tasks, personId, monday, record, patch.eowAt, { daily: get().daily, projects: get().projects });
             else delete record.eowSnapshot;
           }
           set((s) => ({ weekly: { ...s.weekly, [key]: record } }));
@@ -584,7 +584,7 @@ export const useStore = create()(
           const record = { ...emptyDaily(), ...get().daily[key], ...next };
           if ("eodAt" in next) {
             if (next.eodAt)
-              record.eodSnapshot = dailySnapshot(get().tasks, personId, day, record, next.eodAt);
+              record.eodSnapshot = dailySnapshot(get().tasks, personId, day, record, next.eodAt, { projects: get().projects });
             else delete record.eodSnapshot;
           }
           set((s) => ({

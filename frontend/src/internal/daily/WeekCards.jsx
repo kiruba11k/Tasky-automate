@@ -24,7 +24,7 @@ import { formatWeekRange, weekdayRange } from './dateHelpers';
 
 /** "Weekly targets" and "End of week update" cards for the week containing `date`. */
 export function WeekCards({ personId, date }) {
-  const { tasks, weekly, daily, saveWeekly } = useStore();
+  const { tasks, weekly, daily, projects, saveWeekly } = useStore();
   const [mon] = weekdayRange(date);
   const record = weekly[`${personId}|${mon}`] ?? emptyWeekly();
   const [targetsNote, setTargetsNote] = useState(record.targetsNote);
@@ -45,7 +45,7 @@ export function WeekCards({ personId, date }) {
   }, [personId, mon]);
 
   const weekTasks = tasks.filter((t) => t.assigneeId === personId && t.date >= mon && t.date <= addDays(mon, 6));
-  const progress = buildWeekRows(tasks, personId, mon, record, undefined, daily);
+  const progress = buildWeekRows(tasks, personId, mon, record, undefined, daily, projects);
   const taskRows = progress.rows.filter((r) => r.kind === 'task');
   const met = countTargetsMet(progress.rows);
   const rangeLabel = formatWeekRange(mon);
