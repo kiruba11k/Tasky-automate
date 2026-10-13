@@ -1,9 +1,11 @@
 import React from 'react';
 import { ICONS } from './emojiIcons.generated';
 import { stripVariation } from './emojiUrl';
+import { Ico, iconFor } from './Ico';
 
-/** A cartoon illustration standing in for an emoji character (same artwork on every device). */
+/** An icon standing in for an emoji character (Lucide icons; the older cartoon art, then the plain character, for any emoji without one). */
 export function Emoji({ e, size = '1.15em', label, className = '' }) {
+  if (iconFor(e)) return <Ico e={e} size={size} label={label} className={className} />;
   const body = ICONS[stripVariation(e)];
   if (!body) return <span className={className}>{e}</span>;
   return (
