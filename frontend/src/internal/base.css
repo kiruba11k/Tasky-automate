@@ -66,3 +66,39 @@ body { font-size: 14px; }
 .nt-prompt { position: fixed; bottom: 5.5rem; left: 50%; transform: translateX(-50%); z-index: 70; display: flex; align-items: center; gap: .75rem; width: min(30rem, calc(100vw - 2rem)); padding: .7rem .9rem; border-radius: 1.1rem; background: rgb(var(--c-surface)); border: 2px solid rgb(var(--c-accent)); box-shadow: var(--shadow-lift); animation: nt-up .5s cubic-bezier(.34, 1.5, .5, 1) both; }
 @keyframes nt-up { 0% { opacity: 0; transform: translate(-50%, 30px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .nt-card, .nt-emoji, .nt-prompt, .nt-bar { animation: none !important; } }
+
+/* ---------- phones: the side rail becomes a bottom tab bar ---------- */
+.m-bar, .m-sheet-wrap { display: none; }
+@media (max-width: 767px) {
+  .shell-rail { display: none !important; }
+  .shell-main { padding-bottom: 6rem; }
+  .m-bar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; padding: .25rem .25rem calc(.25rem + env(safe-area-inset-bottom, 0px)); background: rgb(var(--c-surface)); border-top: 1px solid rgb(var(--c-line)); box-shadow: 0 -6px 20px rgb(0 0 0 / .06); }
+  .m-tab { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 3.1rem; padding: .3rem .1rem; border-radius: .9rem; font-size: 10.5px; font-weight: 700; line-height: 1.1; color: rgb(var(--c-muted)); text-align: center; }
+  .m-tab-on { background: rgb(var(--c-accent-soft)); color: rgb(var(--c-accent-ink)); }
+  .m-badge { position: absolute; top: 2px; right: 22%; min-width: 1rem; padding: 0 .3rem; border-radius: 999px; background: rgb(var(--c-coral-strong)); color: #fff; font-size: 10px; line-height: 1rem; text-align: center; }
+  .m-sheet-wrap { display: block; position: fixed; inset: 0; z-index: 160; }
+  .m-scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .4); animation: m-fade .2s both; }
+  .m-sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 80vh; overflow-y: auto; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px)); border-radius: 1.4rem 1.4rem 0 0; background: rgb(var(--c-surface)); box-shadow: var(--shadow-lift); animation: m-up .3s cubic-bezier(.3, 1.2, .5, 1) both; }
+  .m-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; font-size: 1.05rem; }
+  .m-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+  .m-tile { min-height: 4.4rem; background: rgb(var(--c-surface-2)); }
+  .m-actions { display: grid; gap: .4rem; margin-top: .9rem; padding-top: .9rem; border-top: 1px solid rgb(var(--c-line)); }
+  .m-actions button { display: flex; align-items: center; gap: .6rem; width: 100%; padding: .7rem .8rem; border-radius: .9rem; background: rgb(var(--c-surface-2)); font-weight: 600; text-align: left; }
+  /* floating things sit above the bar */
+  .shell-chat { bottom: 4.9rem !important; right: .75rem !important; }
+  .shell-chat > button { width: 3rem; height: 3rem; }
+  .nt-prompt { bottom: 5.2rem; }
+  .nt-stack { top: 4rem; right: .5rem; left: .5rem; width: auto; }
+  .mascot-corner:not([style*="top"]) { bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px)) !important; }
+  .chat-window { position: fixed; left: .5rem; right: .5rem; top: 3.9rem; bottom: 8.2rem; width: auto !important; height: auto !important; }
+  .chat-root { flex-direction: column; }
+  .chat-aside { width: 100% !important; flex-direction: row !important; align-items: center; border-right: 0 !important; border-bottom: 1px solid rgb(var(--c-line)); overflow-x: auto; flex-shrink: 0; }
+  .chat-aside > div { padding: .5rem .6rem !important; }
+  .chat-aside > div h1 { display: none; }
+  .chat-aside ul { display: flex; flex: 1; overflow-x: auto; overflow-y: hidden !important; padding: .35rem !important; gap: .25rem; }
+  .chat-aside li { flex-shrink: 0; width: 10.5rem; }
+  .chat-picker { grid-template-columns: repeat(6, 1fr); }
+  .rhythm-card, .focus-pill { bottom: calc(4.8rem + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@keyframes m-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes m-fade { from { opacity: 0; } }

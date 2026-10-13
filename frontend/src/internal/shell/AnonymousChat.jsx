@@ -83,8 +83,8 @@ export function AnonymousChat({ onClose }) {
   };
 
   return (
-    <div className="flex h-full overflow-hidden bg-surface">
-      <aside className="flex w-48 shrink-0 flex-col border-r border-line">
+    <div className="chat-root flex h-full overflow-hidden bg-surface">
+      <aside className="chat-aside flex w-48 shrink-0 flex-col border-r border-line">
         <div className="flex items-center justify-between p-4">
           <h1 className="font-bold">Chat</h1>
           <button

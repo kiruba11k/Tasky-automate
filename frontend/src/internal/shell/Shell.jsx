@@ -29,6 +29,7 @@ import { FloatingDoodles } from '@/internal/ui/FloatingDoodles';
 import { ThemeDialog } from '@/internal/ui/ThemeDialog';
 import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
+import { MobileNav } from './MobileNav';
 import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, PROFILE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
 import { FunChip } from '../fun/FunChip';
 import HubPage from '@/hub/HubPage';
@@ -79,7 +80,7 @@ export function Shell() {
     <div className="relative flex min-h-screen bg-bg">
       <ThemeEffects />
       <FloatingDoodles />
-      <nav className="sticky top-0 z-10 flex h-screen w-[76px] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-3">
+      <nav className="shell-rail sticky top-0 z-10 flex h-screen w-[76px] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-3">
         <img
           src="/logo.jpg"
           alt="Lead Strategus"
@@ -142,7 +143,7 @@ export function Shell() {
           </div>
         </header>
         {hasFun && <PageHero />}
-        <main className="mx-auto max-w-6xl p-4 sm:p-6">
+        <main className="shell-main mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>
             <Route path="/" element={isManager && !alsoWorks ? <ManagerDashboard /> : <MemberDashboard />} />
             <Route path="/projects" element={isAdmin ? <ManagerProjects /> : <MemberProjects />} />
@@ -158,10 +159,10 @@ export function Shell() {
           </Routes>
         </main>
       </div>
-      <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
+      <div className="shell-chat fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
         {chatOpen && <div aria-hidden className="fixed inset-0 -z-10" onClick={() => setChatOpen(false)} />}
         {chatOpen && (
-          <div className="h-[min(520px,75vh)] w-[min(640px,calc(100vw-2.5rem))] overflow-hidden rounded-card border border-line shadow-lift">
+          <div className="chat-window h-[min(520px,75vh)] w-[min(640px,calc(100vw-2.5rem))] overflow-hidden rounded-card border border-line shadow-lift">
             <AnonymousChat onClose={() => setChatOpen(false)} />
           </div>
         )}
@@ -183,6 +184,13 @@ export function Shell() {
           )}
         </button>
       </div>
+      <MobileNav
+        items={navItems}
+        onProject={isAdmin ? () => setProjectDialogOpen(true) : null}
+        projectLabel={isApprover(me) ? 'Onboard a new project' : 'Propose a new project'}
+        onTheme={() => setThemeOpen(true)}
+        onLogout={logout}
+      />
       <ProjectDialog open={projectDialogOpen} onClose={() => setProjectDialogOpen(false)} />
       <ThemeDialog open={themeOpen} onClose={() => setThemeOpen(false)} />
       {!hasFun && <Mascot />}
