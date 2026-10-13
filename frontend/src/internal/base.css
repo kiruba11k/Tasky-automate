@@ -139,3 +139,6 @@ body { font-size: 14px; }
 @keyframes sr-smoke { 0% { transform: translateY(0) scale(.4); opacity: .7; } 100% { transform: translateY(70px) scale(2.2); opacity: 0; } }
 @media (max-width: 767px) { .scroll-rocket { width: 44px; height: 44px; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { .scroll-rocket, .scroll-rocket-go, .scroll-rocket:hover .scroll-rocket-body, .scroll-rocket-flame, .scroll-rocket-smoke i { animation: none !important; } }
+
+/* The cursor buddy follows the pointer and sits right under it: it must never catch a click (its canvas included). */
+.cursor-pal, .cursor-pal * { pointer-events: none !important; }

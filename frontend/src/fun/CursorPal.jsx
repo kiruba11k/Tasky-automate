@@ -26,7 +26,7 @@ export default function CursorPal() {
   if (!enabled) return null;
   const species = buddyFor(loc.pathname.split('/').filter(Boolean)[0] || 'Dashboard', pinned);
   return (
-    <div ref={box} className="cursor-pal" aria-hidden="true">
+    <div ref={box} className="cursor-pal" aria-hidden="true" style={{ pointerEvents: 'none' }}>
       <Suspense fallback={null}><Buddy3D species={species} pose={moving ? 'run' : 'idle'} size={72} equipped={equipped} spin={0.9} /></Suspense>
     </div>
   );
