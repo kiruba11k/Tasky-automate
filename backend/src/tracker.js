@@ -123,7 +123,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         return (data.memberIds || []).includes(u.id) || (prev?.memberIds || []).includes(u.id);
       case 'msg':
         if (deleting) return existing?.owner_id === u.id || (await convMembers(prev.convId)).every((m) => m === u.id); // the sender (never revealed), or the last person left in the chat
-        return !prev && (await convMembers(data.convId)).includes(u.id);
+        return !prev && (await convMembers(data.convId)).includes(u.id) && (data.from == null || data.from === u.id); // a named chat message carries its sender, who can only be the writer
       case 'alias': return key.startsWith(`${u.id}:`);
       default: return false;
     }

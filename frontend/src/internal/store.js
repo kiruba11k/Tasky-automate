@@ -917,9 +917,10 @@ export const useStore = create()(
           set((s) => ({
             notices: s.notices.map((n) => (n.id === id ? { ...n, read: true } : n)),
           })),
-        createConv: (name, memberIds, group) => {
+        /** `anonymous` chats hide who wrote what (each person gets an alias); named chats show real names. Older chats have no flag and stay anonymous. */
+        createConv: (name, memberIds, group, anonymous = false) => {
           const id = newId();
-          set((s) => ({ convs: [...s.convs, { id, name, memberIds, group }] }));
+          set((s) => ({ convs: [...s.convs, { id, name, memberIds, group, anonymous }] }));
           return id;
         },
         /** Delete one of my own messages. (My messages are the ones that carry my alias in that chat.) */
@@ -927,7 +928,8 @@ export const useStore = create()(
           const state = get();
           const msg = state.msgs.find((m) => m.id === msgId);
           if (!msg) return;
-          if (state.aliases[`${state.me}:${msg.convId}`] !== msg.alias) throw new Error("You can only delete your own messages.");
+          const mineMsg = msg.from ? msg.from === state.me : state.aliases[`${state.me}:${msg.convId}`] === msg.alias;
+          if (!mineMsg) throw new Error("You can only delete your own messages.");
           set((s) => ({ msgs: s.msgs.filter((m) => m.id !== msgId) }));
         },
         /** Leave a chat. When the last person leaves, the chat and its messages go. */
@@ -948,13 +950,14 @@ export const useStore = create()(
           const state = get();
           const conv = state.convs.find((c) => c.id === convId);
           if (!conv || !text.trim()) return;
+          const named = conv.anonymous === false;
           const aliasKey = `${state.me}:${convId}`;
-          const alias = state.aliases[aliasKey] ?? randomAlias();
+          const alias = named ? displayName(state.me) : state.aliases[aliasKey] ?? randomAlias();
           set((s) => ({
-            aliases: { ...s.aliases, [aliasKey]: alias },
+            aliases: named ? s.aliases : { ...s.aliases, [aliasKey]: alias },
             msgs: [
               ...s.msgs,
-              { id: newId(), convId, alias, text: text.trim(), at: nowIso() },
+              { id: newId(), convId, alias, ...(named ? { from: state.me } : {}), text: text.trim(), at: nowIso() },
             ],
           }));
           if (conv.memberIds.length <= 6)
@@ -963,7 +966,9 @@ export const useStore = create()(
               .forEach((id) =>
                 notify(
                   id,
-                  `New anonymous message in ${conv.group ? conv.name : "a private chat"}`,
+                  named
+                    ? `${firstName(state.me)} in ${conv.group ? conv.name : "a private chat"}: ${text.trim().slice(0, 60)}`
+                    : `New anonymous message in ${conv.group ? conv.name : "a private chat"}`,
                   "chat",
                 ),
               );

@@ -51,7 +51,7 @@ export function Shell() {
   const person = PEOPLE.find((p) => p.id === me);
   const [chatOpen, setChatOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  const unreadChat = notices.filter((n) => n.to === me && !n.read && n.text.includes('anonymous')).length;
+  const unreadChat = notices.filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous'))).length;
   const navigate = useNavigate();
   useNoticeToasts();
   const [themeOpen, setThemeOpen] = useState(false);
@@ -171,7 +171,7 @@ export function Shell() {
           onClick={() => {
             setChatOpen((open) => !open);
             notices
-              .filter((n) => n.to === me && !n.read && n.text.includes('anonymous'))
+              .filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous')))
               .forEach((n) => useStore.getState().readNotice(n.id));
           }}
           className="focus-ring relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-on shadow-lift transition hover:scale-105"

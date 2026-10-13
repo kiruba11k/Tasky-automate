@@ -3,3 +3,41 @@ body { font-size: 14px; }
 
 /* background pattern of the colour themes from the earlier app */
 [data-fun=pack] body { background-image: var(--page-pattern); background-size: var(--page-pattern-size); }
+
+/* ---------- chat: entrance animations, 3D emojis, emoji picker ---------- */
+@keyframes chat-in-left { 0% { opacity: 0; transform: translateX(-22px) scale(.85); } 60% { transform: translateX(3px) scale(1.03); } 100% { opacity: 1; transform: none; } }
+@keyframes chat-in-right { 0% { opacity: 0; transform: translateX(22px) scale(.85); } 60% { transform: translateX(-3px) scale(1.03); } 100% { opacity: 1; transform: none; } }
+.chat-in-left { animation: chat-in-left .45s cubic-bezier(.34, 1.4, .5, 1) both; transform-origin: left bottom; }
+.chat-in-right { animation: chat-in-right .45s cubic-bezier(.34, 1.4, .5, 1) both; transform-origin: right bottom; }
+.chat-tail-left { border-bottom-left-radius: .35rem; }
+.chat-tail-right { border-bottom-right-radius: .35rem; }
+@keyframes chat-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
+.chat-wave span { transform-origin: 70% 70%; animation: chat-wave 2.2s ease-in-out infinite; }
+.chat-send .chat-plane { transition: transform .35s ease; }
+.chat-send:active .chat-plane, .chat-send:focus-visible .chat-plane { transform: translate(14px, -10px) rotate(25deg); opacity: 0; }
+.chat-send:hover .chat-plane { transform: translate(2px, -2px); }
+
+/* A "3D" emoji: copies stacked in depth with a slow tumble. */
+.e3d { display: inline-block; perspective: 220px; vertical-align: middle; line-height: 1; }
+.e3d-body { display: block; position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+.e3d-spin .e3d-body { animation: e3d-wobble 3.4s ease-in-out infinite; }
+.e3d:hover .e3d-body { animation: e3d-turn .9s ease-in-out; }
+.e3d-layer, .e3d-front { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.e3d-layer { filter: brightness(.45) saturate(1.1); }
+.e3d-front { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .25)); }
+@keyframes e3d-wobble { 0%, 100% { transform: rotateY(-26deg) rotateX(8deg); } 50% { transform: rotateY(26deg) rotateX(-6deg); } }
+@keyframes e3d-turn { to { transform: rotateY(360deg); } }
+.chat-big { background: none; }
+.chat-big-row { display: flex; gap: .5rem; padding: .25rem 0; }
+.chat-big-row .e3d { animation: chat-bounce .9s cubic-bezier(.3, 1.6, .5, 1) both; }
+.chat-big-row .e3d:nth-child(2) { animation-delay: .1s; } .chat-big-row .e3d:nth-child(3) { animation-delay: .2s; }
+@keyframes chat-bounce { 0% { transform: translateY(18px) scale(.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+.chat-burst { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.chat-burst-item { position: absolute; bottom: -2rem; animation-name: chat-rise; animation-timing-function: ease-out; animation-fill-mode: both; }
+@keyframes chat-rise { 0% { transform: translate(0, 0) scale(.4); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--sway), -420px) scale(1.1) rotate(20deg); opacity: 0; } }
+
+.chat-picker { position: absolute; bottom: 100%; left: .75rem; right: .75rem; margin-bottom: .25rem; display: grid; grid-template-columns: repeat(8, 1fr); gap: .15rem; padding: .5rem; border-radius: 1rem; background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-line)); box-shadow: var(--shadow-lift); animation: chat-in-left .25s ease-out both; z-index: 10; }
+.chat-picker-item { display: flex; justify-content: center; align-items: center; height: 2.4rem; border-radius: .6rem; transition: transform .15s; }
+.chat-picker-item:hover { transform: translateY(-4px) scale(1.2); background: rgb(var(--c-surface-2)); }
+@media (prefers-reduced-motion: reduce) { .e3d-body, .chat-in-left, .chat-in-right, .chat-burst-item, .chat-wave span { animation: none !important; } }
