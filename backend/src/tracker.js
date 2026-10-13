@@ -115,10 +115,10 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     const d = doc.data || {};
     switch (doc.kind) {
       case 'notice': return d.to === u.id;
-      case 'alias': return doc.key.startsWith(`${u.id}:`);
+      case 'alias': return trackerRole(u) !== 'founder' && doc.key.startsWith(`${u.id}:`);
       case 'config': return false; // server-only settings (push keys, push subscriptions, alert bookkeeping)
-      case 'conv': return (d.memberIds || []).includes(u.id);
-      case 'msg': return (await convMembers(d.convId)).includes(u.id);
+      case 'conv': return trackerRole(u) !== 'founder' && (d.memberIds || []).includes(u.id); // founders have no anonymous chat
+      case 'msg': return trackerRole(u) !== 'founder' && (await convMembers(d.convId)).includes(u.id);
       default: return true; // tasks, projects, daily, weekly and profiles are shared inside the team
     }
   }
@@ -178,6 +178,16 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       case 'daily': case 'weekly': return key.startsWith(`${u.id}|`) || leadership(u);
       case 'profile': return mine(key) || leadership(u);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
+      case 'conv': case 'msg': case 'alias':
+        if (trackerRole(u) === 'founder') return false; // founders have no anonymous chat, and nobody can add them to a group
+        if (kind === 'conv' && !deleting && Array.isArray(data?.memberIds) && (await live()).some((x) => trackerRole(x) === 'founder' && data.memberIds.includes(x.id))) return false;
+        return canWriteChat(u, kind, key, data, prev, deleting, existing);
+      default: return false;
+    }
+  }
+
+  async function canWriteChat(u, kind, key, data, prev, deleting, existing) {
+    switch (kind) {
       case 'conv':
         if (deleting) return (prev.memberIds || []).includes(u.id) && ((prev.memberIds || []).every((m) => m === u.id) || existing?.owner_id === u.id);
         return (data.memberIds || []).includes(u.id) || (prev?.memberIds || []).includes(u.id);

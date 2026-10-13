@@ -56,6 +56,7 @@ export function Shell() {
   if (found) lastPerson.current = found;
   const person = found || lastPerson.current || { id: me, name: '', role: 'resource', title: '', color: 'mint', history: [] };
   const [chatOpen, setChatOpen] = useState(false);
+  const hasChat = person.role !== 'founder'; // founders have no anonymous chat
   const unreadChat = notices.filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous'))).length;
   const navigate = useNavigate();
   // new-notice cards and desktop alerts are shown by <Alerts /> (App.jsx)
@@ -167,6 +168,7 @@ export function Shell() {
           </Routes>
         </main>
       </div>
+      {hasChat && (
       <div className="shell-chat fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
         {chatOpen && <div aria-hidden className="fixed inset-0 -z-10" onClick={() => setChatOpen(false)} />}
         {chatOpen && (
@@ -192,6 +194,7 @@ export function Shell() {
           )}
         </button>
       </div>
+      )}
       <MobileNav
         items={navItems}
         onTheme={() => setThemeOpen(true)}

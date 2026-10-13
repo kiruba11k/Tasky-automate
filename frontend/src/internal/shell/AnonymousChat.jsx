@@ -315,7 +315,7 @@ export function AnonymousChat({ onClose }) {
         }
       >
         <div className="flex flex-wrap gap-2">
-          {PEOPLE.filter((p) => p.id !== me).map((p) => {
+          {PEOPLE.filter((p) => p.id !== me && p.role !== 'founder').map((p) => {
             const selected = picked.includes(p.id);
             return (
               <button

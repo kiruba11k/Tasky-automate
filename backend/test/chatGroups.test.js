@@ -64,3 +64,36 @@ describe('group chats: anyone renames, only the creator deletes', () => {
     assert.ok(!delta.some((x) => x.key === 'm1' && !x.deleted), 'its messages are not served as live ones');
   });
 });
+
+describe('founders have no anonymous chat', () => {
+  let server, base; const ids = {}; const tok = {};
+  const call = async (method, url, token, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    const t = await res.text(); return { status: res.status, body: t ? JSON.parse(t) : null };
+  };
+  const login = async (email) => (await call('POST', '/api/auth/login', null, { email })).body.token;
+  const put = (token, kind, key, data) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind, key, patch: data }] }).then((r) => r.body.results[0]);
+  before(async () => {
+    const store = new MemoryStore(); await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    server = createApp({ store, jwtSecret: 's', requirePassword: false }).listen(0);
+    base = `http://localhost:${server.address().port}`;
+    const admin = await login('boss@example.com');
+    for (const [n, extra] of [['ann', {}], ['bo', {}], ['fou', { track_role: 'founder', founder: true }]]) {
+      ids[n] = (await call('POST', '/api/entities/User', admin, { full_name: n, email: `${n}@x.com`, role: n === 'fou' ? 'admin' : 'team_member', ...extra })).body.id;
+      tok[n] = await login(`${n}@x.com`);
+    }
+  });
+  after(() => server.close());
+  test('a founder cannot start a chat, post, or hold an alias; nobody can add a founder to a group', async () => {
+    assert.equal((await put(tok.fou, 'conv', 'f1', { id: 'f1', name: 'x', memberIds: [ids.fou, ids.ann] })).ok, false);
+    assert.equal((await put(tok.fou, 'alias', `${ids.fou}:f1`, { alias: 'Calm Otter' })).ok, false);
+    assert.equal((await put(tok.ann, 'conv', 'g1', { id: 'g1', name: 'Lunch', group: true, memberIds: [ids.ann, ids.bo, ids.fou] })).ok, false);
+    assert.equal((await put(tok.ann, 'conv', 'g2', { id: 'g2', name: 'Lunch', group: true, memberIds: [ids.ann, ids.bo] })).ok, true);
+    assert.equal((await put(tok.fou, 'msg', 'm1', { id: 'm1', convId: 'g2', text: 'hi' })).ok, false);
+  });
+  test('a founder is never served chats, even ones they were in', async () => {
+    const docs = (await call('GET', '/api/tracker/docs', tok.fou)).body.docs;
+    assert.equal(docs.some((d) => ['conv', 'msg', 'alias'].includes(d.kind)), false);
+  });
+});
