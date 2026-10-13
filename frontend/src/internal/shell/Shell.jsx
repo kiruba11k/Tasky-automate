@@ -63,21 +63,25 @@ export function Shell() {
   const hasFun = useFunMode().on; // the playful layer (3D scenes, hub, games, birds) is a per-person switch in the Theme dialog; founders never have it
   const isManager = isManagerRole(person.role); // manager or founder: the main admins
   const isAdmin = isAdminTier(person.role); // main admins and project managers
-  const alsoWorks = isAdmin && (person.role === 'pm' || !!person.tracked); // admins who do tasks themselves keep their own dashboard and day
+  // Pages follow the tracker design: the founder / manager pages (team dashboard, team tasks update, people) belong to the main admins only.
+  // A project manager gets their own dashboard and day, Projects and Assign; a resource gets dashboard, day and projects.
+  // The one exception is a main admin who also does tasks (marked "tracked"): they keep their own dashboard and day next to the team pages.
+  const alsoWorks = isManager && !!person.tracked;
   const isPm = projects.some((p) => isProjectPm(p, me) && p.status === 'active');
   const pending = isApprover(me) ? projects.filter((p) => p.status === 'pending').length : 0; // projects waiting for this approver
   const baseItems = [
-    ...(isManager && !alsoWorks
-      ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV]
-      : isAdmin
+    ...(isManager
+      ? alsoWorks
         ? [DASHBOARD_NAV, TEAM_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, TEAM_UPDATES_NAV]
-        : isPm
-          ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
-          : [DASHBOARD_NAV, PROJECTS_NAV]),
+        : [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV]
+      : isAdmin || isPm
+        ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
+        : [DASHBOARD_NAV, PROJECTS_NAV]),
     ...(hasFun ? [HUB_NAV] : []),
     PROFILE_NAV,
   ];
-  const badgeFor = (item) => (isAdmin && (isManager && !alsoWorks ? item === DASHBOARD_NAV : item === TEAM_NAV) ? pending : 0);
+  // projects waiting for an approver: shown on the page where they are decided
+  const badgeFor = (item) => ((isManager ? (alsoWorks ? item === TEAM_NAV : item === DASHBOARD_NAV) : item === PROJECTS_NAV) ? pending : 0);
   const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: badgeFor(item) }))];
   const iconButton = 'focus-ring rounded-xl p-2 text-muted hover:bg-surface-2';
 
@@ -149,7 +153,7 @@ export function Shell() {
             {alsoWorks && <Route path="/team" element={<ManagerDashboard />} />}
             {alsoWorks && <Route path="/team-updates" element={<ManagerDaily />} />}
             {(isAdmin || isPm) && <Route path="/assign" element={<AssignPage key={me} />} />}
-            {isAdmin && <Route path="/people" element={<PeoplePage />} />}
+            {isManager && <Route path="/people" element={<PeoplePage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
