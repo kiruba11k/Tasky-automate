@@ -24,13 +24,19 @@ export function AuthProvider({ children }) {
     return u;
   }, []);
 
-  const login = useCallback(async (email) => startSession(await request('POST', '/api/auth/login', { email })), [startSession]);
+  /** Signs in. Returns the person, or a next step: { setup, setupToken, name } (first time: choose a password) / { needsPassword, name }. */
+  const login = useCallback(async (email, password) => {
+    const res = await request('POST', '/api/auth/login', { email, ...(password ? { password } : {}) });
+    return res.token ? startSession(res) : res;
+  }, [startSession]);
+  /** First password (needs the setup token from login). Signs the person in. */
+  const setPassword = useCallback(async (setupToken, password) => startSession(await request('POST', '/api/auth/set-password', { setupToken, password })), [startSession]);
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
+  const value = useMemo(() => ({ user, loading, login, setPassword, logout, setUser }), [user, loading, login, setPassword, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -12,6 +12,7 @@ import { validateThemePrefs } from './theme.js';
 import { registerBirds } from './birds.js';
 import { registerGames } from './games.js';
 import { registerPush } from './push.js';
+import { passwordStore, passwordProblem, signSetupToken, verifySetupToken } from './passwords.js';
 import { registerSocial } from './social.js';
 import { registerTracker } from './tracker.js';
 import { buddyStatus, hatchEgg, parade, validateBuddyPrefs } from './buddies.js';
@@ -48,7 +49,7 @@ export async function bootstrapAdmin(store, { email, name = 'Admin' } = {}) {
 }
 
 /** Builds the Express app around an initialised store. */
-export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = process.env.ADMIN_EMAIL, random = Math.random, clock = Date.now } = {}) {
+export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = process.env.ADMIN_EMAIL, random = Math.random, clock = Date.now, requirePassword = process.env.REQUIRE_PASSWORD !== 'off' } = {}) {
   // The main admin is the account whose email is ADMIN_EMAIL. Only they add, edit and remove people. (With no ADMIN_EMAIL, any admin.)
   const isOwnerEmail = (email) => !!ownerEmail && normEmail(email) === normEmail(ownerEmail);
   const isOwner = (u) => (ownerEmail ? isOwnerEmail(u.email) : u.role === 'admin');
@@ -75,12 +76,35 @@ export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = proce
   // ---- login: email only. There is no sign-up; only emails an admin/team leader added to the users table can sign in. ----
   const findByEmail = async (email) => (await store.list('User')).find((u) => normEmail(u.email) === normEmail(email));
 
+  // Sign in with an email and a password. The first time (no password yet) the email alone starts a "set your password" step;
+  // from then on the email needs its password. Passwords live in server-only documents (see passwords.js).
+  const passwords = passwordStore(store, clock);
+  const wrongLimit = createLimiter({ max: 10 });
   app.post('/api/auth/login', wrap(async (req, res) => {
     const email = normEmail(req.body?.email);
     if (!loginLimit(`${req.ip}|${email}`)) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
     const user = email ? await findByEmail(email) : null;
     if (!user || user.status === 'Inactive') return res.status(401).json({ error: 'This email has not been added. Ask an admin to add you.' });
-    res.json({ token: signToken(jwtSecret, user.id), user });
+    if (requirePassword) {
+      if (!(await passwords.has(user.id))) return res.json({ setup: true, setupToken: signSetupToken(jwtSecret, user.id), name: user.full_name || user.email });
+      const password = req.body?.password;
+      if (typeof password !== 'string' || !password) return res.json({ needsPassword: true, name: user.full_name || user.email });
+      if (!wrongLimit(`${req.ip}|${email}|pw`)) return res.status(429).json({ error: 'Too many wrong passwords. Try again in a few minutes.' });
+      if (!(await passwords.verify(user.id, password))) return res.status(401).json({ error: 'Wrong email or password.', needsPassword: true });
+    }
+    res.json({ token: signToken(jwtSecret, user.id), user: { ...user, has_password: await passwords.has(user.id) } });
+  }));
+
+  // First password: needs the setup token from the login step. Signs the person in.
+  app.post('/api/auth/set-password', wrap(async (req, res) => {
+    const userId = verifySetupToken(jwtSecret, req.body?.setupToken);
+    const user = userId ? await store.get('User', userId) : null;
+    if (!user || user.status === 'Inactive') return res.status(401).json({ error: 'That link expired. Enter your email again.' });
+    const problem = passwordProblem(req.body?.password);
+    if (problem) return res.status(400).json({ error: problem });
+    if (await passwords.has(user.id)) return res.status(409).json({ error: 'A password is already set. Sign in with it.' });
+    await passwords.set(user.id, req.body.password);
+    res.json({ token: signToken(jwtSecret, user.id), user: { ...user, has_password: true } });
   }));
 
   // ---- uploaded files: ids are random UUIDs; served as attachments with a restricted content type ----
@@ -107,7 +131,28 @@ export function createApp({ store, jwtSecret, staticDir, llm, ownerEmail = proce
   });
   app.use('/api', requireAuth);
 
-  app.get('/api/auth/me', (req, res) => res.json(req.user));
+  app.get('/api/auth/me', wrap(async (req, res) => res.json({ ...req.user, has_password: await passwords.has(req.user.id) })));
+
+  // Set or change my own password. Changing needs the current one; someone who never set one (signed in before passwords existed) just sets it.
+  app.post('/api/auth/change-password', wrap(async (req, res) => {
+    const problem = passwordProblem(req.body?.password);
+    if (problem) return res.status(400).json({ error: problem });
+    if (await passwords.has(req.user.id)) {
+      if (!wrongLimit(`${req.ip}|${req.user.id}|change`)) return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
+      if (!(await passwords.verify(req.user.id, String(req.body?.current || '')))) return res.status(401).json({ error: 'Your current password is not right.' });
+    }
+    await passwords.set(req.user.id, req.body.password);
+    res.json({ ok: true });
+  }));
+
+  // The main admin can clear someone's password (forgotten): they set a new one the next time they sign in.
+  app.post('/api/users/:id/reset-password', wrap(async (req, res) => {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Only the main admin can reset a password.' });
+    const target = await store.get('User', req.params.id);
+    if (!target) return res.status(404).json({ error: 'Not found' });
+    await passwords.clear(target.id);
+    res.json({ ok: true });
+  }));
 
   app.patch('/api/auth/me', wrap(async (req, res) => {
     // Self-service profile edits only: no role/email/status changes.

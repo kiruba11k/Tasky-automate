@@ -8,6 +8,7 @@ import { FunLayer } from './fun/FunLayer';
 import { FunBridge } from './fun/FunBridge';
 import { PrefsSync } from './fun/PrefsSync';
 import { Alerts } from './shell/Alerts';
+import { PasswordPrompt } from './shell/PasswordPrompt';
 
 /** Loads the signed-in person's data from the backend and keeps it in step; shows the app once the first load is done. */
 function Tracker({ user }) {
@@ -36,6 +37,7 @@ function Tracker({ user }) {
       {!user.founder && <><FunBridge /><PrefsSync /></>}
       <Shell />
       <Alerts />
+      <PasswordPrompt />
     </FunLayer>
   );
 }

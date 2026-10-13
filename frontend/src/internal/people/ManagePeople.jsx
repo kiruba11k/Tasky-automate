@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { request } from '@/api/client';
 import { Modal } from '../kit/Modal';
 import { ConfirmModal } from '../kit/ConfirmModal';
@@ -25,6 +25,10 @@ export function ManagePeople({ open, onClose }) {
   }, []);
   useEffect(() => { if (open) load().catch((e) => setError(e.message)); }, [open, load]);
 
+  const resetPassword = async (u) => {
+    if (!window.confirm(`Reset ${u.full_name}'s password? They will choose a new one the next time they sign in.`)) return;
+    try { await request('POST', `/api/users/${u.id}/reset-password`, {}); toast({ title: `${u.full_name} will set a new password at their next sign-in`, tone: 'success' }); } catch (e) { toast({ title: e.message, tone: 'info' }); }
+  };
   const toggleActive = async (u) => {
     try {
       await request('PUT', `/api/entities/User/${u.id}`, { status: u.status === 'Inactive' ? 'Active' : 'Inactive' });
@@ -64,6 +68,9 @@ export function ManagePeople({ open, onClose }) {
               </div>
               <Button tone="ghost" className="border border-line" aria-label={`Edit ${u.full_name}`} onClick={() => setEditing(u)}>
                 <Pencil size={13} /> Edit
+              </Button>
+              <Button tone="ghost" className="border border-line" aria-label={`Reset password for ${u.full_name}`} title="They choose a new password the next time they sign in" onClick={() => resetPassword(u)}>
+                <KeyRound size={13} /> Reset password
               </Button>
               {!u.isOwner && (
                 <>

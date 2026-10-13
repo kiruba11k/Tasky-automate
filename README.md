@@ -185,3 +185,8 @@ Every notice (a task assigned to you, sent for review, approved, sent back, a ch
 
 - **Deadline alerts** run on the server every minute: an hour before the end of a task's working day, 15 minutes before, when it is overdue (the person who assigned it is told too), then once each morning while it stays open (`backend/src/deadlines.js`).
 - Environment (all optional): `WORK_TZ` (default `Asia/Kolkata`), `WORK_END_HOUR` (default `19`), `DEADLINE_ALERTS=off` to disable, and `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` for push. Without VAPID keys the server makes a pair once and keeps it in the database.
+
+
+## Signing in
+
+Email and password. The first time an added email signs in it has no password yet, so it goes to a "choose your password" step (8+ characters) and is signed in; from the second time on the email needs that password. Passwords are stored as salted scrypt hashes in a server-only document (never returned by any API). The main admin (`ADMIN_EMAIL`) can reset someone's password from Manage people; they choose a new one at their next sign-in. People who were already signed in are asked to choose a password once. Set `REQUIRE_PASSWORD=off` to go back to email-only sign-in (the backend tests do this).
