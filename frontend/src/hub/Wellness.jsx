@@ -7,17 +7,33 @@ import { effects } from '@/fun/effects';
 import { Jar } from '@/fun/DoneJar';
 import { Panel, primary, subtle, today } from './ui';
 import Soundscape from './Soundscape';
+import { useStore } from '@/internal/store';
+import { GOAL, addGlass, countGlasses, undoGlass, withLocalCount } from './waterLogic';
 import MoodQuest from './MoodQuest';
 
-const GOAL = 8;
-const key = (u) => `tasky_water_${u}_${today()}`;
-const readWater = (u) => { try { return Number(localStorage.getItem(key(u))) || 0; } catch { return 0; } };
+const localKey = (u) => `tasky_water_${u}_${today()}`; // where this device kept the count before it was saved on the profile
 
-/** Water jar: tap each glass you drink. Reminders come from friendly birds, never pop-ups that block you. */
+/** Water jar: tap each glass you drink (saved on your profile, so it follows you to every device). Reminders come from friendly birds, never pop-ups that block you. */
 export function WaterJar() {
   const { user } = useAuth();
-  const [n, setN] = useState(() => readWater(user?.id));
-  const add = (d) => { const v = Math.max(0, Math.min(16, n + d)); setN(v); try { localStorage.setItem(key(user?.id), String(v)); } catch { /* ignore */ } if (d > 0 && v === GOAL) { effects.stars(); emitFun({ type: 'birdFlyby', banner: 'Fully hydrated!', style: 'loop' }); } };
+  const me = useStore((st) => st.me);
+  const water = useStore((st) => st.profiles[st.me]?.water);
+  const setProfile = useStore((st) => st.setProfile);
+  const date = today();
+  const n = countGlasses(water, date);
+  // a count that only existed in this browser is brought in once
+  useEffect(() => {
+    try {
+      const local = Number(localStorage.getItem(localKey(user?.id))) || 0;
+      if (local > 0) { const merged = withLocalCount(water, date, local); if (countGlasses(merged, date) !== n) setProfile(me, { water: merged }); }
+      localStorage.removeItem(localKey(user?.id));
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+  const add = (d) => {
+    setProfile(me, { water: d > 0 ? addGlass(water, date) : undoGlass(water, date) });
+    if (d > 0 && n + 1 === GOAL) { effects.stars(); emitFun({ type: 'birdFlyby', banner: 'Fully hydrated!', style: 'loop' }); }
+  };
   return (
     <Panel title="Water jar" hint={`Aim for about ${GOAL} glasses today.`}>
       <div className="flex items-center gap-4">
@@ -65,7 +81,7 @@ export function WellnessWatcher() {
       if (document.hidden || Date.now() - lastActive > 120000 || sRef.current.wellness === false) return;
       activeMin += 1;
       if (activeMin % 40 === 0) { emitFun({ type: 'birdFlyby', banner: 'Eye break: look far away', style: 'cross' }); setTimeout(() => setEye(20), 6000); }
-      else if (activeMin % 90 === 0 && readWater(user.id) < GOAL) emitFun({ type: 'birdFlyby', banner: 'Time for some water!', style: 'dive' });
+      else if (activeMin % 90 === 0 && countGlasses(useStore.getState().profiles[useStore.getState().me]?.water, today()) < GOAL) emitFun({ type: 'birdFlyby', banner: 'Time for some water!', style: 'dive' });
     }, 60000);
     return () => { clearInterval(t); window.removeEventListener('tasky:fun', onFun); ['pointerdown', 'keydown'].forEach((e) => window.removeEventListener(e, touch)); };
   }, [user?.id]);
