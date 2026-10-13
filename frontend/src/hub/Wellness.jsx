@@ -7,6 +7,7 @@ import { effects } from '@/fun/effects';
 import { Jar } from '@/fun/DoneJar';
 import { Panel, primary, subtle, today } from './ui';
 import Soundscape from './Soundscape';
+import MoodQuest from './MoodQuest';
 
 const GOAL = 8;
 const key = (u) => `tasky_water_${u}_${today()}`;
@@ -30,17 +31,18 @@ export function WaterJar() {
   );
 }
 
-/** The wellness tab: water, calm sounds and eye-break settings. */
+/** The wellness tab: water, calm sounds and the mood quest. */
 export default function Wellness() {
   const { settings, setSettings } = useFun();
   return (
     <div className="grid lg:grid-cols-2 gap-4">
       <WaterJar />
       <Panel title="Calm sounds" hint="Background sounds to help you focus. Nothing plays until you press a button."><Soundscape /></Panel>
-      <Panel title="Gentle reminders" hint="Birds will remind you now and then. Never a blocking pop-up." className="lg:col-span-2">
-        <label className="flex items-center gap-3 text-sm text-slate-200 cursor-pointer"><input type="checkbox" checked={settings.wellness !== false} onChange={(e) => setSettings({ wellness: e.target.checked })} />Eye breaks (20-20-20: every 40 minutes, look 20 feet away for 20 seconds) and water reminders</label>
-        <button type="button" onClick={() => emitFun({ type: 'eyeBreak' })} className={`${subtle} mt-3`}><Eye className="inline w-4 h-4 mr-1" />Try an eye break now</button>
-      </Panel>
+      <MoodQuest />
+      <label className="lg:col-span-2 flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+        <input type="checkbox" checked={settings.wellness !== false} onChange={(e) => setSettings({ wellness: e.target.checked })} />
+        A bird may suggest an eye break (every 40 minutes) or a glass of water now and then. Never a blocking pop-up.
+      </label>
     </div>
   );
 }
