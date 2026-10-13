@@ -145,7 +145,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     }
   }
 
-  const out = (doc) => ({ kind: doc.kind, key: doc.key, data: doc.deleted ? null : doc.data, deleted: !!doc.deleted, updated: new Date(doc.updated_date).toISOString() });
+  // A conversation is told whether *you* created it (so only the creator is offered "delete the group"); who created it is never revealed.
+  const out = (doc, user) => ({ kind: doc.kind, key: doc.key, data: doc.deleted ? null : doc.kind === 'conv' && user ? { ...doc.data, creator: doc.owner_id === user.id } : doc.data, deleted: !!doc.deleted, updated: new Date(doc.updated_date).toISOString() });
 
   app.get('/api/tracker/people', wrap(async (req, res) => {
     res.json(withApprovers(await live(), isOwner).sort((a, b) => a.name.localeCompare(b.name)));
@@ -161,7 +162,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     for (const r of rows) {
       if (!since && r.deleted) continue; // a first load has no use for tombstones
       if (r.kind === 'msg' && !r.deleted && clock() - bornAt(r) > CHAT_TTL_MS) continue; // expired, the sweep will remove it
-      if (await canRead(req.user, r)) docs.push(out(r));
+      if (await canRead(req.user, r)) docs.push(out(r, req.user));
     }
     res.json({ now, docs });
   }));
@@ -187,10 +188,11 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         // the data stays (it is never served) so that people who could see the document are told it is gone
         await store.update('TrackerDoc', existing.id, { deleted: true, data: prev, owner_id: u.id });
         if (kind === 'task') await mirrorTask(key, prev, true);
+        if (kind === 'conv') await purgeConv(key); // the group's messages and everybody's names in it go with it
         results.push({ ...id, ok: true });
         continue;
       }
-      const patch = it.patch;
+      const patch = kind === 'conv' && it.patch && typeof it.patch === 'object' ? (({ creator, ...rest }) => rest)(it.patch) : it.patch; // the creator flag is computed, never stored
       if (!patch || typeof patch !== 'object' || Array.isArray(patch) || JSON.stringify(patch).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Bad document' }); continue; }
       const data = mergePatch(prev || {}, patch);
       if (JSON.stringify(data).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Document too large' }); continue; }
@@ -200,7 +202,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
-      if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: u.id });
+      // a conversation keeps its creator as owner, whoever edits it later (renaming, leaving)
+      if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: kind === 'conv' && !existing.deleted ? existing.owner_id : u.id });
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
       if (kind === 'task') await mirrorTask(key, data, false);
       if (kind === 'notice' && !existing && data.to && data.to !== u.id && !data.read) pushNotice(data);
@@ -298,6 +301,13 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
   if (env.DEADLINE_ALERTS !== 'off') {
     const dl = setInterval(() => deadlineSweep().catch((e) => console.error('deadline sweep failed:', e)), 60 * 1000);
     dl.unref?.();
+  }
+
+  /** Removes a deleted conversation's messages and everybody's aliases in it (the data stays, unserved, so members are told they are gone). */
+  async function purgeConv(convId) {
+    const gone = (r) => store.update('TrackerDoc', r.id, { deleted: true, data: r.data, owner_id: r.owner_id });
+    for (const m of await store.list('TrackerDoc', { query: { kind: 'msg' }, limit: 100000 })) if (!m.deleted && m.data?.convId === convId) await gone(m);
+    for (const a of await store.list('TrackerDoc', { query: { kind: 'alias' }, limit: 100000 })) if (!a.deleted && a.key.split(':').slice(1).join(':') === convId) await gone(a);
   }
 
   /**

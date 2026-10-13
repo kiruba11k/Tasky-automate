@@ -930,6 +930,31 @@ export const useStore = create()(
           set((s) => ({ convs: [...s.convs, { id, name, memberIds, group, anonymous }] }));
           return id;
         },
+        /** Any member can rename a group. A short note in the chat says so (without saying who, in anonymous chats). */
+        renameConv: (convId, name) => {
+          const state = get();
+          const conv = state.convs.find((c) => c.id === convId);
+          if (!conv?.group || !conv.memberIds.includes(state.me)) return;
+          const next = String(name ?? "").trim();
+          if (!next) throw new Error("Give the group a name.");
+          if (next.length > 40) throw new Error("Keep the group name under 40 characters.");
+          if (next === conv.name) return;
+          const by = conv.anonymous === false ? `${firstName(state.me)} renamed the group to` : "The group was renamed to";
+          set((s) => ({
+            convs: s.convs.map((c) => (c.id === convId ? { ...c, name: next } : c)),
+            msgs: [...s.msgs, { id: newId(), convId, alias: "", system: true, text: `${by} “${next}”`, at: nowIso() }],
+          }));
+        },
+        /** Only the person who created a group can delete it, for everybody. */
+        deleteConv: (convId) => {
+          const state = get();
+          const conv = state.convs.find((c) => c.id === convId);
+          if (!conv) return;
+          if (!conv.group) throw new Error("Only groups can be deleted. Leave a private chat instead.");
+          if (!conv.creator) throw new Error("Only the person who created the group can delete it.");
+          const aliases = Object.fromEntries(Object.entries(state.aliases).filter(([k]) => !k.endsWith(`:${convId}`)));
+          set((s) => ({ aliases, convs: s.convs.filter((c) => c.id !== convId), msgs: s.msgs.filter((m) => m.convId !== convId) }));
+        },
         /** Delete one of my own messages. (My messages are the ones that carry my alias in that chat.) */
         deleteMessage: (msgId) => {
           const state = get();

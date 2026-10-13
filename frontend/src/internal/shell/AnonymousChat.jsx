@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Smile, Send } from 'lucide-react';
+import { Pencil, Smile, Send, Check } from 'lucide-react';
 import { Emoji3D } from './Emoji3D';
 import { LogOut, Plus, Trash2, Users, VenetianMask } from 'lucide-react';
 import { ConfirmModal } from '@/internal/kit/ConfirmModal';
+import { toast } from '@/internal/kit/toast';
 import { Se as useStore, Qe as PEOPLE, Ya as Modal, be as firstName, nt as fullName } from '@/internal/min';
 import { cx } from '@/internal/ui/cx';
 import { Button } from '@/internal/ui/Button';
 import { Avatar } from '@/internal/ui/Avatar';
 import { INPUT_CLASS, timeAgo } from '@/internal/ui/format';
 
-const PICKER = ['😀', '😂', '😍', '🥳', '👍', '🙌', '👏', '🔥', '🎉', '💯', '🚀', '❤️', '😎', '🤔', '😭', '🙏', '✨', '🤝', '☕', '🎂', '💪', '🙈', '😅', '😴'];
+const PICKER_TABS = [
+  ['Smileys', ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😋', '😜', '🤪', '😎', '🤓', '🥳', '🤗', '🤔', '🫡', '🙄', '😏', '😐', '😮', '😱', '😴', '😢', '😭', '😡', '🤯', '💀', '👻', '🤖', '🙈']],
+  ['Hands', ['👍', '👎', '👏', '🙌', '🫶', '🙏', '🤝', '💪', '👋', '✌️', '🤞', '👌', '✊', '👊', '🖐', '🤙', '✍️', '🫰']],
+  ['Hearts', ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '💖', '💕', '💗', '😍', '🥰', '😘', '✨', '💫', '🌟']],
+  ['Party', ['🎉', '🎊', '🥳', '🎈', '🎁', '🎂', '🍾', '🥂', '🏆', '🥇', '🥈', '🥉', '🏅', '👑', '🔥', '💯', '🚀', '⭐', '🌈', '🎶', '🎵', '🎸', '🎮', '🎯']],
+  ['Work', ['💼', '📊', '📈', '📉', '📅', '📆', '📌', '📍', '📎', '📋', '📝', '✅', '❌', '⚠️', '⏰', '⏳', '💡', '🔔', '📞', '📱', '💻', '🖥', '📧', '📣', '🔍', '🔑', '🧠', '🧩', '🧭', '🛠', '🔧', '📦']],
+  ['Food', ['☕', '🍵', '🍕', '🍔', '🍟', '🍩', '🍪', '🍫', '🍦', '🍰', '🧁', '🍿', '🥗', '🍜', '🥪', '🍎', '🍌', '🍊', '🍉', '🍒', '🥕', '🍺', '🍷', '🥤']],
+  ['Nature', ['🌞', '🌙', '⛅', '🌧', '☔', '❄️', '🌈', '🌸', '🌻', '🍀', '🌳', '🌿', '🌱', '🍁', '🌊', '⛰', '🐶', '🐱', '🐼', '🦊', '🐯', '🐰', '🐸', '🐵', '🦄', '🐢', '🦉', '🐙']],
+];
+const PICKER = PICKER_TABS[0][1];
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}\uFE0F?)*\s*){1,3}$/u;
 const EMOJI_PARTS = /(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}\uFE0F?)*)/gu;
 const emojisOf = (text) => String(text).split(EMOJI_PARTS).filter((_, i) => i % 2);
@@ -30,7 +40,7 @@ function Burst({ emojis, burstKey }) {
 
 /** Chat panel shown in the floating chat popup (original: `tue`). Chats can be named (real names) or anonymous (aliases). */
 export function AnonymousChat({ onClose }) {
-  const { me, convs, msgs, aliases, send, createConv, deleteMessage, leaveConv } = useStore();
+  const { me, convs, msgs, aliases, send, createConv, deleteMessage, leaveConv, renameConv, deleteConv } = useStore();
   const [leaving, setLeaving] = useState(false);
   const myConvs = useMemo(() => convs.filter((c) => c.memberIds.includes(me)), [convs, me]);
   const [activeId, setActiveId] = useState(myConvs[0]?.id);
@@ -40,12 +50,17 @@ export function AnonymousChat({ onClose }) {
   const [groupName, setGroupName] = useState('');
   const [anon, setAnon] = useState(false);
   const [picker, setPicker] = useState(false);
+  const [tab, setTab] = useState(0);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [burst, setBurst] = useState(null);
   const seen = useRef(null); // message ids already on screen: only newer ones animate in
   const active = myConvs.find((c) => c.id === activeId) ?? myConvs[0];
   const messages = msgs.filter((m) => m.convId === active?.id);
   const myNames = active ? aliases[`${me}:${active.id}`]?.used ?? [] : []; // every name I have written under in this chat (a new one each day)
   const myAlias = active ? aliases[`${me}:${active.id}`]?.alias : undefined;
+  useEffect(() => { setRenaming(false); }, [activeId]);
   const [menuFor, setMenuFor] = useState(null); // anonymous chats: tap one of my own messages to reveal Delete
   const [peek, setPeek] = useState(false);
   const named = active ? active.anonymous === false : false;
@@ -116,7 +131,7 @@ export function AnonymousChat({ onClose }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{convTitle(conv)}</span>
                     <span className="block truncate text-xs text-muted">
-                      {last ? `${last.from ? firstName(last.from) : last.alias}: ${last.text}` : 'No messages yet'}
+                      {last ? (last.system ? last.text : `${last.from ? firstName(last.from) : last.alias}: ${last.text}`) : 'No messages yet'}
                     </span>
                   </span>
                 </button>
@@ -128,7 +143,24 @@ export function AnonymousChat({ onClose }) {
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-line p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate font-bold">{active ? convTitle(active) : 'Chat'}</p>
+            {renaming && active?.group ? (
+              <form className="flex min-w-0 flex-1 items-center gap-1" onSubmit={(e) => { e.preventDefault(); try { renameConv(active.id, nameDraft); setRenaming(false); } catch (err) { toast({ title: err.message, tone: 'info' }); } }}>
+                <input autoFocus aria-label="Group name" className={cx(INPUT_CLASS, 'py-1')} value={nameDraft} maxLength={40} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(false); }} />
+                <button type="submit" aria-label="Save group name" className="focus-ring rounded-lg p-1.5 text-accent-ink hover:bg-surface-2"><Check size={16} /></button>
+              </form>
+            ) : (
+              <p className="truncate font-bold">{active ? convTitle(active) : 'Chat'}</p>
+            )}
+            {active?.group && !renaming && (
+              <button aria-label="Edit group name" title="Rename the group (any member can)" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2" onClick={() => { setNameDraft(active.name || ''); setRenaming(true); }}>
+                <Pencil size={14} />
+              </button>
+            )}
+            {active?.group && active.creator && (
+              <button aria-label="Delete group" title="Delete the group for everyone (only you, its creator, can)" className="focus-ring rounded-lg p-1.5 text-coral-ink hover:bg-surface-2" onClick={() => setDeleting(true)}>
+                <Trash2 size={15} />
+              </button>
+            )}
             {active && (
               <button
                 aria-label="Leave chat"
@@ -164,6 +196,7 @@ export function AnonymousChat({ onClose }) {
           {burst && <Burst emojis={burst.emojis} burstKey={burst.k} />}
           {messages.length === 0 && <p className="chat-wave py-10 text-center text-sm text-muted">Say hello <span className="inline-block">👋</span></p>}
           {messages.map((m) => {
+            if (m.system) return <p key={m.id} className="py-1 text-center text-xs text-muted">{m.text}</p>;
             const mine = isMine(m);
             const big = EMOJI_ONLY.test(String(m.text).trim());
             const sender = m.from ? fullName(m.from) : m.alias;
@@ -205,12 +238,19 @@ export function AnonymousChat({ onClose }) {
         {active && (
           <div className="relative border-t border-line">
             {picker && (
-              <div className="chat-picker" role="listbox" aria-label="Emojis">
-                {PICKER.map((e) => (
-                  <button key={e} type="button" role="option" aria-label={`Emoji ${e}`} className="chat-picker-item" onClick={() => setDraft((d) => d + e)} onDoubleClick={() => submit(e)} title="Click to add, double-click to send on its own">
-                    <Emoji3D e={e} size="1.7rem" spin={false} />
-                  </button>
-                ))}
+              <div className="chat-picker" role="group" aria-label="Emojis">
+                <div className="chat-picker-tabs" role="tablist">
+                  {PICKER_TABS.map(([label], i) => (
+                    <button key={label} type="button" role="tab" aria-selected={tab === i} className={cx('chat-picker-tab', tab === i && 'chat-picker-tab-on')} onClick={() => setTab(i)}>{label}</button>
+                  ))}
+                </div>
+                <div className="chat-picker-grid" role="listbox">
+                  {PICKER_TABS[tab][1].map((e) => (
+                    <button key={e} type="button" role="option" aria-label={`Emoji ${e}`} className="chat-picker-item" onClick={() => setDraft((d) => d + e)} onDoubleClick={() => submit(e)} title="Click to add, double-click to send on its own">
+                      <Emoji3D e={e} size="1.7rem" spin={false} />
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <form
@@ -242,6 +282,14 @@ export function AnonymousChat({ onClose }) {
         confirmLabel="Leave"
         onClose={() => setLeaving(false)}
         onConfirm={() => active && leaveConv(active.id)}
+      />
+      <ConfirmModal
+        open={deleting}
+        title="Delete this group for everyone?"
+        message="The group and all its messages disappear for every member. This cannot be undone."
+        confirmLabel="Delete group"
+        onClose={() => setDeleting(false)}
+        onConfirm={() => { if (active) { try { deleteConv(active.id); } catch (err) { toast({ title: err.message, tone: 'info' }); } } }}
       />
       <Modal
         open={creating}

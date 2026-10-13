@@ -145,12 +145,12 @@ function Letter({ item, now, onClose, onDismiss }) {
         <DialogDescription className="sr-only">An anonymous message. It disappears five minutes after you opened it.</DialogDescription>
         <div className="bird-letter">
           <div className="bird-letter-seal" aria-hidden="true"><Emoji e="🪶" size="1.4rem" /></div>
-          <div className="text-xs font-extrabold tracking-widest text-amber-800/70 mb-2">A LITTLE BIRD TOLD ME…</div>
-          <p className="text-lg leading-snug whitespace-pre-wrap break-words font-semibold text-slate-800">{item.text}</p>
-          <div className="text-right text-xs text-amber-900/60 mt-3 italic">— anonymous</div>
+          <div className="text-xs font-extrabold tracking-widest mb-2" style={{ color: '#92400e' }}>A LITTLE BIRD TOLD ME…</div>
+          <p className="text-lg leading-snug whitespace-pre-wrap break-words font-semibold" style={{ color: '#1e293b' }}>{item.text}</p>
+          <div className="text-right text-xs mt-3 italic" style={{ color: '#78350f' }}>— anonymous</div>
           <div className="mt-4" role="timer" aria-label="Time before this message flies away">
             <div className="h-2 rounded-full bg-amber-900/15 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-[width] duration-1000 ease-linear" style={{ width: `${pct}%` }} /></div>
-            <div className="flex justify-between text-[11px] text-amber-900/70 mt-1"><span>Flies away in {fmt(left)}</span><button type="button" onClick={onDismiss} className="underline font-bold">Let it fly now</button></div>
+            <div className="flex justify-between text-[11px] mt-1" style={{ color: '#78350f' }}><span>Flies away in {fmt(left)}</span><button type="button" onClick={onDismiss} className="underline font-bold">Let it fly now</button></div>
           </div>
         </div>
       </DialogContent>
