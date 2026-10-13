@@ -7,22 +7,24 @@ import {
   yt as formatDate,
   $e as dayKey,
   Mt as weekStart,
+  ft as addDays,
   $g as workingDaysBetween,
   AR as countProgress,
   df as weeklyTargetFor,
   ea as canPlanFor,
   tc as metricInPeriod,
 } from '@/internal/min';
+import { projectWeekStart, savedWeekPlan } from '@/internal/lib/domain';
 import { ProgressBars } from './ProgressBars';
 import { ProgressTile } from './ProgressTile';
 import { weekOptions, monthOptions } from './weekOptions';
 
 /** Percentage of the working days of the current week / month that have elapsed. */
-export function expectedProgressPct(kind) {
+export function expectedProgressPct(kind, weekFrom = weekStart(0)) {
   const today = dayKey(0);
   if (kind === 'week') {
-    const start = weekStart(0);
-    return Math.round((workingDaysBetween(start, today).length / 5) * 100);
+    const days = Math.max(1, workingDaysBetween(weekFrom, addDays(weekFrom, 6)).length);
+    return Math.round((workingDaysBetween(weekFrom, today).length / days) * 100);
   }
   const monthStart = `${today.slice(0, 7)}-01`;
   const lastDay = new Date(+today.slice(0, 4), +today.slice(5, 7), 0);
@@ -41,7 +43,7 @@ const pillClass = (active) =>
 export function ProjectProgress({ p: project, compact }) {
   const tasks = useStore((s) => s.tasks);
   const daily = useStore((s) => s.daily);
-  const currentWeek = weekStart(0);
+  const currentWeek = projectWeekStart(project, dayKey(0)); // the project's own 7-day week that today is in
   const currentMonth = dayKey(0).slice(0, 7);
   const weeks = useMemo(() => weekOptions(project, 'progress'), [project]);
   const months = useMemo(() => monthOptions(project), [project]);
@@ -51,8 +53,10 @@ export function ProjectProgress({ p: project, compact }) {
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('bars');
 
-  const week = weeks.some((w) => w.start === weekPick)
-    ? weekPick
+  const week = weeks.some((w) => w.start === projectWeekStart(project, weekPick))
+    ? projectWeekStart(project, weekPick)
+    : weeks.some((w) => w.start === weekPick)
+      ? weekPick
     : ((weeks.find((w) => w.when === 'current') ?? weeks[0])?.start ?? currentWeek);
   const month = months.some((m) => m.key === monthPick) ? monthPick : currentMonth;
   const periodKey = kind === 'week' ? week : month;
@@ -61,7 +65,7 @@ export function ProjectProgress({ p: project, compact }) {
     () => countProgress(project, tasks, daily, { kind, key: periodKey }),
     [project, tasks, daily, kind, periodKey],
   );
-  const savedPlan = kind === 'week' ? project.weekPlans?.[week] : undefined;
+  const savedPlan = kind === 'week' ? savedWeekPlan(project, week) : undefined;
   const me = useStore((s) => s.me);
   const canPlan = canPlanFor(project, me);
   const isDraft = kind === 'week' && !savedPlan && !project.weekLocked;
@@ -74,7 +78,7 @@ export function ProjectProgress({ p: project, compact }) {
         ? project.monthTarget
         : undefined;
   const isFuture = kind === 'week' && week > currentWeek;
-  const expected = (kind === 'week' ? week === currentWeek : month === currentMonth) ? expectedProgressPct(kind) : undefined;
+  const expected = (kind === 'week' ? week === currentWeek : month === currentMonth) ? expectedProgressPct(kind, week) : undefined;
   const metrics = project.metrics.filter((m) => metricInPeriod(m, kind));
   const items = metrics
     .filter((m) => filter === 'all' || m.id === filter)

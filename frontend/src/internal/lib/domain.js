@@ -5,6 +5,7 @@ import {
   clockToMinutes,
   currentWeekStart,
   formatDayMonth,
+  parseDateKey,
   recentPeriods,
   resolvePeriod,
   shiftPeriod,
@@ -110,9 +111,24 @@ export function finalizeProjectsForDay(projects, personId, day, at, daily) {
 
 // ---------------------------------------------------------- project planning
 
-/** `df` - weekly target for the week containing `date` (plan or default). */
+/** `di` - first day of the project's own 7-day week that contains `date` (weeks count from the project's start date).
+ *  Dates before the start, or a project with no start yet, fall back to the Monday of that week. */
+export function projectWeekStart(project, date) {
+  if (!project?.startDate || date < project.startDate) return weekStart(date);
+  const days = Math.round((parseDateKey(date).getTime() - parseDateKey(project.startDate).getTime()) / 864e5);
+  return addDays(project.startDate, Math.floor(days / 7) * 7);
+}
+
+/** `yf` - weekly target for the week containing `date` (the saved plan, else the default). Plans saved before weeks
+ *  started on the project's start date are still found under their Monday. */
 export const weekTargetFor = (project, date) =>
-  project.weekPlans?.[weekStart(date)] ?? project.weekTarget;
+  project.weekPlans?.[projectWeekStart({ startDate: project.startDate ?? "" }, date)] ??
+  project.weekPlans?.[weekStart(date)] ??
+  project.weekTarget;
+
+/** The plan saved for the week containing `date`, if there is one (under the project's week start, or the Monday older plans used). */
+export const savedWeekPlan = (project, date) =>
+  project.weekPlans?.[projectWeekStart({ startDate: project.startDate ?? "" }, date)] ?? project.weekPlans?.[weekStart(date)];
 
 /** `bV` - Mon-Fri status (finalized or not) of a week. */
 export function weekDayStatus(project, week = currentWeekStart(0)) {
@@ -129,24 +145,19 @@ export function weekDayStatus(project, week = currentWeekStart(0)) {
   });
 }
 
-/** `Dw` - numbered project weeks from the start date to `weeksAhead` past the current week. */
+/** `qw` - the project's 7-day weeks, numbered from the start date. With an end date it runs to the end; without one,
+ *  `weeksAhead` weeks past today (or past the start, if that is still ahead). */
 export function projectWeeks(project, weeksAhead = 4) {
   if (!project.startDate) return [];
-  const first = weekStart(project.startDate);
-  const lastProjectWeek =
-    project.endDate && project.endDate >= project.startDate ? weekStart(project.endDate) : first;
-  const horizon = currentWeekStart(weeksAhead);
-  const last = lastProjectWeek > horizon ? lastProjectWeek : horizon;
-  const thisWeek = currentWeekStart(0);
+  const today = todayKey(0);
+  const last =
+    project.endDate && project.endDate >= project.startDate
+      ? project.endDate
+      : addDays(today > project.startDate ? today : project.startDate, weeksAhead * 7);
   const out = [];
-  for (let c = first, n = 1; c <= last && n <= 104; c = addDays(c, 7), n++) {
-    out.push({
-      n,
-      start: c,
-      end: addDays(c, 4),
-      label: `Week ${n} · ${formatDayMonth(n === 1 && project.startDate > c ? project.startDate : c)} to ${formatDayMonth(addDays(c, 4))}`,
-      plannedAhead: c > thisWeek,
-    });
+  for (let c = project.startDate, n = 1; c <= last && n <= 104; c = addDays(c, 7), n++) {
+    const end = addDays(c, 6) > last ? last : addDays(c, 6);
+    out.push({ n, start: c, end, label: `Week ${n} · ${formatDayMonth(c)} to ${formatDayMonth(end)}`, plannedAhead: c > today });
   }
   return out;
 }

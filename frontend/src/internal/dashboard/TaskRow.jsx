@@ -16,6 +16,7 @@ import {
   lt as runAction,
   Ye as showToast,
 } from '@/internal/min';
+import { LinkInputs, LinkChips } from '../ui/LinkFields';
 import { OnTimeBadge } from './OnTimeBadge';
 import { ResubmitBadge } from './ResubmitBadge';
 import { HistoryToggle } from './HistoryToggle';
@@ -34,6 +35,7 @@ export function TaskRow({ task }) {
   const [doneQty, setDoneQty] = useState(task.doneQty ?? task.qty);
   const [minutes, setMinutes] = useState(task.minutes ?? task.targetMinutes);
   const [reviewerId, setReviewerId] = useState(task.reviewerId ?? reviewers[0]?.id ?? '');
+  const [links, setLinks] = useState(task.links?.length ? task.links : ['']);
   const [error, setError] = useState('');
   const taskType = TASK_TYPES.find((t) => t.id === task.typeId);
   const statusMeta = STATUS_META[task.status];
@@ -70,6 +72,7 @@ export function TaskRow({ task }) {
             {standard != null && standard !== task.targetMinutes ? ` (standard ${formatMinutes(standard)})` : ''}
             {taskType ? ` · ideal ${taskType.ideal}` : ' · custom task'}
           </p>
+          <LinkChips links={task.links} className="mt-1" />
           <HistoryToggle task={task} open={historyOpen} onClick={() => setHistoryOpen((v) => !v)} className="mt-0.5" />
         </div>
         <OnTimeBadge task={task} />
@@ -109,7 +112,7 @@ export function TaskRow({ task }) {
         footer={
           <Button
             onClick={() => {
-              if (runAction(() => submitForReview(task.id, doneQty, minutes, reviewerId), setError)) {
+              if (runAction(() => submitForReview(task.id, doneQty, minutes, reviewerId, links), setError)) {
                 setSubmitOpen(false);
                 showToast({
                   title: `${isResubmit ? 'Resubmitted' : 'Sent'} to ${firstName(reviewerId)} for approval`,
@@ -174,6 +177,12 @@ export function TaskRow({ task }) {
         <p className="mt-3 text-sm text-muted">
           Target: {formatMinutes(task.targetMinutes)} for {task.qty} {task.unit}
         </p>
+        <div className="mt-4 text-sm font-semibold">
+          Links <span className="font-normal text-muted">(optional: the sheet or doc to check)</span>
+          <div className="mt-1">
+            <LinkInputs value={links} onChange={setLinks} />
+          </div>
+        </div>
         {isResubmit && (
           <p className="mt-1 text-xs text-muted">
             This will be resubmit {(task.resubmits ?? 0) + 1}. The time you send it is recorded in the task history.

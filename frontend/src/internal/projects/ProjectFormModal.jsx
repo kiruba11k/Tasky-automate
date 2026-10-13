@@ -69,7 +69,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
   const [focusId, setFocusId] = useState('');
   const [defaultTargets, setDefaultTargets] = useState({});
   const [weekPlans, setWeekPlans] = useState({});
-  const [planWeek, setPlanWeek] = useState('');
+  const [, setPlanWeek] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -108,10 +108,11 @@ export function ProjectFormModal({ open, onClose, edit }) {
     }
   }, [open, edit]);
 
+  const today = dayKey(0);
   const weeks = useMemo(
     () =>
       startDate && endDate && endDate >= startDate
-        ? projectWeeks({ startDate, endDate }, 0).filter((w) => w.start <= endDate)
+        ? projectWeeks({ startDate, endDate })
         : [],
     [startDate, endDate],
   );
@@ -387,14 +388,9 @@ export function ProjectFormModal({ open, onClose, edit }) {
         icon={<CalendarRange size={15} className="text-accent" />}
         title="Project weeks"
         hint={
-          weeks.length ? (
-            <>
-              Weeks are numbered from the start date, Monday to Friday.{' '}
-              {edit
-                ? 'Pre-plan targets for any week in the Targets tab.'
-                : 'Once the project is live you can pre-plan targets for each week in its Targets tab.'}
-            </>
-          ) : undefined
+          weeks.length
+            ? 'Split automatically into 7-day weeks from the start date to the end date. Weekly targets are planned in Tasks update, under Weekly targets.'
+            : undefined
         }
       >
         {weeks.length === 0 ? (
@@ -418,13 +414,13 @@ export function ProjectFormModal({ open, onClose, edit }) {
                   key={w.start}
                   className={clsx(
                     'rounded-lg border px-2 py-1 text-xs',
-                    w.start === weekStart(0)
+                    w.start <= today && today <= w.end
                       ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                       : 'border-line bg-surface text-ink',
                   )}
                 >
                   {w.label}
-                  {w.start === weekStart(0) ? ' (this week)' : w.start === weekStart(1) ? ' (next week)' : ''}
+                  {w.start <= today && today <= w.end ? ' (this week)' : w.start === weekStart(1) ? ' (next week)' : ''}
                 </li>
               ))}
               {weeks.length > 9 && (
@@ -442,91 +438,6 @@ export function ProjectFormModal({ open, onClose, edit }) {
           </>
         )}
       </FormSection>
-
-      {!edit &&
-        weeks.length > 0 &&
-        (() => {
-          const activeWeek = weeks.some((w) => w.start === planWeek) ? planWeek : weeks[0].start;
-          const planFields = weekPlans[activeWeek] ?? {};
-          return (
-            <FormSection
-              icon={<span>📅</span>}
-              title="Plan the weeks"
-              hint="Set a default weekly target, then pre-plan any of the first weeks if it should differ. Blank fields use the default. Saved with the project."
-            >
-              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted">
-                Default weekly target
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {METRICS.map((m) => (
-                  <label
-                    key={m.id}
-                    className="rounded-xl border border-line bg-surface p-2 text-xs font-semibold text-ink"
-                  >
-                    <span className="block truncate" title={m.label}>
-                      {m.label}
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
-                      aria-label={`${m.label} default weekly target`}
-                      className={clsx(NUMBER_INPUT_CLASS, 'mt-1 w-full text-base')}
-                      placeholder="0"
-                      value={defaultTargets[m.id] ?? ''}
-                      onChange={(e) => setDefaultTargets({ ...defaultTargets, [m.id]: e.target.value })}
-                    />
-                  </label>
-                ))}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted">Pre-plan</p>
-                <select
-                  aria-label="Pre-plan week"
-                  className={SELECT_CLASS}
-                  value={activeWeek}
-                  onChange={(e) => setPlanWeek(e.target.value)}
-                >
-                  {weeks.slice(0, 8).map((w) => (
-                    <option key={w.start} value={w.start}>
-                      {w.label}
-                      {weekPlans[w.start] && Object.values(weekPlans[w.start]).some((v) => v.trim())
-                        ? ' · planned'
-                        : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {METRICS.map((m) => (
-                  <label
-                    key={m.id}
-                    className="rounded-xl border border-line bg-surface p-2 text-xs font-semibold text-ink"
-                  >
-                    <span className="block truncate" title={m.label}>
-                      {m.label}
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
-                      aria-label={`${m.label} target for the planned week`}
-                      className={clsx(NUMBER_INPUT_CLASS, 'mt-1 w-full text-base')}
-                      placeholder={defaultTargets[m.id] || 'default'}
-                      value={planFields[m.id] ?? ''}
-                      onChange={(e) =>
-                        setWeekPlans({
-                          ...weekPlans,
-                          [activeWeek]: { ...planFields, [m.id]: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                ))}
-              </div>
-            </FormSection>
-          );
-        })()}
 
       <FormSection
         icon={<span>⏱️</span>}

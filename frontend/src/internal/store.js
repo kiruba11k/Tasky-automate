@@ -21,6 +21,7 @@ import {
   validateTargets,
   weeklySnapshot,
   dailySnapshot,
+  projectWeekStart,
 } from "./lib/domain.js";
 
 /** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
@@ -195,12 +196,68 @@ export const useStore = create()(
           return { ...project, week, month };
         });
 
+      /** Trims links, adds https:// when it is missing and refuses anything that is not a web address. */
+      const normalizeLinks = (links) =>
+        (links ?? [])
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((l) => {
+            const withScheme = /^https?:\/\//i.test(l) ? l : `https://${l}`;
+            try {
+              return new URL(withScheme).href;
+            } catch {
+              throw new Error(`"${l}" does not look like a link.`);
+            }
+          });
+
       return {
         ...emptyState(),
         setMe: (id) => set({ me: id }),
         startTask: (id) => patchTask(id, { status: "in_progress" }),
         undoStart: (id) => patchTask(id, { status: "todo" }),
-        submitForReview: (id, doneQty, minutes, reviewerId) => {
+        /** Sends work that was not assigned as a task to someone for approval (an ad-hoc task that starts in review). */
+        requestApproval: ({ projectId, title, links, reviewerId, note }) => {
+          const me = get().me;
+          if (!projectId) throw new Error("Pick a project.");
+          if (!title.trim()) throw new Error("Type what the task was.");
+          if (!reviewerId) throw new Error("Choose who should approve it.");
+          const cleanLinks = normalizeLinks(links);
+          const at = nowIso();
+          const task = {
+            id: newId(),
+            typeId: "custom",
+            customName: title.trim(),
+            unit: "task",
+            qty: 1,
+            doneQty: 1,
+            targetMinutes: 30,
+            minutes: 30,
+            standardMinutes: 30,
+            projectId,
+            assigneeId: me,
+            assignedById: me,
+            reviewerId,
+            priority: false,
+            status: "in_review",
+            adhoc: true,
+            links: cleanLinks,
+            feedback: note?.trim() ? [{ by: me, text: note.trim(), at }] : [],
+            createdAt: at,
+            date: todayKey(0),
+            reminders: 0,
+            reviews: [],
+            title: title.trim(),
+            history: [{ at, by: me, action: "submitted", to: reviewerId, note: note?.trim() || undefined }],
+            resubmits: 0,
+            submittedAt: at,
+          };
+          set((s) => ({ tasks: [task, ...s.tasks] }));
+          notify(
+            reviewerId,
+            `${firstName(me)} sent ${task.title} to you for approval${cleanLinks.length ? ` with ${cleanLinks.length} link${cleanLinks.length > 1 ? "s" : ""}` : ""}`,
+          );
+        },
+        submitForReview: (id, doneQty, minutes, reviewerId, links) => {
           const task = requireTask(id);
           if (!(doneQty > 0)) throw new Error("Enter how many you completed.");
           if (!(minutes > 0)) throw new Error("Enter the minutes you took.");
@@ -222,6 +279,7 @@ export const useStore = create()(
             doneQty,
             minutes,
             reviewerId,
+            links: links ? normalizeLinks(links) : task.links,
             submittedAt: at,
             resubmits,
             history: [
@@ -650,10 +708,7 @@ export const useStore = create()(
             ),
           ];
           const weekPlans = Object.fromEntries(
-            Object.entries(draft.weekPlans ?? {}).map(([week, counts]) => [
-              weekStart(week),
-              validateTargets(counts),
-            ]),
+            Object.entries(draft.weekPlans ?? {}).map(([week, counts]) => [week, validateTargets(counts)]),
           );
           const autoApprove = isApprover(me); // only approvers put a project live; everyone else sends it for approval
           const id = newId();
@@ -871,8 +926,7 @@ export const useStore = create()(
             );
         },
         setWeekPlan: (projectId, week, key, value) => {
-          requireManage(projectId);
-          const monday = weekStart(week);
+          const monday = projectWeekStart(requireManage(projectId), week);
           const n = Number(value);
           if (!Number.isFinite(n) || n < 0) throw new Error("Targets must be zero or more.");
           patchProject(projectId, (p) => ({
@@ -884,14 +938,12 @@ export const useStore = create()(
           }));
         },
         saveWeekPlan: (projectId, week, counts) => {
-          requireManage(projectId);
-          const monday = weekStart(week);
+          const monday = projectWeekStart(requireManage(projectId), week);
           const valid = validateTargets(counts);
           patchProject(projectId, (p) => ({ ...p, weekPlans: { ...p.weekPlans, [monday]: valid } }));
         },
         clearWeekPlan: (projectId, week) => {
-          requireManage(projectId);
-          const monday = weekStart(week);
+          const monday = projectWeekStart(requireManage(projectId), week);
           patchProject(projectId, (p) => {
             const plans = { ...p.weekPlans };
             delete plans[monday];

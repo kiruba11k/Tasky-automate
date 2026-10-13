@@ -5,23 +5,29 @@ import {
   oe as clsx,
   Te as Button,
   qe as Badge,
-  Mt as weekStart,
+  $e as dayKey,
   DR as listPlanWeeks,
   df as weekTargetFor,
   tc as tracksPeriod,
   lt as attempt,
   Ye as toast,
 } from '@/internal/min';
+import { projectWeekStart, savedWeekPlan } from '@/internal/lib/domain';
 import { BIG_NUMBER_INPUT_CLASS } from './projectHelpers';
 
-/** "Plan targets week by week" panel in a project's Targets tab. */
-export function WeekPlanner({ p }) {
+/** Project number targets for one week (messages, responses, calls...). Weeks run in 7-day blocks from the project's start.
+ *  `date` picks the week to open on (default: the current week). */
+export function WeekPlanner({ p, date }) {
   const { saveWeekPlan, clearWeekPlan } = useStore();
   const weeks = useMemo(() => listPlanWeeks(p, 'plan'), [p]);
-  const thisWeek = weekStart(0);
+  const thisWeek = projectWeekStart(p, dayKey(0));
+  const wanted = projectWeekStart(p, date ?? dayKey(0));
   const [selected, setSelected] = useState(() =>
-    weeks.some((w) => w.start === thisWeek) ? thisWeek : (weeks[0]?.start ?? thisWeek),
+    weeks.some((w) => w.start === wanted) ? wanted : (weeks[0]?.start ?? thisWeek),
   );
+  useEffect(() => {
+    if (weeks.some((w) => w.start === wanted)) setSelected(wanted);
+  }, [wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
   const index = Math.max(
@@ -29,7 +35,7 @@ export function WeekPlanner({ p }) {
     weeks.findIndex((w) => w.start === selected),
   );
   const week = weeks[index];
-  const savedPlan = p.weekPlans?.[selected];
+  const savedPlan = savedWeekPlan(p, selected);
   const targets = weekTargetFor(p, selected);
   const metrics = p.metrics.filter((m) => tracksPeriod(m, 'week'));
   const upcoming = weeks.filter((w) => w.start > thisWeek).slice(0, 4);

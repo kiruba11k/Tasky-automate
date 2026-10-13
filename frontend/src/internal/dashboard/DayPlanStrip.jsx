@@ -14,7 +14,7 @@ export const projectColor = (projects, projectId) =>
   PROJECT_COLORS[Math.max(0, projects.findIndex((p) => p.id === projectId)) % PROJECT_COLORS.length];
 
 /** Horizontal 10am-7pm strip with the planned time blocks, lunch and a live "now" marker. */
-export function DayPlanStrip({ blocks, loggedMinutes }) {
+export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
   const projects = useStore((s) => s.projects);
   const theme = useTheme();
   const blockStyle = (color) =>
@@ -89,6 +89,28 @@ export function DayPlanStrip({ blocks, loggedMinutes }) {
             </div>
           );
         })}
+        {extra
+          .filter((x) => x.start && x.end && x.end > x.start)
+          .map((x) => {
+            const from = Math.max(DAY_START, timeToMinutes(x.start));
+            const to = Math.min(DAY_END, timeToMinutes(x.end));
+            if (to <= from) return null;
+            return (
+              <div
+                key={x.id}
+                data-extra-block
+                className="absolute inset-y-0 flex items-center justify-center truncate border-r-2 border-surface bg-lavender-strong px-2 text-[11px] font-semibold text-white"
+                style={{
+                  left: `${((from - DAY_START) / span) * 100}%`,
+                  width: `${((to - from) / span) * 100}%`,
+                  backgroundImage: 'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.18) 0 6px, transparent 6px 12px)',
+                }}
+                title={`Extra ${x.start} to ${x.end} · ${x.work}`}
+              >
+                Extra · {x.work || 'extra hours'}
+              </div>
+            );
+          })}
         {!blocks.length && (
           <p className="absolute inset-y-0 left-0 flex w-1/3 items-center justify-center text-xs text-muted">
             No day plan yet

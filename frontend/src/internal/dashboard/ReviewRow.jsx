@@ -11,6 +11,7 @@ import {
   lt as runAction,
   Ye as showToast,
 } from '@/internal/min';
+import { LinkChips } from '../ui/LinkFields';
 import { OnTimeBadge } from './OnTimeBadge';
 import { ResubmitBadge } from './ResubmitBadge';
 import { HistoryToggle } from './HistoryToggle';
@@ -51,9 +52,12 @@ export function ReviewRow({ task, projectName }) {
             )}
           </p>
           <p className="text-xs text-muted">
-            {firstName(task.assigneeId)} · {projectName} · {task.doneQty} {task.unit} in {formatMinutes(task.minutes ?? 0)}{' '}
-            (target {formatMinutes(task.targetMinutes)})
+            {task.adhoc
+              ? `${firstName(task.assigneeId)} · ${projectName} · sent for approval without an assigned task`
+              : `${firstName(task.assigneeId)} · ${projectName} · ${task.doneQty} ${task.unit} in ${formatMinutes(task.minutes ?? 0)} (target ${formatMinutes(task.targetMinutes)})`}
           </p>
+          {task.adhoc && task.feedback[0] && <p className="text-xs">Note: {task.feedback[0].text}</p>}
+          <LinkChips links={task.links} className="mt-1" />
           <p className="text-xs text-muted">
             Sent for approval {formatDateTime(task.submittedAt)}
             {(task.resubmits ?? 0) > 0 && firstSubmit && firstSubmit.at !== task.submittedAt

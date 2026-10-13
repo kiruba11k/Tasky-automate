@@ -19,7 +19,9 @@ import {
   VM as StatusFilterCard,
   rt as Card,
   Vle as PersonUpdateCard,
+  vt as Avatar,
 } from '@/internal/min';
+import { EntriesLog } from '../daily/EntriesLog';
 
 /** Manager view of "/daily": team tasks update (daily or weekly). */
 export function ManagerDaily() {
@@ -27,6 +29,7 @@ export function ManagerDaily() {
   useStore((s) => s.profiles);
   const [view, setView] = useState('daily');
   const [date, setDate] = useState(TODAY_KEY);
+  const [sheet, setSheet] = useState('sheets'); // summary cards, or each person's task tables
   const [filter, setFilter] = useState('all');
   const weekKey = weekKeyOf(date);
   const ids = useMemo(() => [...TEAM_IDS].sort((a, b) => personName(a).localeCompare(personName(b))), []);
@@ -173,11 +176,46 @@ export function ManagerDaily() {
           <p className="py-6 text-center text-muted">Everyone is in ✓</p>
         </Card>
       )}
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-        {visible.map((r) => (
-          <PersonUpdateCard key={r.id} r={r} view={view} />
+      <div className="flex w-fit rounded-full bg-surface-2 p-1" role="tablist" aria-label="Cards or sheets">
+        {['cards', 'sheets'].map((tab) => (
+          <button
+            key={tab}
+            role="tab"
+            aria-selected={sheet === tab}
+            onClick={() => setSheet(tab)}
+            className={cn(
+              'focus-ring rounded-full px-4 py-1 text-xs font-semibold',
+              sheet === tab ? 'bg-surface text-ink shadow-soft' : 'text-muted',
+            )}
+          >
+            {tab === 'cards' ? 'Summary cards' : 'Task updates'}
+          </button>
         ))}
       </div>
+      {sheet === 'cards' ? (
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+          {visible.map((r) => (
+            <PersonUpdateCard key={r.id} r={r} view={view} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {visible.map((r) => (
+            <div key={r.id} className="space-y-2" data-person-sheet={r.id}>
+              <p className="flex items-center gap-2 font-bold">
+                <Avatar id={r.id} size="sm" />
+                {r.name}
+                <span className="text-xs font-normal text-muted">{r.title}</span>
+              </p>
+              {view === 'daily' ? (
+                <EntriesLog personId={r.id} date={date} readOnly />
+              ) : (
+                <EntriesLog personId={r.id} date={date} kind="week" readOnly />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

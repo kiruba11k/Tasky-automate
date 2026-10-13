@@ -29,6 +29,8 @@ import { PendingHint } from './PendingHint';
 import { CustomRowsEditor } from './CustomRowsEditor';
 import { ProjectNumbersEditor } from './ProjectNumbersEditor';
 import { WeekCards } from './WeekCards';
+import { EntriesLog } from './EntriesLog';
+import { EntriesProgress } from './EntriesProgress';
 import { buildDayRows } from './progressRows';
 import { latestWorkday } from './dateHelpers';
 import {
@@ -170,7 +172,7 @@ export function TasksUpdate() {
             <h2 className="text-base font-bold">Plan your day</h2>
             <HoursStats t={hours} sent={eodSent} />
           </div>
-          <DayTimeline blocks={plan} loggedMinutes={submittedTasks.reduce((sum, t) => sum + (t.minutes ?? 0), 0)} />
+          <DayTimeline blocks={plan} extra={nonEmptyExtras(extra)} loggedMinutes={submittedTasks.reduce((sum, t) => sum + (t.minutes ?? 0), 0)} />
           <div className="mt-5 space-y-2">
             {plan.length === 0 && (
               <p className="text-sm text-muted">
@@ -440,6 +442,14 @@ export function TasksUpdate() {
           </div>
         </Card>
       </section>
+      <EntriesLog personId={me} date={date} plan={plan} extra={extra} />
+      <EntriesLog personId={me} date={date} kind="week" />
+      <div className="border-t-2 border-dashed border-line pt-5">
+        <h2 className="text-lg font-bold">Auto-filled updates</h2>
+        <p className="text-sm text-muted">
+          Built from the daily and weekly tasks above and your assigned tasks. Targets against what got achieved, updated as you go.
+        </p>
+      </div>
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <UpdateCard
           id="todays-targets"
@@ -452,6 +462,7 @@ export function TasksUpdate() {
           onEdit={() => setEditingSod(true)}
           view={
             <>
+              <EntriesProgress personId={me} date={date} kind="day" />
               <TaskSummary tasks={dayTasks} mode="assigned" />
               <TargetsTable
                 rows={viewRows.rows}
@@ -463,6 +474,7 @@ export function TasksUpdate() {
             </>
           }
         >
+          <EntriesProgress personId={me} date={date} kind="day" />
           <TaskSummary tasks={dayTasks} mode="assigned" />
           <TargetsTable
             rows={editRows.rows}
@@ -525,6 +537,7 @@ export function TasksUpdate() {
           onEdit={() => setEditingEod(true)}
           view={
             <>
+              <EntriesProgress personId={me} date={date} kind="day" />
               <TaskSummary tasks={submittedTasks} mode="submitted" />
               <TargetsTable
                 rows={viewRows.rows}
@@ -537,6 +550,8 @@ export function TasksUpdate() {
             </>
           }
         >
+          <EntriesProgress personId={me} date={date} kind="day" />
+          <TimeTable plan={plan} extra={nonEmptyExtras(extra)} sent={false} />
           <TaskSummary tasks={submittedTasks} mode="submitted" />
           <TargetsTable
             rows={viewRows.rows}

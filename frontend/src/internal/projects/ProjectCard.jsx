@@ -9,7 +9,6 @@ import {
 import { ProjectHero } from './ProjectHero';
 import { ProjectSidebar } from './ProjectSidebar';
 import { TargetsPanel } from './TargetsPanel';
-import { WeekPlanner } from './WeekPlanner';
 import { MetricsEditor } from './MetricsEditor';
 import { WeekNumbers } from './WeekNumbers';
 import { MeetingsPanel } from './MeetingsPanel';
@@ -61,7 +60,9 @@ export function ProjectCard({ p, color }) {
         )}
         {active === 'targets' && canEdit && (
           <>
-            <WeekPlanner p={p} />
+            <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
+              Week by week targets are planned in <b className="text-ink">Tasks update</b>, under Weekly targets. They show up here and in Progress straight away.
+            </p>
             <div className="grid gap-4 lg:grid-cols-2">
               <TargetsPanel p={p} period="week" />
               <TargetsPanel p={p} period="month" />

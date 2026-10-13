@@ -1,11 +1,12 @@
-import { $e as dayKey, Mt as weekStart, Dw as weekRanges } from '@/internal/min';
+import { $e as dayKey, ft as addDays, Dw as weekRanges } from '@/internal/min';
+import { projectWeekStart } from '@/internal/lib/domain';
 
-const relativeWeekLabel = (start) =>
-  start === weekStart(0) ? 'this week' : start === weekStart(1) ? 'next week' : start === weekStart(-1) ? 'last week' : '';
+const relativeWeekLabel = (start, current) =>
+  start === current ? 'this week' : start === addDays(current, 7) ? 'next week' : start === addDays(current, -7) ? 'last week' : '';
 
 /** Week choices for a project's selects. `mode` "plan" lists all weeks, otherwise only current/future/known ones. */
 export function weekOptions(project, mode = 'plan') {
-  const current = weekStart(0);
+  const current = projectWeekStart(project, dayKey(0)); // the project's own 7-day week that today falls in
   return weekRanges(project)
     .filter(
       (w) =>
@@ -15,7 +16,7 @@ export function weekOptions(project, mode = 'plan') {
         !!project.weekPlans?.[w.start],
     )
     .map((w) => {
-      const rel = relativeWeekLabel(w.start);
+      const rel = relativeWeekLabel(w.start, current);
       return {
         start: w.start,
         n: w.n,

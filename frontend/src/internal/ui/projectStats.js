@@ -40,8 +40,12 @@ export function periodRange(period) {
 export function projectPeriodCounts(project, tasks, daily, period) {
   const currentWeek = weekStart(0);
   const currentMonth = dayKey(0).slice(0, 7);
-  if (period.kind === 'week' && period.key !== currentWeek) {
-    return { counts: project.pastWeeks.find((w) => w.start === period.key)?.counts ?? {}, auto: {} };
+  // Project weeks count from the project's start date, so "this week" is whichever 7 days today falls in.
+  const today = dayKey(0);
+  const isCurrentWeek = period.key === currentWeek || (today >= period.key && today < addDays(period.key, 7));
+  if (period.kind === 'week' && !isCurrentWeek) {
+    const past = project.pastWeeks.find((w) => w.start === period.key) ?? project.pastWeeks.find((w) => w.start >= period.key && w.start < addDays(period.key, 7));
+    return { counts: past?.counts ?? {}, auto: {} };
   }
   if (period.kind === 'month' && period.key !== currentMonth) {
     return { counts: project.pastMonths.find((m) => m.month === period.key)?.counts ?? {}, auto: {} };

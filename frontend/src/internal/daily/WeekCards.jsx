@@ -12,6 +12,7 @@ import {
   ft as addDays,
 } from '@/internal/min';
 import { UpdateCard } from './UpdateCard';
+import { EntriesProgress } from './EntriesProgress';
 import { TaskSummary } from './TaskSummary';
 import { WeekProgressList } from './WeekProgressList';
 import { PendingHint } from './PendingHint';
@@ -63,6 +64,7 @@ export function WeekCards({ personId, date }) {
         onEdit={() => setEditingTargets(true)}
         view={
           <>
+            <EntriesProgress personId={personId} date={date} kind="week" />
             <TaskSummary tasks={weekTasks} mode="assigned" />
             <WeekProgressList rows={progress.rows} sent={progress.sent} />
             {!progress.sent &&
@@ -78,6 +80,7 @@ export function WeekCards({ personId, date }) {
           </>
         }
       >
+        <EntriesProgress personId={personId} date={date} kind="week" />
         <TaskSummary tasks={weekTasks} mode="assigned" />
         <WeekProgressList rows={taskRows} sent={progress.sent} />
         {!progress.sent && taskRows.length > 0 && pendingHint}
@@ -133,11 +136,13 @@ export function WeekCards({ personId, date }) {
                 <span className="text-muted">weekly targets met</span>
               </p>
             )}
+            <EntriesProgress personId={personId} date={date} kind="week" />
             <WeekHours personId={personId} mon={mon} />
             <NoteLine label="How it went" text={record.eowNote} />
           </>
         }
       >
+        <EntriesProgress personId={personId} date={date} kind="week" />
         <WeekHours personId={personId} mon={mon} />
         <label className="block text-sm font-semibold">
           How did the week go?

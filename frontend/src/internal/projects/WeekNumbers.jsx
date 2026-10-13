@@ -19,6 +19,7 @@ import {
   lt as attempt,
   Ye as toast,
 } from '@/internal/min';
+import { savedWeekPlan } from '@/internal/lib/domain';
 import { formatClock, BIG_NUMBER_INPUT_CLASS } from './projectHelpers';
 
 /** "This week's numbers" tab: locked read-only totals with an Edit mode for corrections. */
@@ -28,7 +29,7 @@ export function WeekNumbers({ p, canEdit }) {
   const today = dayKey(0);
   const { counts, auto } = countWeek(p, tasks, daily, { kind: 'week', key: week });
   const me = useStore((s) => s.me);
-  const isDraft = !p.weekPlans?.[week] && !p.weekLocked;
+  const isDraft = !savedWeekPlan(p, week) && !p.weekLocked;
   const targets = isDraft && !canEditProject(p, me) ? undefined : weekTargetFor(p, week);
   const endOfDaySentCount = (date) =>
     p.teamIds.filter((id) => !!daily[`${id}|${date}`]?.eodAt).length;

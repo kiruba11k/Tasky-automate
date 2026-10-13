@@ -49,6 +49,25 @@ export function taskTransitionProblem(prev, next, userId) {
   return null;
 }
 
+const isLink = (l) => typeof l === 'string' && l.length <= 2000 && /^https?:\/\/\S+$/i.test(l);
+/** Why the links on a task are refused, or null. Links are web addresses to the sheet or doc to check. */
+export function taskLinksProblem(task) {
+  if (task?.links === undefined) return null;
+  if (!Array.isArray(task.links) || task.links.length > 10 || !task.links.every(isLink)) return 'Links must be web addresses (at most 10).';
+  return null;
+}
+const short = (v, n) => v === undefined || (typeof v === 'string' && v.length <= n);
+const count = (v) => v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1e7);
+/** Why the task rows of a day or week ("Daily update", "Weekly targets by project") are refused, or null. */
+export function entriesProblem(doc) {
+  if (doc?.entries === undefined) return null;
+  const rows = doc.entries;
+  if (!Array.isArray(rows) || rows.length > 300) return 'Too many task rows.';
+  const ok = rows.every((r) => r && typeof r === 'object' && typeof r.id === 'string' && r.id.length <= 60 && typeof r.projectId === 'string' && r.projectId.length <= 200
+    && typeof r.task === 'string' && r.task.length <= 200 && short(r.custom, 200) && short(r.desc, 500) && short(r.remarks, 1000) && count(r.qty) && count(r.estMin) && count(r.actualMin) && count(r.doneQty));
+  return ok ? null : 'A task row is not valid.';
+}
+
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
 export function mergePatch(target, patch) {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch;
@@ -96,13 +115,30 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     }
   }
 
+  /**
+   * "Send for approval": work nobody assigned goes straight to a reviewer as a task that starts in review. It must be the
+   * sender's own work on a project they are on, and a resource's work still goes only to the project's manager.
+   */
+  async function adhocApprovalOk(u, data) {
+    const mine = (id) => id === u.id;
+    if (data.adhoc !== true || data.status !== 'in_review' || !mine(data.assigneeId) || !mine(data.assignedById) || !data.reviewerId || mine(data.reviewerId)) return false;
+    const project = (await find('project', data.projectId))?.data;
+    if (!project || project.status !== 'active') return false;
+    if (!leadership(u) && !(project.pmId === u.id || (project.teamIds || []).includes(u.id) || (project.admins || []).includes(u.id))) return false;
+    if (trackerRole(u) === 'resource') return data.reviewerId === project.pmId;
+    return (await live()).some((x) => x.id === data.reviewerId);
+  }
+
   /** May `u` write `data` to this document? `prev` is the stored data (undefined for a new document). */
   async function canWrite(u, kind, key, data, prev, changed = [], deleting = false, existing = null) {
     const mine = (id) => id === u.id;
     switch (kind) {
       case 'task': {
         const t = prev || data;
-        if (!prev) return lead(u) && (mine(data.assignedById) || leadership(u)); // only managers and PMs give out tasks
+        if (!prev) {
+          if (lead(u) && (mine(data.assignedById) || leadership(u))) return true; // only managers and PMs give out tasks
+          return adhocApprovalOk(u, data); // ...but anyone may send their own unassigned work for approval
+        }
         if (deleting) return lead(u) || mine(prev.assignedById); // the assignee cannot delete their own task
         // Review rules. A task is approved (done) or sent back (changes) only by its reviewer. Work by a resource is always
         // reviewed by the project manager of its project. Only the current reviewer can pass the review to someone else.
@@ -198,7 +234,11 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       if (JSON.stringify(data).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Document too large' }); continue; }
       const changed = Object.keys(patch);
       if (kind === 'task') {
-        const why = taskTransitionProblem(prev, data, u.id);
+        const why = taskTransitionProblem(prev, data, u.id) || taskLinksProblem(data);
+        if (why) { results.push({ ...id, ok: false, error: why }); continue; }
+      }
+      if (kind === 'daily' || kind === 'weekly') {
+        const why = entriesProblem(data);
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
