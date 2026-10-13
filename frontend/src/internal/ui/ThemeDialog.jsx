@@ -4,6 +4,7 @@ import { Se as useStore, Ya as Modal } from '@/internal/min';
 import { cx } from './cx';
 import { Button } from './Button';
 import { THEMES, MY_DEFAULT, useTheme } from './theme';
+import { useFunMode } from '../fun/useFunMode';
 
 const NOW_EMOJIS = ['🏃', '🚀', '🐢', '🦖', '⏰', '☕', '🦄', '🐝'];
 const ACCENT_SWATCHES = ['#7C3AED', '#DB2777', '#EA580C', '#059669', '#2563EB', '#DC2626'];
@@ -61,6 +62,8 @@ export function ThemeDialog({ open, onClose }) {
   const theme = useTheme();
   const [showCustom, setShowCustom] = useState(false);
   const custom = theme.custom;
+  const fun = useFunMode();
+  const toggleFun = (value) => { try { sessionStorage.setItem('tracker_theme_open', '1'); } catch { /* ignore */ } fun.set(value); };
   const mine = { ...MY_DEFAULT, ...useStore((st) => st.profiles[st.me]?.myTheme) };
   const cartoon = useStore((st) => Boolean(st.profiles[st.me]?.cartoon));
   const updateMine = (patch) => setProfile(me, { theme: 'pack:mine', myTheme: { ...mine, ...patch, neutral: { ...mine.neutral, ...patch.neutral } } });
@@ -184,6 +187,16 @@ export function ThemeDialog({ open, onClose }) {
         </div>
       )}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {fun.available && (
+          <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-accent bg-accent-soft p-3 sm:col-span-2">
+            <span className="text-3xl">🎮</span>
+            <span className="flex-1">
+              <b className="block text-sm">Fun mode</b>
+              <span className="text-xs text-muted">3D scenes and buddies, the Team hub with games, birds, sounds and effects. Off keeps the app plain and quick. Your choice follows you to every device.</span>
+            </span>
+            <input type="checkbox" role="switch" aria-label="Fun mode" data-testid="fun-mode-toggle" checked={fun.on} onChange={(e) => toggleFun(e.target.checked)} className="h-5 w-5" />
+          </label>
+        )}
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3 sm:col-span-2">
           <span className="text-3xl">✏️</span>
           <span className="flex-1">

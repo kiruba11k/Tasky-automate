@@ -9,9 +9,11 @@ import { FunBridge } from './fun/FunBridge';
 import { PrefsSync } from './fun/PrefsSync';
 import { Alerts } from './shell/Alerts';
 import { PasswordPrompt } from './shell/PasswordPrompt';
+import { useFunMode } from './fun/useFunMode';
 
 /** Loads the signed-in person's data from the backend and keeps it in step; shows the app once the first load is done. */
 function Tracker({ user }) {
+  const { on: funOn } = useFunMode();
   const [state, setState] = useState({ ready: false, error: '' });
   useEffect(() => {
     let session;
@@ -35,7 +37,7 @@ function Tracker({ user }) {
   if (!state.ready) return <div className="flex min-h-screen items-center justify-center bg-bg text-sm text-muted" role="status">Loading your tracker…</div>;
   return (
     <FunLayer>
-      {!user.founder && <><FunBridge /><PrefsSync /></>}
+      {funOn && <><FunBridge /><PrefsSync /></>}
       <Shell />
       <Alerts />
       <PasswordPrompt />

@@ -372,7 +372,7 @@ function FunProviderFull({ children }) {
       <div id="fun-portal" className={scope} />
       <div className={scope}>
       {settings.mascot && (
-        <div className="mascot-corner fixed z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]" style={settings.mascotPos ? { left: `${settings.mascotPos.x * 100}%`, top: `${settings.mascotPos.y * 100}%`, transform: 'translate(-50%, -50%)' } : { left: '0.75rem', bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="mascot-corner fixed z-[90] flex items-end gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)]" style={settings.mascotPos ? { left: `${settings.mascotPos.x * 100}%`, top: `${settings.mascotPos.y * 100}%`, transform: 'translate(-50%, -50%)' } : { left: 'calc(76px + 0.75rem)', bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
           <button type="button" onClick={(e) => { if (dragged.current) { dragged.current = false; e.preventDefault(); return; } poke(e); }} onPointerDown={startDrag} onDoubleClick={() => setSettings({ mascotPos: null })} title="Drag me anywhere (double-click to send me home)" aria-label="Tap Tasky for a joke, drag to move" className="pointer-events-auto shrink-0 focus:outline-none touch-none cursor-grab active:cursor-grabbing">
             <MascotAvatar mood={mood} settings={settings} />
           </button>
@@ -430,9 +430,11 @@ function FunProviderPro({ children }) {
   return <FunContext.Provider value={PRO_VALUE}>{children}</FunContext.Provider>;
 }
 
-export function FunProvider({ children }) {
+/** `enabled` (the person's Fun mode switch) turns the whole layer on; founders never get it. Without the prop, everyone but founders does. */
+export function FunProvider({ children, enabled }) {
   const { user } = useAuth();
-  return user?.founder ? <FunProviderPro>{children}</FunProviderPro> : <FunProviderFull>{children}</FunProviderFull>;
+  const on = enabled === undefined ? !user?.founder : enabled && !user?.founder;
+  return on ? <FunProviderFull>{children}</FunProviderFull> : <FunProviderPro>{children}</FunProviderPro>;
 }
 
 /** The class that scopes the fun styles (see postcss.config.js), with the person's fun / calm choices. */

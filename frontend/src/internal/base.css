@@ -89,7 +89,7 @@ body { font-size: 14px; }
   .shell-chat > button { width: 3rem; height: 3rem; }
   .nt-prompt { bottom: 5.2rem; }
   .nt-stack { top: 4rem; right: .5rem; left: .5rem; width: auto; }
-  .mascot-corner:not([style*="top"]) { bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px)) !important; }
+  .mascot-corner:not([style*="top"]) { left: .75rem !important; bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px)) !important; }
   .chat-window { position: fixed; left: .5rem; right: .5rem; top: 3.9rem; bottom: 8.2rem; width: auto !important; height: auto !important; }
   .chat-root { flex-direction: column; }
   .chat-aside { width: 100% !important; flex-direction: row !important; align-items: center; border-right: 0 !important; border-bottom: 1px solid rgb(var(--c-line)); overflow-x: auto; flex-shrink: 0; }
@@ -104,7 +104,7 @@ body { font-size: 14px; }
 @keyframes m-fade { from { opacity: 0; } }
 
 /* ---------- "choose a password" card for people who signed in before passwords existed ---------- */
-.pw-card { position: fixed; left: 1rem; bottom: 1rem; z-index: 75; width: min(20rem, calc(100vw - 2rem)); padding: .9rem; border-radius: 1.1rem; background: rgb(var(--c-surface)); border: 2px solid rgb(var(--c-accent)); box-shadow: var(--shadow-lift); animation: pw-up .5s cubic-bezier(.34, 1.5, .5, 1) both; }
+.pw-card { position: fixed; left: calc(76px + 1rem); bottom: 1rem; z-index: 75; width: min(20rem, calc(100vw - 2rem)); padding: .9rem; border-radius: 1.1rem; background: rgb(var(--c-surface)); border: 2px solid rgb(var(--c-accent)); box-shadow: var(--shadow-lift); animation: pw-up .5s cubic-bezier(.34, 1.5, .5, 1) both; }
 @keyframes pw-up { from { opacity: 0; transform: translateY(30px); } }
 .pw-x { position: absolute; top: .5rem; right: .5rem; padding: .2rem; border-radius: .5rem; color: rgb(var(--c-muted)); }
-@media (max-width: 767px) { .pw-card { bottom: 5rem; } }
+@media (max-width: 767px) { .pw-card { left: 1rem; bottom: 5rem; } }
