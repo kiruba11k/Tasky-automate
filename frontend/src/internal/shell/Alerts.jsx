@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { request } from '@/api/client';
 import { Se as useStore } from '@/internal/min';
 import { Emoji3D } from './Emoji3D';
+import { playAlert, loudest } from './alertSound';
 
 /** Look of an alert, from what the notice says: [emoji, tone, animation]. */
 export function look(n) {
@@ -74,6 +75,8 @@ function Toasts() {
       state.notices.forEach((n) => seen.current.add(n.id));
       if (!fresh.length) return;
       setCards((c) => [...c, ...fresh.map((n) => ({ ...n, k: n.id }))].slice(-3));
+      // one tune per arrival (the most important one when several come together), unless the person turned alert sounds off
+      if (useStore.getState().profiles[state.me]?.alertSound !== false) playAlert(loudest(fresh.map((n) => look(n)[1])));
       fresh.forEach((n) => {
         if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try { new Notification(n.kind === 'deadline' ? '⏰ Deadline' : n.kind === 'chat' ? '💬 New message' : '📋 Tasks', { body: n.text, tag: n.id, icon: '/logo.jpg' }); } catch { /* some browsers need the service worker */ }

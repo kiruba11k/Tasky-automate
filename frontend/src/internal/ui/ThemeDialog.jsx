@@ -5,6 +5,7 @@ import { cx } from './cx';
 import { Button } from './Button';
 import { THEMES, MY_DEFAULT, useTheme } from './theme';
 import { useFunMode } from '../fun/useFunMode';
+import { playAlert } from '../shell/alertSound';
 
 const NOW_EMOJIS = ['🏃', '🚀', '🐢', '🦖', '⏰', '☕', '🦄', '🐝'];
 const ACCENT_SWATCHES = ['#7C3AED', '#DB2777', '#EA580C', '#059669', '#2563EB', '#DC2626'];
@@ -64,6 +65,7 @@ export function ThemeDialog({ open, onClose }) {
   const custom = theme.custom;
   const fun = useFunMode();
   const toggleFun = (value) => { try { sessionStorage.setItem('tracker_theme_open', '1'); } catch { /* ignore */ } fun.set(value); };
+  const alertSound = useStore((st) => st.profiles[st.me]?.alertSound !== false);
   const mine = { ...MY_DEFAULT, ...useStore((st) => st.profiles[st.me]?.myTheme) };
   const cartoon = useStore((st) => Boolean(st.profiles[st.me]?.cartoon));
   const updateMine = (patch) => setProfile(me, { theme: 'pack:mine', myTheme: { ...mine, ...patch, neutral: { ...mine.neutral, ...patch.neutral } } });
@@ -197,6 +199,14 @@ export function ThemeDialog({ open, onClose }) {
             <input type="checkbox" role="switch" aria-label="Fun mode" data-testid="fun-mode-toggle" checked={fun.on} onChange={(e) => toggleFun(e.target.checked)} className="h-5 w-5" />
           </label>
         )}
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3 sm:col-span-2">
+          <span className="text-3xl">🔔</span>
+          <span className="flex-1">
+            <b className="block text-sm">Alert sounds</b>
+            <span className="text-xs text-muted">A short tune when a new alert arrives: a task for you, a review, an approval, a deadline. Each kind sounds different.</span>
+          </span>
+          <input type="checkbox" role="switch" aria-label="Alert sounds" data-testid="alert-sound-toggle" checked={alertSound} onChange={(e) => { setProfile(me, { alertSound: e.target.checked }); if (e.target.checked) playAlert('good'); }} className="h-5 w-5" />
+        </label>
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3 sm:col-span-2">
           <span className="text-3xl">✏️</span>
           <span className="flex-1">
