@@ -24,6 +24,7 @@ import { CUSTOM_TASK, blankEntry, entryName, newEntryId, parseQty, taskChoices, 
 export const EDIT_DAY_TASKS = 'ls-edit-day-tasks';
 
 const TEXT = 'focus-ring w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink';
+const isDone = (row, achieved) => (row.qty ? (achieved ?? 0) >= row.qty : (achieved ?? 0) > 0);
 const NUMBER = 'focus-ring w-20 rounded-lg border border-line bg-surface px-2 py-1 text-right text-sm tabular-nums text-ink';
 
 /** The record (and previous one, to copy from) that holds a person's rows for a day or a week. */
@@ -219,7 +220,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day'
                       <th className="w-20 px-2 py-1.5">Target</th>
                       <th className="w-24 px-2 py-1.5">Estimated</th>
                       <th className="w-24 px-2 py-1.5">Actual</th>
-                      <th className="w-20 px-2 py-1.5">Achieved</th>
+                      <th className="w-20 px-2 py-1.5">Done</th>
                       <th className="w-44 px-2 py-1.5">Remarks</th>
                       {editable && <th className="w-8" />}
                     </tr>
@@ -292,19 +293,26 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, kind = 'day'
                             )}
                           </td>
                           <td className="px-2 py-1.5">
-                            {readOnly ? (
-                              <span className="tabular-nums">{achieved ?? '·'}</span>
-                            ) : (
-                              <input
-                                aria-label="Achieved"
-                                type="number"
-                                min={0}
-                                className={NUMBER}
-                                placeholder={kind === 'week' && achieved != null ? String(achieved) : '0'}
-                                value={r.doneQty ?? ''}
-                                onChange={(e) => update(r.id, { doneQty: parseQty(e.target.value) })}
-                              />
-                            )}
+                            {(() => {
+                              const finished = isDone(r, achieved);
+                              const partial = !finished && achieved ? `${achieved}/${r.qty ?? '?'}` : '';
+                              return readOnly ? (
+                                <span className={finished ? 'font-semibold text-mint-ink' : 'tabular-nums text-muted'}>{finished ? '✓ Done' : partial || '·'}</span>
+                              ) : (
+                                <label className="flex items-center gap-2" title="Tick when this is done">
+                                  <input
+                                    aria-label="Achieved"
+                                    type="checkbox"
+                                    className="h-5 w-5 shrink-0" style={{ accentColor: "rgb(var(--c-accent))" }}
+                                    checked={finished}
+                                    onChange={(e) =>
+                                      update(r.id, { doneQty: e.target.checked ? Math.max(r.qty ?? 1, 1) : kind === 'week' && achieved ? 0 : undefined })
+                                    }
+                                  />
+                                  {partial && <span className="text-xs tabular-nums text-muted">{partial}</span>}
+                                </label>
+                              );
+                            })()}
                           </td>
                           <td className="px-2 py-1.5">
                             {readOnly ? (

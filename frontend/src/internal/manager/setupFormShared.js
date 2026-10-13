@@ -3,7 +3,8 @@ import { We as formatMinutes } from '@/internal/min';
 
 /** Outreach rate fields. (bundle: LP) */
 export const RATE_FIELDS = [
-  { key: 'prospect', label: 'Prospect mapping', hint: 'minutes per prospect' },
+  // Prospect mapping is typed per 10 prospects (stored per prospect, so the maths elsewhere does not change).
+  { key: 'prospect', label: 'Prospect mapping', hint: 'minutes per 10 prospects', per: 10 },
   {
     key: 'l1',
     label: '1st level message',

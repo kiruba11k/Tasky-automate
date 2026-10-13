@@ -14,7 +14,7 @@ export const projectColor = (projects, projectId) =>
   PROJECT_COLORS[Math.max(0, projects.findIndex((p) => p.id === projectId)) % PROJECT_COLORS.length];
 
 /** Horizontal 10am-7pm strip with the planned time blocks, lunch and a live "now" marker. */
-export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
+export function DayPlanStrip({ blocks, loggedMinutes, extra = [], lunch = { start: '13:00', end: '14:00' } }) {
   const projects = useStore((s) => s.projects);
   const theme = useTheme();
   const blockStyle = (color) =>
@@ -51,11 +51,11 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
         <div
           className="absolute inset-y-0 flex items-center justify-center border-x-2 border-surface bg-grey text-[11px] font-semibold text-grey-ink"
           style={{
-            left: `${((780 - DAY_START) / span) * 100}%`,
-            width: `${(60 / span) * 100}%`,
+            left: `${((timeToMinutes(lunch.start) - DAY_START) / span) * 100}%`,
+            width: `${((timeToMinutes(lunch.end) - timeToMinutes(lunch.start)) / span) * 100}%`,
             backgroundImage: 'repeating-linear-gradient(135deg, rgb(0 0 0 / 0.04) 0 6px, transparent 6px 12px)',
           }}
-          title="Lunch 1pm to 2pm"
+          title={`Lunch ${formatClockLabel(timeToMinutes(lunch.start))} to ${formatClockLabel(timeToMinutes(lunch.end))}`}
         >
           🍽 Lunch
         </div>

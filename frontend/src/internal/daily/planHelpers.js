@@ -6,14 +6,14 @@ export const TIME_SLOTS = Array.from(
   (_, i) => `${String(10 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`,
 );
 
-/** Fixed lunch block shown between the planned blocks. */
-export const LUNCH_BLOCK = {
+/** The lunch row shown between the planned blocks (the day's own lunch, 1pm to 2pm unless changed). */
+export const lunchBlock = (lunch = LUNCH) => ({
   id: 'lunch',
-  start: LUNCH.start,
-  end: LUNCH.end,
+  start: lunch.start,
+  end: lunch.end,
   projectId: '',
   taskIds: [],
-};
+});
 
 export const FIELD_CLASS = 'focus-ring rounded-xl border border-line bg-surface px-2 py-1 text-sm text-ink';
 

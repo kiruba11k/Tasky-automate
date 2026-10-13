@@ -1,6 +1,6 @@
 // The tracker store. Its data lives on the server and is kept in step by sync.js.
 import { create } from "zustand";
-import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, LUNCH_BLOCK } from "./lib/dates.js";
+import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel } from "./lib/dates.js";
 import { PEOPLE, TASK_TYPES, isAdminTier, isApprover, approverNames, roleOf } from "./lib/constants.js";
 import {
   DEFAULT_METRICS,
@@ -533,9 +533,10 @@ export const useStore = create()(
               )
                 throw new Error("Actual time must be between 0 and 12 hours.");
             }
+            const lunch = next.lunch ?? lunchFor(get().daily, personId, day);
             for (const block of next.plan)
-              if (block.start < LUNCH_BLOCK.end && block.end > LUNCH_BLOCK.start)
-                throw new Error("1pm to 2pm is lunch 🍽, move that block around it.");
+              if (block.start < lunch.end && block.end > lunch.start)
+                throw new Error(`${clockLabel(lunch.start)} to ${clockLabel(lunch.end)} is lunch 🍽, move that block around it.`);
             const sorted = [...next.plan].sort((a, b) => a.start.localeCompare(b.start));
             for (let i = 1; i < sorted.length; i++)
               if (sorted[i].start < sorted[i - 1].end)
@@ -569,6 +570,16 @@ export const useStore = create()(
                 };
               }),
             };
+          if (next.lunch) {
+            const { start, end } = next.lunch;
+            if (!/^\d\d:\d\d$/.test(start ?? "") || !/^\d\d:\d\d$/.test(end ?? ""))
+              throw new Error("Pick when lunch starts and ends.");
+            if (end <= start) throw new Error("Lunch must end after it starts.");
+            if (start < "10:00" || end > "19:00") throw new Error("Lunch has to fall between 10am and 7pm.");
+            for (const block of next.plan ?? get().daily[key]?.plan ?? [])
+              if (block.start < end && block.end > start)
+                throw new Error(`Lunch overlaps a time block (${block.start} to ${block.end}), move one of them.`);
+          }
           const record = { ...emptyDaily(), ...get().daily[key], ...next };
           if ("eodAt" in next) {
             if (next.eodAt)

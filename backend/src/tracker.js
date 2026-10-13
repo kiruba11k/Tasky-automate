@@ -68,6 +68,14 @@ export function entriesProblem(doc) {
   return ok ? null : 'A task row is not valid.';
 }
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** Why a day's lunch break is refused, or null. It is a start and an end time within the working day. */
+export function lunchProblem(doc) {
+  if (doc?.lunch === undefined) return null;
+  const l = doc.lunch;
+  return l && typeof l === 'object' && HHMM.test(l.start) && HHMM.test(l.end) && l.start < l.end && l.start >= '10:00' && l.end <= '19:00' ? null : 'Lunch needs a start and an end between 10:00 and 19:00.';
+}
+
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
 export function mergePatch(target, patch) {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch;
@@ -238,7 +246,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
-        const why = entriesProblem(data);
+        const why = entriesProblem(data) || lunchProblem(data);
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }

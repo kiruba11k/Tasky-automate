@@ -44,8 +44,8 @@ export function ProjectHero({ p, color, onEdit }) {
     ['🤝', `${p.month.meetings ?? 0} meetings`, 'booked this month'],
     [
       '⏱️',
-      `${standards.prospect} / ${standards.l1} / ${standards.l2} min`,
-      `prospect · L1 · L2 standard${p.customStandards.length ? ` · +${p.customStandards.length} custom` : ''}`,
+      `${Math.round(standards.prospect * 1000) / 100} / ${standards.l1} / ${standards.l2} min`,
+      `prospects (per 10) · L1 · L2 standard${p.customStandards.length ? ` · +${p.customStandards.length} custom` : ''}`,
     ],
   ];
   return (

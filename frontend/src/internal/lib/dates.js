@@ -46,6 +46,26 @@ export const GRANULARITY_LABELS = {
 /** `ri` - the fixed daily lunch break (1pm to 2pm); no work blocks may overlap. */
 export const LUNCH_BLOCK = { start: "13:00", end: "14:00" };
 
+/** The lunch break for a person's day: the one they set for that day, else the latest one they set before it, else 1pm to 2pm. */
+export function lunchFor(daily, personId, date) {
+  const own = daily[`${personId}|${date}`]?.lunch;
+  if (own) return own;
+  let best = null;
+  for (const [key, rec] of Object.entries(daily)) {
+    if (!rec?.lunch || !key.startsWith(`${personId}|`)) continue;
+    const day = key.slice(personId.length + 1);
+    if (day < date && (!best || day > best.day)) best = { day, lunch: rec.lunch };
+  }
+  return best ? best.lunch : LUNCH_BLOCK;
+}
+
+/** "1pm" / "1:30pm" for an HH:MM time. */
+export function clockLabel(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}${m ? `:${String(m).padStart(2, "0")}` : ""}${h >= 12 ? "pm" : "am"}`;
+}
+
 /** `dR` / `Iw` - Date -> "YYYY-MM-DD" (local). */
 export function toDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;

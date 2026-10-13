@@ -15,8 +15,8 @@ import {
   zw as computeDayHours,
   $R as DayTimeline,
   NR as planFromProjectHours,
-  ri as LUNCH,
 } from '@/internal/min';
+import { lunchFor, clockLabel, LUNCH_BLOCK as DEFAULT_LUNCH } from '../lib/dates';
 import { DatePicker } from './DatePicker';
 import { HoursStats } from './HoursStats';
 import { DurationInput } from './DurationInput';
@@ -35,7 +35,7 @@ import { buildDayRows } from './progressRows';
 import { latestWorkday } from './dateHelpers';
 import {
   TIME_SLOTS,
-  LUNCH_BLOCK,
+  lunchBlock,
   FIELD_CLASS,
   nextIdSuffix,
   blockMinutes,
@@ -51,6 +51,7 @@ export function TasksUpdate() {
   const key = `${me}|${date}`;
   const record = daily[key] ?? emptyDaily();
   const [plan, setPlan] = useState(record.plan);
+  const [lunch, setLunch] = useState(() => lunchFor(daily, me, date));
   const [extra, setExtra] = useState(record.extra ?? []);
   const [sodNote, setSodNote] = useState(record.sodNote);
   const [sodTargets, setSodTargets] = useState(record.sodTargets);
@@ -66,6 +67,7 @@ export function TasksUpdate() {
     setEditingSod(false);
     setEditingEod(false);
     setPlan(r.plan);
+    setLunch(lunchFor(useStore.getState().daily, me, date));
     setExtra(r.extra ?? []);
     setSodCustom(r.sodCustom ?? []);
     setEodCustom(r.eodCustom ?? []);
@@ -81,6 +83,7 @@ export function TasksUpdate() {
     if (r) {
       setPlan(r.plan);
       setExtra(r.extra ?? []);
+      setLunch(lunchFor(useStore.getState().daily, me, date));
     }
   };
 
@@ -120,10 +123,10 @@ export function TasksUpdate() {
 
   const addBlock = () => {
     let start = [...plan].sort((a, b) => a.end.localeCompare(b.end)).at(-1)?.end ?? '10:00';
-    if (start >= LUNCH.start && start < LUNCH.end) start = LUNCH.end;
+    if (start >= lunch.start && start < lunch.end) start = lunch.end;
     const endIndex = Math.min(
       TIME_SLOTS.length - 1,
-      start < LUNCH.start ? TIME_SLOTS.indexOf(LUNCH.start) : TIME_SLOTS.indexOf(start) + 4,
+      start < lunch.start && TIME_SLOTS.includes(lunch.start) ? TIME_SLOTS.indexOf(lunch.start) : TIME_SLOTS.indexOf(start) + 4,
     );
     if (start >= '19:00') {
       return toast({ title: 'Your day is already planned up to 7pm', tone: 'info' });
@@ -161,7 +164,7 @@ export function TasksUpdate() {
           <h1 className="text-2xl font-bold">Tasks update</h1>
           <p className="text-sm text-muted">
             Plan your day and record the real time it took. Targets and actuals fill in from your tasks. Working hours
-            10am to 7pm, lunch 1pm to 2pm.
+            10am to 7pm, lunch {clockLabel(lunch.start)} to {clockLabel(lunch.end)} (you can change it below).
           </p>
         </div>
         <DatePicker date={date} onChange={setDate} />
@@ -172,7 +175,7 @@ export function TasksUpdate() {
             <h2 className="text-base font-bold">Plan your day</h2>
             <HoursStats t={hours} sent={eodSent} />
           </div>
-          <DayTimeline blocks={plan} extra={nonEmptyExtras(extra)} loggedMinutes={submittedTasks.reduce((sum, t) => sum + (t.minutes ?? 0), 0)} />
+          <DayTimeline blocks={plan} extra={nonEmptyExtras(extra)} lunch={lunch} loggedMinutes={submittedTasks.reduce((sum, t) => sum + (t.minutes ?? 0), 0)} />
           <div className="mt-5 space-y-2">
             {plan.length === 0 && (
               <p className="text-sm text-muted">
@@ -193,17 +196,50 @@ export function TasksUpdate() {
                 <span className="w-8" />
               </div>
             )}
-            {[...plan, LUNCH_BLOCK]
+            {[...plan, lunchBlock(lunch)]
               .sort((a, b) => a.start.localeCompare(b.start))
               .map((block) => {
                 if (block.id === 'lunch') {
                   return (
                     <div
                       key="lunch"
-                      className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-surface-2 py-2 pl-4 pr-3 text-sm text-muted"
+                      data-lunch
+                      className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-line bg-surface-2 py-2 pl-4 pr-3 text-sm text-muted"
                     >
-                      <span className="w-[12.5rem] font-semibold tabular-nums">13:00 to 14:00</span>
-                      <span>🍽 Lunch break, every day</span>
+                      <select
+                        aria-label="Lunch start"
+                        className={cx(FIELD_CLASS, 'w-[5.5rem]')}
+                        value={lunch.start}
+                        onChange={(e) => {
+                          const start = e.target.value;
+                          setLunch((l) => ({ start, end: l.end > start ? l.end : TIME_SLOTS[Math.min(TIME_SLOTS.indexOf(start) + 2, TIME_SLOTS.length - 1)] }));
+                        }}
+                      >
+                        {TIME_SLOTS.slice(0, -1).map((t) => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                      <span className="w-4 text-center">→</span>
+                      <select
+                        aria-label="Lunch end"
+                        className={cx(FIELD_CLASS, 'w-[5.5rem]')}
+                        value={lunch.end}
+                        onChange={(e) => setLunch((l) => ({ ...l, end: e.target.value }))}
+                      >
+                        {TIME_SLOTS.slice(1).map((t) => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                      <span>🍽 Lunch break</span>
+                      {(lunch.start !== DEFAULT_LUNCH.start || lunch.end !== DEFAULT_LUNCH.end) && (
+                        <button
+                          type="button"
+                          className="focus-ring rounded-lg px-1 text-xs font-semibold text-accent-ink hover:underline"
+                          onClick={() => setLunch({ ...DEFAULT_LUNCH })}
+                        >
+                          Back to 1pm to 2pm
+                        </button>
+                      )}
                     </div>
                   );
                 }
@@ -333,7 +369,7 @@ export function TasksUpdate() {
             <Button
               tone="ghost"
               className="border border-line"
-              onClick={() => setPlan(planFromProjectHours(projects, me))}
+              onClick={() => setPlan(planFromProjectHours(projects, me, lunch))}
             >
               <WandSparkles size={14} /> Fill from my project hours
             </Button>
@@ -430,7 +466,7 @@ export function TasksUpdate() {
                 className="ml-auto"
                 onClick={() =>
                   guarded(() => {
-                    saveDaily(me, date, { plan, extra: nonEmptyExtras(extra) });
+                    saveDaily(me, date, { plan, extra: nonEmptyExtras(extra), lunch });
                     syncPlanFromStore();
                     toast({ title: 'Plan and times saved', tone: 'success' });
                   })
@@ -511,6 +547,7 @@ export function TasksUpdate() {
               guarded(() => {
                 saveDaily(me, date, {
                   plan,
+                  lunch,
                   sodNote,
                   sodTargets,
                   sodCustom: sodCustom.filter((r) => r.label.trim()),
@@ -638,6 +675,7 @@ export function TasksUpdate() {
               guarded(() => {
                 saveDaily(me, date, {
                   plan,
+                  lunch,
                   extra: nonEmptyExtras(extra),
                   eodNote,
                   eodActuals,

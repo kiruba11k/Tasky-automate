@@ -630,13 +630,14 @@ export function buildTodayTasks(projects) {
 
 // --------------------------------------------------------- daily / weekly
 
-/** `NR` - default plan blocks for a person from project hours (10-13 and 14-19). */
-export function defaultPlanBlocks(projects, personId) {
+/** `NR` - default plan blocks for a person from project hours (10am to 7pm around the lunch break). */
+export function defaultPlanBlocks(projects, personId, lunch = { start: "13:00", end: "14:00" }) {
   const blocks = [];
+  const toMin = (t) => +t.slice(0, 2) * 60 + +t.slice(3, 5);
   const windows = [
-    [600, 780],
-    [840, 1140],
-  ];
+    [600, toMin(lunch.start)],
+    [toMin(lunch.end), 1140],
+  ].filter(([from, to]) => to > from);
   const clock = (m) =>
     `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   let w = 0;

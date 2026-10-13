@@ -2,7 +2,7 @@ import test, { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, bootstrapAdmin } from '../src/app.js';
 import { MemoryStore } from '../src/store.js';
-import { entriesProblem, taskLinksProblem } from '../src/tracker.js';
+import { entriesProblem, taskLinksProblem, lunchProblem } from '../src/tracker.js';
 
 test('links and task rows are checked', () => {
   assert.equal(taskLinksProblem({}), null);
@@ -17,6 +17,14 @@ test('links and task rows are checked', () => {
   assert.ok(entriesProblem({ entries: [{ ...row, qty: -1 }] }));
   assert.ok(entriesProblem({ entries: [{ ...row, task: 5 }] }));
   assert.ok(entriesProblem({ entries: Array(301).fill(row) }));
+});
+
+test('a day\'s lunch break is a valid time range', () => {
+  assert.equal(lunchProblem({}), null);
+  assert.equal(lunchProblem({ lunch: { start: '12:30', end: '13:30' } }), null);
+  assert.ok(lunchProblem({ lunch: { start: '14:00', end: '13:00' } }));
+  assert.ok(lunchProblem({ lunch: { start: '09:00', end: '10:00' } }));
+  assert.ok(lunchProblem({ lunch: 'noon' }));
 });
 
 describe('send for approval: anyone sends their own unassigned work to a reviewer', () => {

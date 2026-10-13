@@ -34,7 +34,9 @@ import { ConfirmModal } from '../kit/ConfirmModal';
 import { PersonPicker } from './PersonPicker';
 
 const EMPTY_TASK = { name: '', unit: '', minutes: '' };
-const DEFAULT_STANDARD_INPUTS = { prospect: '2', l1: '2', l2: '1.5' };
+// What the standard-time boxes show: minutes per unit, but per 10 for prospect mapping (see RATE_FIELDS).
+const DEFAULT_STANDARD_INPUTS = { prospect: '20', l1: '2', l2: '1.5' };
+const roundMin = (n) => Math.round(n * 100) / 100;
 
 /** Create ("Propose"/"Onboard") or edit a project. */
 export function ProjectFormModal({ open, onClose, edit }) {
@@ -90,7 +92,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
         setTeam(ids.map((id) => ({ id, h: String(edit.hours[id] ?? 0) })));
         const std = { ...DEFAULT_STANDARDS, ...edit.standards };
         setStandards({
-          prospect: String(std.prospect),
+          prospect: String(roundMin(std.prospect * 10)),
           l1: String(std.l1),
           l2: String(std.l2),
         });
@@ -159,7 +161,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
         const v = toNumber(standards[f.key]);
         if (!(v > 0))
           throw new Error(`Set the standard time for ${f.label.toLowerCase()} (above 0 minutes).`);
-        return [f.key, v];
+        return [f.key, f.per ? roundMin(v / f.per) : v]; // typed per 10 prospects, kept per prospect
       }),
     );
     const hours = {};
@@ -463,7 +465,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
               </span>
               <span className="mt-1 block text-[11px] text-muted">
                 {f.hint}
-                {toNumber(standards[f.key]) > 0 ? ` · ${perHourLabel(toNumber(standards[f.key]))}` : ''}
+                {toNumber(standards[f.key]) > 0 ? ` · ${perHourLabel(toNumber(standards[f.key]) / (f.per ?? 1))}` : ''}
               </span>
             </label>
           ))}
