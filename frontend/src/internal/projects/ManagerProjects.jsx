@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Se as useStore, Te as Button, rt as Card, Tr as PROJECT_COLORS } from '@/internal/min';
+import { Se as useStore, Te as Button, rt as Card, Kw as PendingPanel, Tr as PROJECT_COLORS } from '@/internal/min';
+import { approverNames } from '@/internal/lib/constants';
 import { ProjectCard } from './ProjectCard';
 import { ProjectFormModal } from './ProjectFormModal';
 
 /** Projects page for management: every active project, plus onboarding. */
 export function ManagerProjects() {
   const projects = useStore((s) => s.projects);
+  const me = useStore((s) => s.me);
+  // proposals this person sent that are still waiting: they show here so the sender can see they were sent
+  const sent = projects.filter((p) => p.status === 'pending' && p.pmId === me);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const active = projects
     .map((p, i) => ({ p, color: PROJECT_COLORS[i % PROJECT_COLORS.length] }))
@@ -19,10 +23,17 @@ export function ManagerProjects() {
           <Plus size={14} /> Onboard a project
         </Button>
       </div>
+      {sent.map((p) => (
+        <PendingPanel key={p.id} color="#94A3B8" title={p.name} meta={`Sent for approval to ${approverNames()}`}>
+          <p className="p-4 text-sm text-muted">
+            {p.description || 'No description'} · Once approved you can set targets and assign tasks.
+          </p>
+        </PendingPanel>
+      ))}
       {active.map(({ p, color }) => (
         <ProjectCard key={p.id} p={p} color={color} />
       ))}
-      {active.length === 0 && (
+      {active.length === 0 && sent.length === 0 && (
         <Card>
           <p className="py-6 text-center text-muted">No active projects yet.</p>
         </Card>
