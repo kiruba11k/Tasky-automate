@@ -11,14 +11,14 @@ const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
 /** Tracker role: founder | manager | pm | resource (derived from the user's role unless set explicitly). */
 // A named project approver (the PROJECT_APPROVERS emails, or "Can approve project proposals") is at least a manager, so they get the
-// team pages (People, project approvals) even when their account was not made an admin; an explicit tracker role still wins.
+// team pages (People, project approvals) even when their account was not made an admin or was given another role.
 const approverEmails = () => (process.env.PROJECT_APPROVERS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 const isNamedApprover = (u) => u.approver === true || approverEmails().includes(String(u.email || '').toLowerCase());
 export const trackerRole = (u) => {
   if (u.founder) return 'founder';
+  if (isNamedApprover(u) && u.track_role !== 'founder') return 'manager'; // approvers are always on the manager side, whatever role was picked for them
   if (ROLES.includes(u.track_role)) return u.track_role;
-  const base = { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource';
-  return base !== 'manager' && isNamedApprover(u) ? 'manager' : base;
+  return { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource';
 };
 // Main admins (founder, manager) and project managers are all admins; only the main admins are "leadership".
 const leadership = (u) => ['founder', 'manager'].includes(trackerRole(u));
