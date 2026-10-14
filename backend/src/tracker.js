@@ -10,7 +10,16 @@ const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are dat
 const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
 /** Tracker role: founder | manager | pm | resource (derived from the user's role unless set explicitly). */
-export const trackerRole = (u) => (u.founder ? 'founder' : ROLES.includes(u.track_role) ? u.track_role : { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource');
+// A named project approver (the PROJECT_APPROVERS emails, or "Can approve project proposals") is at least a manager, so they get the
+// team pages (People, project approvals) even when their account was not made an admin; an explicit tracker role still wins.
+const approverEmails = () => (process.env.PROJECT_APPROVERS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+const isNamedApprover = (u) => u.approver === true || approverEmails().includes(String(u.email || '').toLowerCase());
+export const trackerRole = (u) => {
+  if (u.founder) return 'founder';
+  if (ROLES.includes(u.track_role)) return u.track_role;
+  const base = { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource';
+  return base !== 'manager' && isNamedApprover(u) ? 'manager' : base;
+};
 // Main admins (founder, manager) and project managers are all admins; only the main admins are "leadership".
 const leadership = (u) => ['founder', 'manager'].includes(trackerRole(u));
 const lead = (u) => leadership(u) || trackerRole(u) === 'pm';
@@ -19,8 +28,6 @@ const TITLES = { founder: 'Founder', manager: 'Manager', pm: 'Project Manager', 
 
 // Who approves project proposals: people flagged `approver` and the emails in PROJECT_APPROVERS (comma separated). Nobody else.
 // If nobody qualifies yet, every manager can, so approvals never get stuck.
-const approverEmails = () => (process.env.PROJECT_APPROVERS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-const isNamedApprover = (u) => u.approver === true || approverEmails().includes(String(u.email || '').toLowerCase());
 export const approvers = (users) => {
   const named = users.filter(isNamedApprover);
   return named.length ? named : users.filter(leadership);
