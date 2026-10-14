@@ -129,8 +129,8 @@ export const useStore = create()(
         if (!(draft.qty > 0)) throw new Error("Quantity must be at least 1.");
         if (!(draft.targetMinutes > 0)) throw new Error("Target time must be at least 1 minute.");
         const project = requireProject(draft.projectId);
-        // the owner or an admin of the project assigns its tasks; a resource on the project may hand tasks to anyone too
-        if (!canManageProject(project, me) && !(roleOf(me) === "resource" && project.teamIds.includes(me)))
+        // the owner, an admin or anyone on the project's team assigns its tasks
+        if (!canManageProject(project, me) && !project.teamIds.includes(me))
           throw new Error(`Only people on ${project.name} can assign its tasks.`);
         if (project.status !== "active")
           throw new Error(`${project.name} is still waiting for approval.`);

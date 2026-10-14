@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Se as useStore, Qe as PEOPLE, xn as isManagerRole, $e as dayKey, be as firstName } from '@/internal/min';
 import { useTheme } from '@/internal/ui/theme';
+import { QUOTES, QUOTE_KIND_LABELS } from '@/internal/ui/quotes';
 import { SARCASTIC_QUIPS, MOTIVATION_LINES } from '@/internal/ui/mascotLines';
 
 /** Knight mascot that gives sarcastic quips and real motivation (original: `SU`). */
@@ -68,11 +69,14 @@ export function Mascot() {
 
   const nextLine = () => {
     const c = counters.current;
-    const motivational = c.said % 2 === 1;
+    const slot = c.said % 4;
     c.said += 1;
-    return motivational
-      ? { kind: 'motivation', text: boosts[c.boost++ % boosts.length] }
-      : { kind: 'sarcastic', text: quips[c.quip++ % quips.length] };
+    if (slot === 3)
+      return c.quip++ % 2 === 0
+        ? { kind: 'sarcastic', text: quips[Math.floor(c.quip / 2) % quips.length] }
+        : { kind: 'motivation', text: boosts[c.boost++ % boosts.length] };
+    const q = QUOTES[(Math.floor(Math.random() * QUOTES.length) + c.said * 7) % QUOTES.length];
+    return { kind: q.kind, text: q.text, by: q.by };
   };
   const speak = () => {
     setTick((n) => n + 1);
@@ -97,7 +101,7 @@ export function Mascot() {
   return (
     <div className="pointer-events-none fixed bottom-4 left-[84px] z-30 flex items-end gap-2 sm:left-[92px]">
       <button
-        aria-label="Mascot: click for a sarcastic quip or some motivation"
+        aria-label="Mascot: click for a quote, a life lesson or some motivation"
         data-testid="mascot"
         onClick={speak}
         className="focus-ring ls-bob pointer-events-auto shrink-0 rounded-full"
@@ -117,9 +121,16 @@ export function Mascot() {
           className="ls-pop pointer-events-auto relative mb-10 max-w-[min(20rem,calc(100vw-12rem))] rounded-2xl border-2 border-ink bg-surface px-4 py-3 text-sm font-semibold shadow-lift sm:mb-14"
         >
           <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-muted">
-            {line.kind === 'motivation' ? 'Real talk' : 'Sarcasm mode'}
+            {line.by ? QUOTE_KIND_LABELS[line.kind] : line.kind === 'motivation' ? 'Real talk' : 'Sarcasm mode'}
           </span>
-          {line.text}
+          {line.by ? (
+            <>
+              <span className="italic">“{line.text}”</span>
+              <span className="mt-1 block text-xs font-bold text-accent-ink">{line.by}</span>
+            </>
+          ) : (
+            line.text
+          )}
           <button
             aria-label="Dismiss"
             className="absolute -right-2 -top-2 rounded-full border border-line bg-surface p-0.5"

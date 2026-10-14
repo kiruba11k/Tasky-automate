@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Check, MessageSquare, Forward, Star } from 'lucide-react';
+import { Check, CheckCheck, MessageSquare, Forward, Star, Repeat } from 'lucide-react';
 import {
   Se as useStore,
   qe as Badge,
   Te as Button,
   vt as Avatar,
+  Ya as Modal,
   Ge as inputClass,
+  oe as cx,
   We as formatMinutes,
   be as firstName,
   lt as runAction,
@@ -22,9 +24,12 @@ import { sortedHistory } from './historyMeta';
 
 /** A submitted task waiting for my review: approve, send feedback, or forward. */
 export function ReviewRow({ task, projectName }) {
-  const { approve, sendBack, forwardReview } = useStore();
+  const { approve, approvePart, sendBack, forwardReview } = useStore();
   const forwardTargets = useReviewerOptions(task.projectId).filter((o) => o.id !== task.assigneeId);
   const [panel, setPanel] = useState(null);
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [approveMode, setApproveMode] = useState('all');
+  const [partQty, setPartQty] = useState('');
   const [note, setNote] = useState('');
   const [forwardTo, setForwardTo] = useState(forwardTargets[0]?.id ?? '');
   const history = sortedHistory(task);
@@ -68,12 +73,19 @@ export function ReviewRow({ task, projectName }) {
         </div>
         <OnTimeBadge task={task} />
         <Button
-          onClick={() =>
-            runAction(() => {
-              approve(task.id);
-              showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
-            })
-          }
+          onClick={() => {
+            if (task.adhoc || task.qty <= 1) {
+              runAction(() => {
+                approve(task.id);
+                showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
+              });
+              return;
+            }
+            setPartQty('');
+            setNote('');
+            setApproveMode('all');
+            setApproveOpen(true);
+          }}
         >
           <Check size={13} /> Approve
         </Button>
@@ -115,6 +127,103 @@ export function ReviewRow({ task, projectName }) {
           <Button type="submit">Send</Button>
         </form>
       )}
+      <Modal open={approveOpen} onClose={() => setApproveOpen(false)} title="Approve" description={task.title} size="sm">
+        <div className="space-y-3" data-testid="approve-choice">
+          <button
+            className={cx(
+              'focus-ring w-full rounded-xl border-2 p-3 text-left transition',
+              approveMode === 'all' ? 'border-accent bg-accent-soft/40' : 'border-line hover:border-accent/50',
+            )}
+            onClick={() => setApproveMode('all')}
+          >
+            <p className="flex items-center gap-2 font-semibold">
+              <CheckCheck size={15} className="text-mint-ink" /> Approve all {task.doneQty ?? task.qty} {task.unit}
+            </p>
+            <p className="text-xs text-muted">Everything submitted is good.</p>
+          </button>
+          <button
+            className={cx(
+              'focus-ring w-full rounded-xl border-2 p-3 text-left transition',
+              approveMode === 'part' ? 'border-accent bg-accent-soft/40' : 'border-line hover:border-accent/50',
+            )}
+            onClick={() => setApproveMode('part')}
+          >
+            <p className="flex items-center gap-2 font-semibold">
+              <Repeat size={15} className="text-butter-ink" /> Approve part
+            </p>
+            <p className="text-xs text-muted">Approve some, send the rest back for rework.</p>
+          </button>
+          {approveMode === 'part' && (
+            <div className="space-y-2 rounded-xl bg-surface-2/60 p-3" data-testid="approve-part">
+              <label className="block text-xs font-semibold text-muted">
+                Approve how many?
+                <span className="mt-1 flex items-center gap-1.5">
+                  <input
+                    aria-label="Approved quantity"
+                    type="number"
+                    min={1}
+                    max={task.qty - 1}
+                    autoFocus
+                    className={cx(inputClass, 'w-24 text-right')}
+                    value={partQty}
+                    onChange={(e) => setPartQty(e.target.value)}
+                    placeholder={String(Math.floor(task.qty / 2))}
+                  />
+                  <span className="text-sm text-ink">
+                    of {task.qty} {task.unit}
+                  </span>
+                </span>
+              </label>
+              <label className="block text-xs font-semibold text-muted">
+                What needs rework for the rest?
+                <input
+                  aria-label="Rework note"
+                  className={cx(inputClass, 'mt-1')}
+                  placeholder="e.g. Wrong persona on 10 of them, redo with the CFO angle"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </label>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button tone="ghost" onClick={() => setApproveOpen(false)}>
+              Cancel
+            </Button>
+            {approveMode === 'all' ? (
+              <Button
+                onClick={() => {
+                  if (runAction(() => approve(task.id))) {
+                    setApproveOpen(false);
+                    showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
+                  }
+                }}
+              >
+                <Check size={13} /> Approve all
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  const count = Math.round(+partQty);
+                  if (runAction(() => approvePart(task.id, count, note))) {
+                    setApproveOpen(false);
+                    setNote('');
+                    showToast({
+                      title: `Approved ${count}, ${task.qty - count} sent back to ${firstName(task.assigneeId)}`,
+                      tone: 'success',
+                    });
+                  }
+                }}
+              >
+                <Check size={13} />{' '}
+                {+partQty > 0 && +partQty < task.qty
+                  ? `Approve ${Math.round(+partQty)}, send back ${task.qty - Math.round(+partQty)}`
+                  : 'Approve part'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
       {panel === 'forward' && (
         <form
           className="mt-2 sm:ml-10 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"

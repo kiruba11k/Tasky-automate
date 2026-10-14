@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Star, RotateCcwClock } from 'lucide-react';
+import { Send, Star, RotateCcwClock, Repeat } from 'lucide-react';
 import {
   Se as useStore,
   qe as Badge,
@@ -65,6 +65,11 @@ export function TaskRow({ task }) {
               </Badge>
             )}
             {task.reminders > 0 && task.status !== 'done' && <Badge tone="peach">⏰ Reminded</Badge>}
+            {task.reworkOf && task.status !== 'done' && (
+              <Badge tone="butter">
+                <Repeat size={11} /> Rework of a part-approved task
+              </Badge>
+            )}
             <ResubmitBadge task={task} />
           </p>
           <p className="text-xs text-muted">

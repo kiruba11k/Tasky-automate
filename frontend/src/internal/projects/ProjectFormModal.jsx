@@ -1,6 +1,6 @@
 import { isAdminTier, isApprover, approverNames } from '@/internal/lib/constants';
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarRange, Crown, ArrowRightLeft, Plus, ShieldCheck, Trash, X } from 'lucide-react';
+import { Crown, ArrowRightLeft, Plus, ShieldCheck, Trash, X } from 'lucide-react';
 import {
   Se as useStore,
   oe as clsx,
@@ -9,8 +9,6 @@ import {
   vt as Avatar,
   Wo as roleOf,
   $e as dayKey,
-  Mt as weekStart,
-  yt as formatDate,
   Dw as projectWeeks,
   Rw as DEFAULT_STANDARDS,
   cf as METRICS,
@@ -67,11 +65,9 @@ export function ProjectFormModal({ open, onClose, edit }) {
   const [admins, setAdmins] = useState([]);
   const [handoverTo, setHandoverTo] = useState('');
   const [handoverMode, setHandoverMode] = useState(null);
-  const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [focusId, setFocusId] = useState('');
   const [defaultTargets, setDefaultTargets] = useState({});
   const [weekPlans, setWeekPlans] = useState({});
-  const [, setPlanWeek] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -79,7 +75,6 @@ export function ProjectFormModal({ open, onClose, edit }) {
       setError('');
       setHandoverMode(null);
       setHandoverTo('');
-      setShowAllWeeks(false);
       setNewTask(EMPTY_TASK);
       setFocusId('');
       if (edit) {
@@ -110,7 +105,6 @@ export function ProjectFormModal({ open, onClose, edit }) {
     }
   }, [open, edit]);
 
-  const today = dayKey(0);
   const weeks = useMemo(
     () =>
       startDate && endDate && endDate >= startDate
@@ -118,12 +112,10 @@ export function ProjectFormModal({ open, onClose, edit }) {
         : [],
     [startDate, endDate],
   );
-  const visibleWeeks = showAllWeeks || weeks.length <= 9 ? weeks : weeks.slice(0, 8);
 
   const resetForm = () => {
     setDefaultTargets({});
     setWeekPlans({});
-    setPlanWeek('');
     setName('');
     setClient('');
     setDescription('');
@@ -385,61 +377,6 @@ export function ProjectFormModal({ open, onClose, edit }) {
           />
         </label>
       </div>
-
-      <FormSection
-        icon={<CalendarRange size={15} className="text-accent" />}
-        title="Project weeks"
-        hint={
-          weeks.length
-            ? 'Split automatically into 7-day weeks from the start date to the end date. Weekly targets are planned in Tasks update, under Weekly targets.'
-            : undefined
-        }
-      >
-        {weeks.length === 0 ? (
-          <p className="text-xs font-semibold text-coral-ink">
-            Pick a start date and an end date after it to see the weeks.
-          </p>
-        ) : (
-          <>
-            <p className="mb-2 text-xs text-muted">
-              <b className="text-ink">
-                {weeks.length} week{weeks.length === 1 ? '' : 's'}
-              </b>
-              {' from '}
-              {formatDate(weeks[0].start)}
-              {' to '}
-              {formatDate(weeks[weeks.length - 1].end)}
-            </p>
-            <ul className="flex flex-wrap gap-1.5" aria-label="Week preview">
-              {visibleWeeks.map((w) => (
-                <li
-                  key={w.start}
-                  className={clsx(
-                    'rounded-lg border px-2 py-1 text-xs',
-                    w.start <= today && today <= w.end
-                      ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
-                      : 'border-line bg-surface text-ink',
-                  )}
-                >
-                  {w.label}
-                  {w.start <= today && today <= w.end ? ' (this week)' : w.start === weekStart(1) ? ' (next week)' : ''}
-                </li>
-              ))}
-              {weeks.length > 9 && (
-                <li>
-                  <button
-                    type="button"
-                    className="focus-ring rounded-lg px-2 py-1 text-xs font-semibold text-accent-ink hover:bg-surface"
-                    onClick={() => setShowAllWeeks((v) => !v)}
-                  >
-                    {showAllWeeks ? 'Show fewer' : `+ ${weeks.length - 8} more weeks`}
-                  </button>
-                </li>
-              )}
-            </ul>
-          </>
-        )}
-      </FormSection>
 
       <FormSection
         icon={<span>⏱️</span>}

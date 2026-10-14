@@ -100,3 +100,41 @@ export function plannedWeekTargets(project, weekly, projectWeekStartKey) {
   });
   return out;
 }
+
+/** Identity of a row across days: the same project, task, custom name and kind of target add up in the week's table. */
+export const rowKey = (row) => `${row.projectId}|${row.task}|${(row.custom ?? "").trim().toLowerCase()}|${row.kind ?? "number"}`;
+
+/**
+ * The rows of a person's "Weekly update": every row of the week's Monday to Friday day tables plus the rows added to the week
+ * itself, with the same work added up into one row (targets, achieved, estimated and taken time, latest status / text, notes
+ * joined). `overrides` are numbers or statuses typed over the sums in the week table, by `rowKey`.
+ */
+export function weekRows(personId, monday, daily, weekEntries = [], overrides = {}) {
+  const all = [...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i))), ...weekEntries];
+  const merged = new Map();
+  all.forEach((row) => {
+    const key = rowKey(row);
+    const sum = merged.get(key);
+    if (!sum) {
+      merged.set(key, { ...row, id: `wk-${key}`, remarks: row.remarks ?? "" });
+      return;
+    }
+    sum.qty = row.qty != null || sum.qty != null ? (sum.qty ?? 0) + (row.qty ?? 0) : undefined;
+    sum.doneQty = row.doneQty != null || sum.doneQty != null ? (sum.doneQty ?? 0) + (row.doneQty ?? 0) : undefined;
+    sum.estMin += row.estMin;
+    sum.actualMin = row.actualMin != null || sum.actualMin != null ? (sum.actualMin ?? 0) + (row.actualMin ?? 0) : undefined;
+    if (row.targetText) sum.targetText = row.targetText;
+    if (row.actualText) sum.actualText = row.actualText;
+    if (row.status) sum.status = row.status;
+    if (!sum.desc && row.desc) sum.desc = row.desc;
+    if (row.remarks && !sum.remarks.includes(row.remarks)) sum.remarks = sum.remarks ? `${sum.remarks}; ${row.remarks}` : row.remarks;
+  });
+  merged.forEach((sum, key) => {
+    const typed = overrides[key];
+    if (typed?.qty != null) sum.qty = typed.qty;
+    if (typed?.doneQty != null) sum.doneQty = typed.doneQty;
+    if (typed?.status) sum.status = typed.status;
+    if (typed?.actualText != null) sum.actualText = typed.actualText;
+  });
+  return [...merged.values()];
+}

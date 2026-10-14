@@ -1,242 +1,255 @@
-import React, { useState } from 'react';
-import { Pencil, Lock, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Pencil, Lock } from 'lucide-react';
 import {
   Se as useStore,
-  oe as clsx,
   Te as Button,
   qe as Badge,
-  Yw as ProgressBar,
-  Gw as progressTone,
   AR as countWeek,
-  bV as weekDays,
-  HV as endOfDayStatus,
-  ea as canEditProject,
-  df as weekTargetFor,
   tc as tracksPeriod,
   Mt as weekStart,
-  $e as dayKey,
-  be as firstName,
   lt as attempt,
   Ye as toast,
 } from '@/internal/min';
-import { savedWeekPlan, projectWeekStart } from '@/internal/lib/domain';
-import { plannedWeekTargets } from '@/internal/lib/entries';
-import { formatClock, BIG_NUMBER_INPUT_CLASS } from './projectHelpers';
+import { ProgressBar } from '../ui/ProgressBar';
+import { weekTargetFor } from '@/internal/lib/domain';
+import { formatDayMonth, todayKey } from '@/internal/lib/dates';
+import { TABLE_INPUT_CLASS, MILESTONE_STATUSES, sortedWeeks, targetKind } from './targetKinds';
 
-/** "This week's numbers" tab: locked read-only totals with an Edit mode for corrections. */
-export function WeekNumbers({ p, canEdit }) {
-  const { tasks, daily, weekly, setWeekValues, finalizeDay } = useStore();
-  const week = weekStart(0);
-  const today = dayKey(0);
-  const { counts, auto } = countWeek(p, tasks, daily, { kind: 'week', key: week });
-  const me = useStore((s) => s.me);
-  const isDraft = !savedWeekPlan(p, week) && !p.weekLocked;
-  const teamPlanned = isDraft && Object.keys(plannedWeekTargets(p, weekly, projectWeekStart(p, week))).length > 0;
-  const targets = isDraft && !canEditProject(p, me) && !teamPlanned ? undefined : weekTargetFor(p, week, weekly);
-  const endOfDaySentCount = (date) =>
-    p.teamIds.filter((id) => !!daily[`${id}|${date}`]?.eodAt).length;
-  const days = weekDays(p, week);
-  const eod = endOfDayStatus(p, { daily }, today);
-  const metrics = p.metrics.filter((m) => tracksPeriod(m, 'week'));
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({});
-  const [error, setError] = useState('');
-  const finalizedCount = days.filter((d) => d.finalized).length;
+const ACHIEVED_INPUT_CLASS =
+  'focus-ring w-24 rounded-lg border border-line bg-surface px-2 py-1 text-right text-sm tabular-nums text-ink';
 
-  const startEditing = () => {
-    setDraft(Object.fromEntries(metrics.map((m) => [m.id, String(counts[m.id] ?? 0)])));
-    setError('');
-    setEditing(true);
-  };
+const STATUS_TONES = { Completed: 'mint', Blocked: 'coral', 'In progress': 'sky' };
 
-  const save = () => {
-    const changes = {};
-    for (const m of metrics) {
-      const raw = (draft[m.id] ?? '').trim();
-      const value = raw === '' ? 0 : Number(raw);
-      const autoCounted = auto[m.id] ?? 0;
-      if (!Number.isFinite(value) || value < 0) return setError(`${m.label}: type a number of zero or more.`);
-      if (value < autoCounted)
-        return setError(
-          `${m.label} can't be lower than the ${autoCounted} already counted from submitted tasks and end-of-day updates.`,
-        );
-      Math.round(value) !== (counts[m.id] ?? 0) && (changes[m.id] = Math.round(value) - autoCounted);
-    }
-    attempt(() => {
-      Object.keys(changes).length && setWeekValues(p.id, changes);
-      finalizeDay(p.id, today);
-    }, setError) &&
-      (setEditing(false),
-      toast({
-        title: Object.keys(changes).length
-          ? "This week's numbers saved and today finalised"
-          : 'No changes, today is finalised',
-        tone: 'success',
-      }));
-  };
-
+/** Goal / achieved bar of one row. */
+function AchievedBar({ value, goal }) {
   return (
-    <div className="space-y-4" data-testid="week-numbers">
-      <div
-        className={clsx(
-          'flex flex-wrap items-center gap-3 rounded-2xl border-2 p-3',
-          editing ? 'border-butter-strong/70 bg-butter/25' : 'border-line bg-surface-2',
-        )}
-      >
-        <span
-          className={clsx(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-            editing ? 'bg-butter text-butter-ink' : 'bg-surface text-ink shadow-soft',
-          )}
+    <span className="flex items-center gap-2">
+      <ProgressBar value={value} max={goal} tone={goal && value >= goal ? 'mint' : 'sky'} />
+      <span className="w-10 text-right text-xs tabular-nums text-muted">
+        {goal ? `${Math.round((value / goal) * 100)}%` : ''}
+      </span>
+    </span>
+  );
+}
+
+/** "This week's numbers" tab: pick a week, fill in what was achieved against each goal, Save or Lock. */
+function WeekNumbersTable({ p, canEdit, auto }) {
+  const saveWeekActuals = useStore((s) => s.saveWeekActuals);
+  const weeks = sortedWeeks(p);
+  const today = todayKey(0);
+  const initial = (weeks.find((w) => w.start <= today && today <= w.end) ?? weeks[weeks.length - 1])?.start;
+  const [selected, setSelected] = useState(initial);
+  const index = weeks.findIndex((w) => w.start === selected);
+  const week = weeks[index];
+  const isThisWeek = !!week && week.start <= today && today <= week.end;
+  const off = (week && p.weekOff?.[week.start]) || [];
+  const metrics = p.metrics.filter((m) => tracksPeriod(m, 'week') && !off.includes(m.id));
+  const goals = week ? weekTargetFor(p, week.start) : {};
+  const actuals = (week && p.weekActuals?.[week.start]) || {};
+  const textRows = (week && p.weekText?.[week.start]) || [];
+  const lockedAt = week ? p.weekDoneAt?.[week.start] : undefined;
+  const [draft, setDraft] = useState(null);
+  useEffect(() => {
+    setDraft(null);
+  }, [selected]);
+  const editable = canEdit && (!!draft || !lockedAt);
+  const startValue = (id) => String(actuals[id] ?? (isThisWeek ? (auto[id] ?? 0) : 0));
+  const current = draft ?? {
+    m: Object.fromEntries(metrics.map((m) => [m.id, startValue(m.id)])),
+    rows: textRows.map((r) => ({ ...r })),
+  };
+  const patch = (changes) => setDraft({ ...current, ...changes });
+  const patchRow = (id, changes) =>
+    patch({ rows: current.rows.map((r) => (r.id === id ? { ...r, ...changes } : r)) });
+
+  const save = (lock) => {
+    if (!week) return;
+    const numbers = {};
+    metrics.forEach((m) => {
+      numbers[m.id] = Math.max(0, Math.round(+current.m[m.id] || 0));
+    });
+    attempt(() => saveWeekActuals(p.id, week.start, numbers, current.rows, lock)) &&
+      (setDraft(null), toast({ title: lock ? `Week ${index + 1} numbers locked 🔒` : 'Saved', tone: 'success' }));
+  };
+
+  if (!weeks.length)
+    return (
+      <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
+        No weeks set yet. Add weeks and their targets in the Targets tab first.
+      </p>
+    );
+  return (
+    <div className="space-y-4" data-testid="week-numbers-simple">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Week"
+          className="focus-ring rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
         >
-          {editing ? <Pencil size={18} /> : <Lock size={18} />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 font-bold">
-            <span>{editing ? "Editing this week's numbers" : 'Locked'}</span>
-            {!editing && <Badge tone="mint">Read-only</Badge>}
-          </p>
-          <p className="text-xs text-muted">
-            {editing
-              ? "Type the correct totals, then Save. Saving finalises today's numbers again."
-              : 'Filled in automatically from submitted tasks and end-of-day updates, and locked (auto-filled ones too). Each day finalises when end-of-day updates are sent.'}
-          </p>
-        </div>
-        {canEdit &&
-          (editing ? (
-            <div className="flex gap-2">
-              <Button
-                tone="ghost"
-                className="border border-line bg-surface"
-                onClick={() => {
-                  setEditing(false);
-                  setError('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={save}>
-                <Check size={14} /> Save and finalise
-              </Button>
-            </div>
-          ) : (
-            <Button tone="ghost" className="border border-line bg-surface text-ink" onClick={startEditing}>
+          {weeks.map((w, i) => (
+            <option key={w.start} value={w.start}>
+              Week {i + 1} · {formatDayMonth(w.start)} to {formatDayMonth(w.end)}
+              {w.start <= today && today <= w.end ? ' (this week)' : ''}
+            </option>
+          ))}
+        </select>
+        {lockedAt && !draft ? (
+          <Badge tone="mint">
+            <Lock size={11} /> Locked{' '}
+            {new Date(lockedAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
+          </Badge>
+        ) : (
+          <Badge tone="butter">
+            <Pencil size={11} /> Open
+          </Badge>
+        )}
+        <span className="ml-auto flex gap-2">
+          {canEdit && lockedAt && !draft && (
+            <Button
+              tone="ghost"
+              className="border border-line"
+              onClick={() =>
+                setDraft({
+                  m: Object.fromEntries(metrics.map((m) => [m.id, startValue(m.id)])),
+                  rows: textRows.map((r) => ({ ...r })),
+                })
+              }
+            >
               <Pencil size={13} /> Edit
             </Button>
-          ))}
+          )}
+          {editable && (
+            <>
+              <Button tone="ghost" className="border border-line" onClick={() => save(false)}>
+                Save
+              </Button>
+              <Button onClick={() => save(true)}>
+                <Lock size={13} /> Lock
+              </Button>
+            </>
+          )}
+        </span>
       </div>
-      {error && (
-        <p role="alert" className="text-sm font-semibold text-coral-ink">
-          {error}
+      {metrics.length + current.rows.length === 0 ? (
+        <p className="text-sm text-muted">No targets for this week. Set them in the Targets tab.</p>
+      ) : (
+        <table className="w-full text-sm" aria-label="This week's numbers">
+          <thead>
+            <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <th className="py-1.5">Target</th>
+              <th className="py-1.5">Goal</th>
+              <th className="py-1.5">Achieved</th>
+              <th className="w-40 py-1.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.map((m) => {
+              const goal = goals[m.id] ?? 0;
+              const value = +current.m[m.id] || 0;
+              return (
+                <tr key={m.id} className="border-b border-line/70" data-number-row={m.label}>
+                  <td className="py-2 font-medium">{m.label}</td>
+                  <td className="py-2 tabular-nums text-muted">{goal}</td>
+                  <td className="py-2">
+                    {editable ? (
+                      <input
+                        aria-label={`${m.label} achieved`}
+                        type="number"
+                        min={0}
+                        className={ACHIEVED_INPUT_CLASS}
+                        value={current.m[m.id] ?? ''}
+                        onChange={(e) => patch({ m: { ...current.m, [m.id]: e.target.value } })}
+                      />
+                    ) : (
+                      <b className="tabular-nums">{value}</b>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    <AchievedBar value={value} goal={goal} />
+                  </td>
+                </tr>
+              );
+            })}
+            {current.rows.map((r) => {
+              const kind = targetKind(r);
+              return (
+                <tr key={r.id} className="border-b border-line/70" data-text-target={r.id}>
+                  <td className="py-2 font-medium">{r.label}</td>
+                  <td className="py-2 text-muted">
+                    {kind === 'number' ? <span className="tabular-nums">{r.targetNum ?? 0}</span> : r.target || '·'}
+                  </td>
+                  <td className="py-2" colSpan={kind === 'number' ? 1 : 2}>
+                    {kind === 'number' ? (
+                      editable ? (
+                        <input
+                          aria-label={`${r.label} achieved`}
+                          type="number"
+                          min={0}
+                          className={ACHIEVED_INPUT_CLASS}
+                          value={r.actualNum ?? ''}
+                          onChange={(e) =>
+                            patchRow(r.id, {
+                              actualNum: e.target.value === '' ? undefined : Math.max(0, Math.round(+e.target.value)),
+                            })
+                          }
+                        />
+                      ) : (
+                        <b className="tabular-nums">{r.actualNum ?? 0}</b>
+                      )
+                    ) : kind === 'milestone' ? (
+                      editable ? (
+                        <select
+                          aria-label={`${r.label} status`}
+                          className="focus-ring rounded-lg border border-line bg-surface px-2 py-1 text-sm"
+                          value={r.status ?? 'Not started'}
+                          onChange={(e) => patchRow(r.id, { status: e.target.value })}
+                        >
+                          {MILESTONE_STATUSES.map((s) => (
+                            <option key={s}>{s}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Badge tone={STATUS_TONES[r.status] ?? 'grey'}>{r.status ?? 'Not started'}</Badge>
+                      )
+                    ) : editable ? (
+                      <input
+                        aria-label={`${r.label} achieved`}
+                        className={TABLE_INPUT_CLASS}
+                        value={r.actual ?? ''}
+                        placeholder="What happened"
+                        onChange={(e) => patchRow(r.id, { actual: e.target.value })}
+                      />
+                    ) : (
+                      <span>{r.actual || '·'}</span>
+                    )}
+                  </td>
+                  {kind === 'number' && (
+                    <td className="py-2">
+                      <AchievedBar value={r.actualNum ?? 0} goal={r.targetNum ?? 0} />
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      {editable && isThisWeek && (
+        <p className="text-xs text-muted">
+          Numbers start from what the team's daily updates and submitted tasks counted this week. Change anything, then
+          Lock.
         </p>
       )}
-      <div>
-        {isDraft && targets && (
-          <p className="mb-2">
-            <Badge tone={teamPlanned ? 'sky' : 'butter'}>{teamPlanned ? "Targets from the team's weekly plans" : 'Draft target'}</Badge>
-          </p>
-        )}
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
-          Finalised days this week · {finalizedCount} of 5
-        </p>
-        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Finalised days">
-          {days.map((d) => {
-            const isToday = d.date === today;
-            const isFuture = d.date > today;
-            return (
-              <li
-                key={d.date}
-                data-finalized={d.finalized ? 'yes' : 'no'}
-                className={clsx(
-                  'rounded-xl border px-3 py-2 text-sm',
-                  d.finalized
-                    ? 'border-mint-strong/50 bg-mint/30'
-                    : isToday
-                      ? 'border-butter-strong/60 bg-butter/25'
-                      : 'border-line bg-surface',
-                )}
-              >
-                <p className="flex items-center justify-between font-semibold">
-                  {isToday ? `Today, ${d.label}` : d.label}
-                  {d.finalized && <Check size={14} className="text-mint-ink" />}
-                </p>
-                <p className={clsx('text-xs', d.finalized ? 'text-mint-ink' : 'text-muted')}>
-                  {d.finalized
-                    ? `Finalised ${formatClock(d.at)}`
-                    : isFuture
-                      ? 'Upcoming'
-                      : endOfDaySentCount(d.date) > 0 && p.teamIds.length > 0
-                        ? `Partly finalised ${endOfDaySentCount(d.date)} of ${p.teamIds.length}`
-                        : isToday
-                          ? 'Waiting for end of day'
-                          : 'Not finalised'}
-                </p>
-              </li>
-            );
-          })}
-        </ol>
-        {p.teamIds.length > 0 && (
-          <p className="mt-2 text-xs text-muted">
-            End of day sent today:{' '}
-            {eod.sent.length ? <b className="text-ink">{eod.sent.map(firstName).join(', ')}</b> : 'nobody yet'}
-            {eod.pending.length > 0 && <> · waiting on {eod.pending.map(firstName).join(', ')}</>}
-          </p>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-        {metrics.map((m) => {
-          const autoCounted = auto[m.id] ?? 0;
-          const count = counts[m.id] ?? 0;
-          const target = targets?.[m.id];
-          const pct = target ? Math.round((count / target) * 100) : null;
-          return (
-            <div
-              key={m.id}
-              data-metric={m.label}
-              className={clsx(
-                'rounded-2xl border p-3',
-                editing ? 'border-accent/50 bg-surface' : 'border-line bg-surface-2/60',
-              )}
-            >
-              <p
-                className="flex items-center gap-1 truncate text-[11px] font-bold uppercase tracking-wide text-muted"
-                title={m.label}
-              >
-                {!editing && <Lock size={10} className="shrink-0" />}
-                {m.label}
-              </p>
-              <div className="mt-1 flex items-baseline gap-1">
-                {editing ? (
-                  <input
-                    type="number"
-                    min={autoCounted}
-                    inputMode="numeric"
-                    aria-label={`${m.label} this week`}
-                    className={clsx(BIG_NUMBER_INPUT_CLASS, 'w-24')}
-                    value={draft[m.id] ?? ''}
-                    onChange={(e) => setDraft({ ...draft, [m.id]: e.target.value })}
-                  />
-                ) : (
-                  <span className="text-2xl font-extrabold tabular-nums" aria-label={`${m.label} this week`}>
-                    {count}
-                  </span>
-                )}
-                {target ? <span className="text-sm text-muted">/ {target}</span> : null}
-              </div>
-              {!editing && target ? (
-                <ProgressBar className="mt-2 h-1.5" pct={pct ?? 0} tone={progressTone(pct)} />
-              ) : null}
-              {autoCounted > 0 && (
-                <p className="mt-1 text-[10px] text-accent-ink">
-                  {autoCounted} auto-counted{editing ? ' (minimum)' : ''}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
+}
+
+/** Week numbers tab (project `p`; `canEdit` lets managers fill in and lock a week). */
+export function WeekNumbers({ p, canEdit }) {
+  const { tasks, daily } = useStore();
+  const { counts } = countWeek(p, tasks, daily, { kind: 'week', key: weekStart(0) });
+  return <WeekNumbersTable p={p} canEdit={canEdit} auto={counts} />;
 }
 
 export default WeekNumbers;

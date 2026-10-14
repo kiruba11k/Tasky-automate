@@ -20,6 +20,7 @@ import {
 } from '@/internal/min';
 import { BADGE_EMOJIS, ACCENT_OPTIONS, readProfilePhoto } from './profileData';
 import { MyProgress } from './MyProgress';
+import { LeaveSection } from './LeaveSection';
 
 /** Profile page (route "/profile"). (Ale) */
 export function Profile() {
@@ -65,6 +66,7 @@ export function Profile() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Profile</h1>
+      <LeaveSection personId={me} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <Card>
           <CardTitle>You</CardTitle>

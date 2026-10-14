@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LUNCH_BLOCK } from '../lib/dates';
 import { Se as useStore, ac as useTheme, Tr as PROJECT_COLORS, We as formatMinutes } from '@/internal/min';
 
 /** Day runs 10:00 to 19:00, expressed in minutes. */
@@ -14,8 +15,9 @@ export const projectColor = (projects, projectId) =>
   PROJECT_COLORS[Math.max(0, projects.findIndex((p) => p.id === projectId)) % PROJECT_COLORS.length];
 
 /** Horizontal 10am-7pm strip with the planned time blocks, lunch and a live "now" marker. */
-export function DayPlanStrip({ blocks, loggedMinutes, extra = [], lunch = { start: '13:00', end: '14:00' } }) {
+export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
   const projects = useStore((s) => s.projects);
+  const lunch = useStore((s) => s.profiles[s.me]?.lunch) ?? LUNCH_BLOCK; // the lunch set on my profile
   const theme = useTheme();
   const blockStyle = (color) =>
     theme.blocks === 'striped'
@@ -55,7 +57,7 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [], lunch = { star
             width: `${((timeToMinutes(lunch.end) - timeToMinutes(lunch.start)) / span) * 100}%`,
             backgroundImage: 'repeating-linear-gradient(135deg, rgb(0 0 0 / 0.04) 0 6px, transparent 6px 12px)',
           }}
-          title={`Lunch ${formatClockLabel(timeToMinutes(lunch.start))} to ${formatClockLabel(timeToMinutes(lunch.end))}`}
+          title={`Lunch ${lunch.start} to ${lunch.end}`}
         >
           🍽 Lunch
         </div>
@@ -81,7 +83,9 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [], lunch = { star
               }}
               title={`${b.start} to ${b.end} · ${b.custom ? b.custom.title : project?.name}`}
             >
-              {b.custom ? `${b.custom.priority ? '★ ' : ''}${b.custom.title}` : project?.client}
+              {b.custom
+                ? `${b.custom.priority ? '★ ' : ''}${b.custom.title}`
+                : (project?.client ?? b.projectId.replace('other:', ''))}
               {' · '}
               {b.start}
               {' to '}

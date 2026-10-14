@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Se as useStore } from '@/internal/min';
+import { useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
   rt as Card,
@@ -28,13 +29,12 @@ import {
   nk as GranularityTabs,
   rk as KpiTabs,
   ik as PeriodPicker,
-  ak as TimeBreakdown,
-  ok as AssignVsStandard,
+  $e as dayKey,
 } from '@/internal/min';
 import { TAG_ORDER, roleOf, titleOf, totalKpis } from './peopleUtils';
-import { PersonDetailModal } from './PersonDetail';
 import { ManagePeople } from './ManagePeople';
 import { Button } from '../ui/Button';
+import { LeaveBadge } from '../ui/LeaveBadge';
 import { PEOPLE } from '../lib/constants';
 
 const WHO_OPTIONS = [
@@ -56,7 +56,8 @@ export function People() {
   });
   const [who, setWho] = useState('all');
   const [sort, setSort] = useState({ col: 'name', dir: 'asc' });
-  const [openPerson, setOpenPerson] = useState(null);
+  const navigate = useNavigate();
+  const openPerson = (id) => navigate(`/people/${id}`);
   const [adding, setAdding] = useState(false);
   const me = useStore((s) => s.me);
   const isMainAdmin = !!PEOPLE.find((p) => p.id === me)?.owner; // the account set in ADMIN_EMAIL
@@ -104,8 +105,6 @@ export function People() {
   }, [allRows, who, sort, kpi]);
   const totals = useMemo(() => totalKpis(rows), [rows]);
   const prevTotals = useMemo(() => totalKpis(rows.map((row) => row.prev)), [rows]);
-  const acknowledge = allRows.filter((row) => row.tag === 'acknowledge');
-  const support = allRows.filter((row) => row.tag === 'support');
   const noun = granularityNoun(gran);
 
   const toggleSort = (col) =>
@@ -141,19 +140,14 @@ export function People() {
     );
   };
 
-  const callouts = [
-    ['acknowledge', acknowledge, 'Top performers this ' + noun],
-    ['support', support, 'May need support or training'],
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">People</h1>
           <p className="text-sm text-muted">
-            Everyone's daily, weekly and monthly progress: who to acknowledge, who needs support, and
-            where the time goes.
+            Everyone at a glance. Click a person to see their daily, weekly and monthly performance, task
+            history and current work.
           </p>
         </div>
         {isMainAdmin && <Button onClick={() => setAdding(true)}>Manage people</Button>}
@@ -175,46 +169,6 @@ export function People() {
           {prevPeriod.title}).
         </p>
       </Card>
-      <div className="grid gap-4 md:grid-cols-2">
-        {callouts.map(([tag, list, hint]) => (
-          <Card
-            key={tag}
-            className={cn(
-              'border-l-4',
-              tag === 'acknowledge' ? 'border-mint-strong' : 'border-coral-strong',
-            )}
-          >
-            <div data-testid={`callout-${tag}`}>
-              <CardTitle right={<span className="text-xs text-muted">{hint}</span>}>
-                {TAG_LABELS[tag]}
-              </CardTitle>
-              {list.length === 0 ? (
-                <p className="text-sm text-muted">Nobody in this {noun}.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {list.map((row) => (
-                    <li key={row.personId}>
-                      <button
-                        type="button"
-                        onClick={() => setOpenPerson(row.personId)}
-                        className="focus-ring flex w-full items-center gap-3 rounded-xl p-1.5 text-left hover:bg-surface-2"
-                      >
-                        <Avatar id={row.personId} size="sm" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold">
-                            {displayName(row.personId)}
-                          </span>
-                          <span className="block text-xs text-muted">{row.tagReason}</span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Card>
-        ))}
-      </div>
       <Card>
         <CardTitle
           right={
@@ -254,7 +208,7 @@ export function People() {
                     key={row.personId}
                     data-person={row.personId}
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
-                    onClick={() => setOpenPerson(row.personId)}
+                    onClick={() => openPerson(row.personId)}
                   >
                     <td className="py-2 pl-1 pr-2">
                       <button
@@ -262,12 +216,13 @@ export function People() {
                         className="focus-ring flex items-center gap-2 rounded-lg text-left"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenPerson(row.personId);
+                          openPerson(row.personId);
                         }}
                       >
                         <Avatar id={row.personId} size="sm" />
                         <span>
-                          <span className="font-semibold">{displayName(row.personId)}</span>
+                          <span className="font-semibold">{displayName(row.personId)}</span>{' '}
+                          <LeaveBadge personId={row.personId} date={dayKey(0)} />
                           <br />
                           <span className="text-xs text-muted">{titleOf(row.personId)}</span>
                         </span>
@@ -335,34 +290,11 @@ export function People() {
           </table>
         </div>
         <p className="mt-3 text-xs text-muted">
-          Click a column to sort, click a person for their profile. Flags compare each person with
+          Click a column to sort, click a person to open their page. Flags compare each person with
           the team in the same {noun}. Hours logged is time recorded on submitted tasks; extra hours
           come from end-of-day updates.
         </p>
       </Card>
-      <Card>
-        <CardTitle
-          right={<span className="text-xs text-muted">{['Team, ', period.title]}</span>}
-        >
-          Where time goes
-        </CardTitle>
-        <TimeBreakdown from={period.from} to={period.to} />
-      </Card>
-      <Card>
-        <CardTitle
-          right={<span className="text-xs text-muted">Tasks assigned for {period.title}</span>}
-        >
-          Assigned vs standard time, by assigner
-        </CardTitle>
-        <AssignVsStandard from={period.from} to={period.to} />
-      </Card>
-      <PersonDetailModal
-        personId={openPerson}
-        gran={gran}
-        kpi={kpi}
-        index={safeIndex}
-        onClose={() => setOpenPerson(null)}
-      />
     </div>
   );
 }

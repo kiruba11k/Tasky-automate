@@ -12,15 +12,33 @@ import {
   nt as personName,
   be as firstName,
   oe as cx,
+  $e as dayKey,
 } from '@/internal/min';
 
-/** Best on-time person of a role this month (or undefined). */
-function topByRole(stats, role) {
+/** Share (%) of the work assigned to a person this month, up to today, that has been done (or null when nothing was assigned). */
+function completionThisMonth(tasks, personId) {
+  const from = `${dayKey(0).slice(0, 7)}-01`;
+  let assigned = 0;
+  let done = 0;
+  tasks.forEach((t) => {
+    if (t.assigneeId !== personId || t.adhoc || t.date < from || t.date > dayKey(0)) return;
+    assigned += t.qty;
+    if (t.status === 'done') done += Math.min(t.qty, t.doneQty ?? t.qty);
+  });
+  return assigned ? Math.round((done / assigned) * 100) : null;
+}
+
+/** Best person of a role this month, ranked by the average of on-time % and assigned-work-done % (or undefined). */
+function topByRole(stats, tasks, role) {
   const ids = new Set(PEOPLE.filter((p) => p.role === role).map((p) => p.id));
   const best = stats
     .filter((r) => ids.has(r.personId) && r.onTime != null && r.tasks > 0)
-    .sort((a, b) => b.onTime - a.onTime || b.tasks - a.tasks)[0];
-  return best ? { ...PEOPLE.find((p) => p.id === best.personId), row: best } : undefined;
+    .map((row) => {
+      const completion = completionThisMonth(tasks, row.personId) ?? 0;
+      return { row, completion, score: (row.onTime + completion) / 2 };
+    })
+    .sort((a, b) => b.score - a.score || b.row.tasks - a.row.tasks)[0];
+  return best ? { ...PEOPLE.find((p) => p.id === best.row.personId), row: best.row, completion: best.completion } : undefined;
 }
 
 /** Monthly "Star Resource / Project of the Month / Star Project Manager" cards with a detail dialog. */
@@ -41,8 +59,8 @@ export function Spotlight() {
         (b.month.meetings ?? 0) / Math.max(1, b.monthTarget.meetings ?? 0) -
         (a.month.meetings ?? 0) / Math.max(1, a.monthTarget.meetings ?? 0),
     )[0];
-    return { resource: topByRole(stats, 'resource'), pm: topByRole(stats, 'pm'), project };
-  }, [projects, stats]);
+    return { resource: topByRole(stats, tasks, 'resource'), pm: topByRole(stats, tasks, 'pm'), project };
+  }, [projects, stats, tasks]);
 
   const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
   const cards = [
@@ -52,7 +70,9 @@ export function Spotlight() {
       title: 'Star Resource',
       id: winners.resource?.id,
       name: winners.resource ? personName(winners.resource.id) : 'Not picked yet',
-      stat: winners.resource ? `${winners.resource.row.onTime}% of tasks on time` : '',
+      stat: winners.resource
+        ? `${winners.resource.row.onTime}% on time · ${winners.resource.completion}% of assigned work done`
+        : '',
       bg: 'from-[#0E9F6E] via-[#0B7F5B] to-[#065F46]',
     },
     {
@@ -70,7 +90,7 @@ export function Spotlight() {
       title: 'Star Project Manager',
       id: winners.pm?.id,
       name: winners.pm ? personName(winners.pm.id) : 'Not picked yet',
-      stat: winners.pm ? `${winners.pm.row.onTime}% of tasks on time` : '',
+      stat: winners.pm ? `${winners.pm.row.onTime}% on time · ${winners.pm.completion}% of assigned work done` : '',
       bg: 'from-[#1D3FA0] via-[#2747C9] to-[#4F46E5]',
     },
   ];

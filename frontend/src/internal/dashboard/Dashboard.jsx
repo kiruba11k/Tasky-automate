@@ -14,7 +14,6 @@ import {
 } from '@/internal/min';
 import { QuoteOfTheDay } from './QuoteOfTheDay';
 import { Spotlight } from './Spotlight';
-import { lunchFor } from '../lib/dates';
 import { dayLoggedMinutes } from '../lib/domain';
 import { DayPlanStrip } from './DayPlanStrip';
 import { ReviewQueue } from './ReviewQueue';
@@ -74,7 +73,7 @@ export function Dashboard() {
         <CardTitle right={<span className="text-xs text-muted">{carriedCount > 0 && `${carriedCount} carried over from ${carriedFrom}`}</span>}>
           My day
         </CardTitle>
-        <DayPlanStrip blocks={plan} loggedMinutes={loggedMinutes} lunch={lunchFor(daily, me, today)} />
+        <DayPlanStrip blocks={plan} loggedMinutes={loggedMinutes} />
         <Link
           to="/daily"
           className="focus-ring mt-3 inline-block rounded-lg text-sm font-semibold text-accent-ink hover:underline"

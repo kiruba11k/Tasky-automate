@@ -243,3 +243,9 @@ Mg	getFocusable	kit/useFocusTrap.js
 AI	BUTTON_VARIANT_CLASSES	kit/buttonStyles.js
 Pz	BUTTON_SIZE_CLASSES	kit/buttonStyles.js
 xg	BUTTON_ICON_CLASSES	kit/buttonStyles.js
+Jf	LeaveBadge	ui/LeaveBadge.jsx
+EH	LeaveSection	people/LeaveSection.jsx
+jj	leaveOn	lib/leave.js
+ede	PersonPage	people/PersonPage.jsx
+Jue	HistoryCalendar	people/HistoryCalendar.jsx
+kw	TaskLine	people/TaskLine.jsx

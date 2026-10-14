@@ -12,3 +12,4 @@ export { FloatingDoodles } from './FloatingDoodles';
 export { ThemeDialog } from './ThemeDialog';
 export { SARCASTIC_QUIPS, MOTIVATION_LINES } from './mascotLines';
 export { onTimeStats, minutesSaved, TASK_TYPE_KPI_KEYS, periodRange, projectPeriodCounts } from './projectStats';
+export { LeaveBadge } from './LeaveBadge';

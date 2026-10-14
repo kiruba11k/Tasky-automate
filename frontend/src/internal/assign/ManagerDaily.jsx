@@ -20,13 +20,14 @@ import {
   rt as Card,
   Vle as PersonUpdateCard,
   vt as Avatar,
+  qe as Badge,
 } from '@/internal/min';
 import { EntriesLog } from '../daily/EntriesLog';
+import { leaveLabel, leaveOn } from '../lib/leave';
 
 /** Manager view of "/daily": team tasks update (daily or weekly). */
 export function ManagerDaily() {
-  const { daily, weekly, tasks, projects } = useStore();
-  useStore((s) => s.profiles);
+  const { daily, weekly, tasks, projects, profiles } = useStore();
   const [view, setView] = useState('daily');
   const [date, setDate] = useState(TODAY_KEY);
   const [sheet, setSheet] = useState('sheets'); // summary cards, or each person's task tables
@@ -50,6 +51,7 @@ export function ManagerDaily() {
             sentAt: entry?.eodAt,
             hours: dailyHours(entry),
             note: (sent ? entry?.eodNote : entry?.sodNote) || entry?.sodNote,
+            leave: leaveLabel(leaveOn(profiles, id, date)),
           };
         }
         const entry = weekly[`${id}|${weekKey}`];
@@ -67,7 +69,7 @@ export function ManagerDaily() {
           note: (sent ? entry?.eowNote : entry?.targetsNote) || entry?.targetsNote,
         };
       }),
-    [ids, view, daily, weekly, tasks, projects, date, weekKey],
+    [profiles, ids, view, daily, weekly, tasks, projects, date, weekKey],
   );
   const dayStats = dailyStats({ daily }, date, ids);
   const weekStats = weeklyStats({ weekly }, weekKey, ids);
@@ -206,6 +208,7 @@ export function ManagerDaily() {
                 <Avatar id={r.id} size="sm" />
                 {r.name}
                 <span className="text-xs font-normal text-muted">{r.title}</span>
+                {r.leave && <Badge tone="lavender">{r.leave}</Badge>}
               </p>
               {view === 'daily' ? (
                 <EntriesLog personId={r.id} date={date} readOnly />

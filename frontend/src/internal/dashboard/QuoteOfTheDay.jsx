@@ -1,16 +1,8 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Quote, FaceSlightlySmiling, RefreshCw } from 'lucide-react';
 import { Se as useStore, be as firstName, oe as cx } from '@/internal/min';
-
-export const QUOTES = [
-  ['The secret of getting ahead is getting started.', 'Mark Twain'],
-  ['Done is better than perfect.', 'Sheryl Sandberg'],
-  ['Quality is not an act, it is a habit.', 'Aristotle'],
-  ['Small daily improvements are the key to staggering long-term results.', 'Unknown'],
-  ['Every no gets you closer to a yes.', 'Sales proverb'],
-  ['Focus on being productive instead of busy.', 'Tim Ferriss'],
-  ['Opportunities don’t happen. You create them.', 'Chris Grosser'],
-];
+import { quoteOfTheDay } from '../ui/quotes';
 
 export const JOKES = [
   'Why did the SDR bring a ladder? To reach the decision maker. 🪜',
@@ -33,7 +25,7 @@ export function QuoteOfTheDay({ extra }) {
 
   const toggleMode = () => setProfile(me, { qotd: mode === 'quote' ? 'joke' : 'quote' });
 
-  const quote = QUOTES[(dayIndex + offset) % QUOTES.length];
+  const quote = quoteOfTheDay(offset);
   const joke = JOKES[(dayIndex + offset) % JOKES.length];
 
   return (
@@ -47,41 +39,71 @@ export function QuoteOfTheDay({ extra }) {
         </div>
         {extra}
       </div>
-      <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-2.5 shadow-soft md:ml-auto md:max-w-xl">
-        <span
-          className={cx(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-            mode === 'quote' ? 'bg-accent-soft text-accent-ink' : 'bg-butter text-butter-ink',
-          )}
-        >
-          {mode === 'quote' ? <Quote size={15} /> : <FaceSlightlySmiling size={15} />}
-        </span>
-        <p className="min-w-0 flex-1 text-sm">
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-muted">
-            {mode === 'quote' ? 'Quote of the day' : 'Joke of the day'}
+      <div
+        className="relative overflow-hidden rounded-2xl p-[1.5px] shadow-soft md:ml-auto md:max-w-xl"
+        data-testid="qotd"
+        style={{
+          background:
+            mode === 'quote'
+              ? 'linear-gradient(120deg, #1D3FA0, #7C3AED, #DB2777)'
+              : 'linear-gradient(120deg, #F59E0B, #F97316)',
+        }}
+      >
+        <div className="relative flex items-center gap-3 rounded-[15px] bg-surface px-4 py-3">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -left-1 -top-5 select-none font-serif text-[84px] leading-none text-accent/10"
+          >
+            “
           </span>
-          {mode === 'quote' ? (
-            <>
-              “{quote[0]}” <span className="text-muted">- {quote[1]}</span>
-            </>
-          ) : (
-            joke
-          )}
-        </p>
-        <div className="flex shrink-0 flex-col gap-1">
-          <button
-            className="focus-ring rounded-lg px-2 py-0.5 text-[11px] font-semibold text-accent-ink hover:bg-surface-2"
-            onClick={toggleMode}
+          <span
+            className={cx(
+              'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-soft',
+              mode === 'quote'
+                ? 'bg-gradient-to-br from-accent to-[#7C3AED]'
+                : 'bg-gradient-to-br from-[#F59E0B] to-[#F97316]',
+            )}
           >
-            {mode === 'quote' ? 'Joke instead' : 'Quote instead'}
-          </button>
-          <button
-            aria-label="Another one"
-            className="focus-ring flex items-center justify-center rounded-lg py-0.5 text-muted hover:bg-surface-2"
-            onClick={() => setOffset((n) => n + 1)}
-          >
-            <RefreshCw size={12} />
-          </button>
+            {mode === 'quote' ? <Quote size={16} /> : <FaceSlightlySmiling size={16} />}
+          </span>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${mode}${offset}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="relative min-w-0 flex-1"
+            >
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted">
+                {mode === 'quote' ? 'Quote of the day' : 'Joke of the day'}
+              </span>
+              {mode === 'quote' ? (
+                <>
+                  <p className="mt-0.5 text-[15px] font-semibold italic leading-snug text-ink">“{quote.text}”</p>
+                  <p className="mt-0.5 text-xs font-semibold text-accent-ink">{quote.by}</p>
+                </>
+              ) : (
+                <p className="mt-0.5 text-sm font-medium">{joke}</p>
+              )}
+            </motion.div>
+          </AnimatePresence>
+          <div className="relative flex shrink-0 flex-col items-center gap-1">
+            <button
+              className="focus-ring rounded-lg px-2 py-0.5 text-[11px] font-semibold text-accent-ink hover:bg-surface-2"
+              onClick={toggleMode}
+            >
+              {mode === 'quote' ? 'Joke instead' : 'Quote instead'}
+            </button>
+            <motion.button
+              whileTap={{ rotate: 180 }}
+              aria-label="Another one"
+              className="focus-ring flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+              onClick={() => setOffset((n) => n + 1)}
+            >
+              <RefreshCw size={12} />
+            </motion.button>
+          </div>
         </div>
       </div>
     </div>

@@ -28,6 +28,7 @@ import { FloatingDoodles } from '@/internal/ui/FloatingDoodles';
 import { ThemeDialog } from '@/internal/ui/ThemeDialog';
 import { AnonymousChat } from './AnonymousChat';
 import { Mascot } from './Mascot';
+import { PersonPage } from '../people/PersonPage';
 import { MobileNav } from './MobileNav';
 import ScrollRocket from './ScrollRocket';
 import { useFunMode } from '../fun/useFunMode';
@@ -164,6 +165,7 @@ export function Shell() {
             {alsoWorks && <Route path="/team-updates" element={<ManagerDaily />} />}
             <Route path="/assign" element={<AssignPage key={me} />} />
             {isManager && <Route path="/people" element={<PeoplePage />} />}
+            {isManager && <Route path="/people/:id" element={<PersonPage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
