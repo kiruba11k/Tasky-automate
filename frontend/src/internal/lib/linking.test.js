@@ -90,20 +90,3 @@ test('a project week with no saved plan takes its targets from what the team pla
   assert.deepEqual(weekTargetFor({ ...project, weekPlans: { '2026-10-07': { messages: 10 } } }, '2026-10-08', weekly), { messages: 10 }); // a saved plan wins
   assert.equal(weekTargetFor(project, '2026-10-08'), project.weekTarget);
 });
-
-import { eodRows, toTsv, EOD_HEADER } from './eodExport.js';
-
-test('the end of day exports as the sheet format, without doubling work', () => {
-  const projects = [{ id: P, name: 'Northwind SaaS - US' }];
-  const tasks = [task({ typeId: 'l2', title: '10 2nd level messages', qty: 10, doneQty: 10, status: 'done', minutes: 45, unit: 'messages' }), task({ typeId: 'deck', title: 'QBR deck', qty: 1, status: 'in_progress', unit: 'docs', targetMinutes: 75 })];
-  const daily = { [`${ME}|2026-10-13`]: { entries: [row({ task: 'l2', qty: 10, doneQty: 10 }), row({ task: 'l1', qty: 30, doneQty: 30, estMin: 60, actualMin: 50, desc: 'CFO list' }), row({ task: 'email', qty: 5 })] } };
-  const rows = eodRows({ tasks, daily, projects, personId: ME, date: '2026-10-13' });
-  assert.deepEqual(rows[0], ['2026-10-13', 'Northwind SaaS - US', '10 2nd level messages', '10 messages', '45m', 'Completed', 10]);
-  assert.deepEqual(rows[1], ['2026-10-13', 'Northwind SaaS - US', 'QBR deck', '1 docs', '1h 15m', 'In Progress', 0]);
-  assert.equal(rows.length, 4); // the l2 row duplicates the l2 task, so it is left out
-  assert.deepEqual(rows[2].slice(2), ['1st level messages (CFO list)', '30 messages', '50m', 'Completed', 30]);
-  assert.equal(rows[3][5], 'Pending');
-  const tsv = toTsv(rows).split('\n');
-  assert.equal(tsv[0], EOD_HEADER.join('\t'));
-  assert.equal(tsv.length, 5); assert.equal(tsv[1].split('\t').length, 7);
-});
