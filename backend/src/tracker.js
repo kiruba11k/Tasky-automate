@@ -14,12 +14,10 @@ const ROLES = ['founder', 'manager', 'pm', 'resource'];
 // team pages (People, project approvals) even when their account was not made an admin or was given another role.
 const approverEmails = () => (process.env.PROJECT_APPROVERS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 const isNamedApprover = (u) => u.approver === true || approverEmails().includes(String(u.email || '').toLowerCase());
-export const trackerRole = (u) => {
-  if (u.founder) return 'founder';
-  if (isNamedApprover(u) && u.track_role !== 'founder') return 'manager'; // approvers are always on the manager side, whatever role was picked for them
-  if (ROLES.includes(u.track_role)) return u.track_role;
-  return { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource';
-};
+const ownRole = (u) => (u.founder ? 'founder' : ROLES.includes(u.track_role) ? u.track_role : { admin: 'manager', team_leader: 'pm' }[u.role] || 'resource');
+/** An approver whose own role is below manager: they move to the manager side but keep their own dashboard and day ("tracked"). */
+const promotedApprover = (u) => isNamedApprover(u) && !['founder', 'manager'].includes(ownRole(u));
+export const trackerRole = (u) => (promotedApprover(u) ? 'manager' : ownRole(u));
 // Main admins (founder, manager) and project managers are all admins; only the main admins are "leadership".
 const leadership = (u) => ['founder', 'manager'].includes(trackerRole(u));
 const lead = (u) => leadership(u) || trackerRole(u) === 'pm';
@@ -41,7 +39,7 @@ export const publicPerson = (u) => ({
   color: COLORS[trackerRole(u)],
   history: [],
 });
-const withApprovers = (users, isOwner) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id), owner: isOwner(u), tracked: u.does_tasks === true })); };
+const withApprovers = (users, isOwner) => { const ids = new Set(approvers(users).map((u) => u.id)); return users.map((u) => ({ ...publicPerson(u), approver: ids.has(u.id), owner: isOwner(u), tracked: u.does_tasks === true || promotedApprover(u) })); };
 
 // A task only moves along these steps, so two people (or two tabs) acting on a stale screen cannot undo each other:
 // an approval cannot overwrite a send-back that happened a moment earlier, and a finished task stays finished.
