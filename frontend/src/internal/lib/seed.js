@@ -6,22 +6,26 @@ import {
   clockToMinutes,
   currentWeekStart,
   dateTimeIso,
+  isWeekday,
   lastWeekdays,
+  nextWeekday,
   nowIso,
   previousWeekday,
   todayKey,
 } from "./dates.js";
-import { DEMO_PEOPLE as PEOPLE, TASK_TYPES } from "./constants.js";
+import { DEMO_PEOPLE as PEOPLE, DEMO_PEOPLE, TASK_TYPES } from "./constants.js";
 import {
   computeStandardMinutes,
   dailySnapshot,
   defaultTaskTitle,
+  defaultWeeks,
   emptyDaily,
   emptyWeekly,
   finalizeProjectsForDay,
   makeCounts,
   newId,
   pickMetrics,
+  projectWeekStart,
   standardMinutes,
   weeklySnapshot,
 } from "./domain.js";
@@ -1125,6 +1129,152 @@ export function buildDemoDaily(projects, tasks) {
 }
 
 /**
+ * `AU` - fills the "Daily update" day tables (`daily[...].entries`) for every resource and project manager over the last
+ * 12 weekdays (and today), and opens this week's (and the two before it) weekly tables. Mutates `daily` and `weekly`.
+ */
+export function seedEntries(projects, daily, weekly) {
+  let state = 7;
+  const rand = () => (state = (state * 9301 + 49297) % 233280) / 233280;
+  const pool = [
+    { task: "prospect", qty: [20, 40], per: 2, desc: "CFO and VP Finance list" },
+    { task: "l1", qty: [25, 45], per: 2, desc: "Personalised, tier 1 accounts" },
+    { task: "l2", qty: [20, 40], per: 1.5, desc: "Replies to last week's openers" },
+    { task: "followup", qty: [20, 35], per: 1.2, desc: "No-reply follow-ups" },
+    { task: "whatsapp", qty: [20, 40], per: 1, desc: "Warm leads" },
+    { task: "email", qty: [15, 30], per: 2, desc: "Event invite batch" },
+    { task: "model", qty: [5, 12], per: 3, desc: "Lookalike model refresh" },
+    { task: "__custom", custom: "Client call prep", qty: [1, 2], per: 30, desc: "Agenda and notes" },
+    { task: "__custom", custom: "CRM clean-up", qty: [30, 60], per: 0.5, desc: "Dedupe and tag" },
+  ];
+  const remarks = ["", "", "Smooth", "List quality was low", "Client asked for changes", "Carried the rest to tomorrow", "Faster than planned", "CRM was slow"];
+  const people = DEMO_PEOPLE.filter((p) => p.role === "resource" || p.role === "pm").map((p) => p.id);
+  const nowStamp = new Date().toISOString();
+  const days = [...lastWeekdays(12, todayKey(0)), ...(isWeekday(todayKey(0)) ? [todayKey(0)] : [])];
+  const rowId = (person) => `se-${person}-${Math.floor(rand() * 1e9).toString(36)}`;
+  /** The rows of one project on one day: 1 to 3 pieces of work that fill the planned minutes. */
+  const rowsFor = (projectId, minutes, person, finished) => {
+    const count = minutes >= 240 ? 3 : minutes >= 120 ? 2 : 1;
+    const used = new Set();
+    const rows = [];
+    while (rows.length < count) {
+      const at = Math.floor(rand() * pool.length);
+      if (used.has(at)) continue;
+      used.add(at);
+      const t = pool[at];
+      const qty = Math.round(t.qty[0] + rand() * (t.qty[1] - t.qty[0]));
+      const estMin = Math.max(15, Math.round((qty * t.per) / 5) * 5);
+      const ratio = 0.7 + rand() * 0.4;
+      rows.push({
+        id: rowId(person),
+        projectId,
+        task: t.task,
+        custom: t.custom,
+        desc: t.desc,
+        qty,
+        estMin,
+        actualMin: finished ? Math.round((estMin * (0.8 + rand() * 0.5)) / 5) * 5 : undefined,
+        doneQty: finished ? Math.min(qty, Math.round(qty * ratio)) : undefined,
+        achieved: "",
+        remarks: finished ? remarks[Math.floor(rand() * remarks.length)] : "",
+        ...(t.custom === "Client call prep"
+          ? { kind: "milestone", targetText: "Prepare agenda and notes", status: finished ? "Completed" : "In progress" }
+          : {}),
+        ...(t.task === "model"
+          ? { kind: "text", targetText: "Refresh lookalike model", actualText: finished ? "Initial refresh done" : "" }
+          : {}),
+      });
+    }
+    return rows;
+  };
+  people.forEach((person) => {
+    const active = projects.filter((p) => p.status === "active" && (p.pmId === person || p.teamIds.includes(person)));
+    days.forEach((day) => {
+      const key = `${person}|${day}`;
+      const rec = daily[key] ?? { ...emptyDaily() };
+      if (rec.entries?.length) return;
+      // minutes per project: the planned blocks and extra work of the day, else the project's hours for the person
+      const minutes = new Map();
+      rec.plan.forEach((b) => {
+        const id = b.custom?.projectId ?? b.projectId;
+        if (id) minutes.set(id, (minutes.get(id) ?? 0) + Math.max(0, clockToMinutes(b.end) - clockToMinutes(b.start)));
+      });
+      (rec.extra ?? []).forEach((x) => {
+        if (x.projectId) minutes.set(x.projectId, (minutes.get(x.projectId) ?? 0) + x.minutes);
+      });
+      if (!minutes.size) active.forEach((p) => minutes.set(p.id, Math.round((p.hours?.[person] ?? 2) * 60)));
+      const isToday = day === todayKey(0);
+      const finished = isToday ? !!rec.eodAt && rec.eodAt <= nowStamp : true;
+      const rows = [...minutes].flatMap(([projectId, mins]) => rowsFor(projectId, mins, person, finished));
+      if (isToday && !finished) {
+        // part way through the day: some of each row is already done
+        const hour = new Date().getHours() + new Date().getMinutes() / 60;
+        const share = Math.min(0.9, Math.max(0.25, (hour - 10) / 9));
+        rows.forEach((r) => {
+          r.doneQty = Math.round((r.qty ?? 0) * share * (0.8 + rand() * 0.3));
+        });
+      }
+      const startedAt = new Date(`${day}T10:${String(5 + Math.floor(rand() * 20)).padStart(2, "0")}:00`).toISOString();
+      const doneAt = finished
+        ? (rec.eodAt ?? new Date(`${day}T18:${String(30 + Math.floor(rand() * 25)).padStart(2, "0")}:00`).toISOString())
+        : undefined;
+      daily[key] = {
+        ...rec,
+        entries: rows,
+        entriesAt: startedAt <= nowStamp ? startedAt : undefined,
+        entriesDoneAt: doneAt && doneAt <= nowStamp ? doneAt : undefined,
+        sodAt: rec.sodAt ?? (startedAt <= nowStamp ? startedAt : undefined),
+      };
+    });
+    // the weekly tables of this week and the two before it are open, with no rows yet
+    [0, -1, -2].forEach((offset) => {
+      const monday = currentWeekStart(offset);
+      const key = `${person}|${monday}`;
+      const rec = weekly[key] ?? emptyWeekly();
+      const openedAt = new Date(`${monday}T10:30:00`).toISOString();
+      weekly[key] = {
+        ...rec,
+        entries: [],
+        entriesDoneAt: offset < 0 ? new Date(`${addDays(monday, 4)}T18:15:00`).toISOString() : undefined,
+        entriesAt: openedAt <= nowStamp ? openedAt : undefined,
+      };
+    });
+  });
+}
+
+/** In-review ad-hoc tasks ("send for approval"): `by` hands finished work to `reviewer`, with the sheet to check. */
+function adhocReviewTask(id, by, reviewer, projectId, name, links, note, minutesAgo) {
+  const at = new Date(Date.now() - minutesAgo * 6e4).toISOString();
+  return {
+    id,
+    typeId: "custom",
+    customName: name,
+    unit: "task",
+    qty: 1,
+    doneQty: 1,
+    targetMinutes: 45,
+    minutes: 45,
+    standardMinutes: 45,
+    projectId,
+    assigneeId: by,
+    assignedById: by,
+    reviewerId: reviewer,
+    priority: false,
+    status: "in_review",
+    adhoc: true,
+    links,
+    feedback: [{ by, text: note, at }],
+    createdAt: at,
+    date: todayKey(0),
+    reminders: 0,
+    reviews: [],
+    title: name,
+    history: [{ at, by, action: "submitted", to: reviewer, note }],
+    resubmits: 0,
+    submittedAt: at,
+  };
+}
+
+/**
  * `Fg` - the complete initial (demo) store state: me, profiles, tasks,
  * projects, notices, convs, msgs, aliases, daily, weekly.
  */
@@ -1140,9 +1290,50 @@ export function buildInitialState() {
       const [person, day] = key.split("|");
       projects = finalizeProjectsForDay(projects, person, day, entry.eodAt, daily);
     });
+  const weekly = buildDemoWeekly(tasks);
+  seedEntries(projects, daily, weekly);
+  projects = projects.map((p) => {
+    if (p.id !== "northwind") return p;
+    // Northwind plans in its own Mon-Fri weeks; this week carries one row of each target kind
+    const customWeeks = defaultWeeks(addDays(currentWeekStart(-1), 0), addDays(currentWeekStart(1), 4));
+    const week = projectWeekStart({ startDate: p.startDate, customWeeks }, todayKey(0));
+    return {
+      ...p,
+      customWeeks,
+      weekText: {
+        [week]: [
+          { id: "tt1", label: "Email sequence", kind: "text", target: "Launch v2 of the CFO sequence to 200 contacts", actual: "Live for 120 contacts, rest on Thursday" },
+          { id: "tt2", label: "Case study sign-off", kind: "milestone", target: "Client signs off the fintech case study", status: "In progress" },
+          { id: "tt3", label: "LinkedIn connection requests", kind: "number", target: "", targetNum: 150, actualNum: 64 },
+        ],
+      },
+    };
+  });
+  // work waiting for review carries the sheet or doc to check
+  tasks
+    .filter((t) => t.status === "in_review")
+    .forEach((t, i) => {
+      t.links =
+        i % 2 === 0
+          ? [`https://docs.google.com/spreadsheets/d/ls-${t.id}/edit`]
+          : [`https://docs.google.com/spreadsheets/d/ls-${t.id}/edit`, "https://drive.google.com/drive/folders/ls-proof"];
+    });
+  tasks.unshift(
+    adhocReviewTask("adhoc1", "bharath", "bheeshma", "northwind", "Northwind objection handling sheet", ["https://docs.google.com/spreadsheets/d/northwind-objections/edit"], "Built this after the calls today, can we share it with the team?", 35),
+    adhocReviewTask("adhoc2", "sachi", "alok", "helios", "Helios CFO list v2", ["https://docs.google.com/spreadsheets/d/helios-cfo-v2/edit", "https://www.linkedin.com/sales/lists/helios-cfo"], "Added 40 new CFOs from the fintech report.", 80),
+  );
   return {
     me: "udhaya",
-    profiles: {},
+    profiles: {
+      udhaya: { leaves: [{ date: lastWeekdays(5, todayKey(0))[4], kind: "full", note: "Sick leave" }] },
+      sachi: {
+        leaves: [
+          { date: nextWeekday(addDays(todayKey(0), 2)), kind: "full", note: "Family function" },
+          { date: nextWeekday(nextWeekday(addDays(todayKey(0), 2))), kind: "full", note: "Family function" },
+        ],
+      },
+      bharath: { leaves: [{ date: previousWeekday(todayKey(0)), kind: "half", note: "Doctor appointment" }] },
+    },
     tasks,
     projects,
     notices: [
@@ -1249,6 +1440,6 @@ export function buildInitialState() {
     ],
     aliases: {},
     daily,
-    weekly: buildDemoWeekly(tasks),
+    weekly,
   };
 }
