@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Sunrise, Moon, Plus, Clock3, Star, Trash, Lock, WandSparkles } from 'lucide-react';
+import { Sunrise, Moon, Plus, Clock3, Star, Trash, Lock, WandSparkles, Copy, Download } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -30,6 +30,7 @@ import { CustomRowsEditor } from './CustomRowsEditor';
 import { ProjectNumbersEditor } from './ProjectNumbersEditor';
 import { WeekCards } from './WeekCards';
 import { dayLoggedMinutes } from '../lib/domain';
+import { eodRows, toTsv } from '../lib/eodExport';
 import { EntriesLog } from './EntriesLog';
 import { EntriesProgress } from './EntriesProgress';
 import { buildDayRows } from './progressRows';
@@ -155,6 +156,25 @@ export function TasksUpdate() {
       },
     ]);
 
+  // This day's end of day as tab-separated rows (Date, Project, Tasks, Expected Outcome, Time, Status, Tasks Done) for a sheet.
+  const eodTsv = () => toTsv(eodRows({ tasks, daily, projects, personId: me, date }));
+  const copyEod = async () => {
+    const text = eodTsv();
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: `End of day for ${date} copied (${text.split('\n').length - 1} rows)`, tone: 'success' });
+    } catch {
+      toast({ title: 'Could not copy, use Download instead', tone: 'info' });
+    }
+  };
+  const downloadEod = () => {
+    const url = URL.createObjectURL(new Blob([eodTsv()], { type: 'text/tab-separated-values' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `eod-${date}.tsv` });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
   const scrollToPlan = () =>
     document.getElementById('plan-your-day')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -168,7 +188,15 @@ export function TasksUpdate() {
             10am to 7pm, lunch {clockLabel(lunch.start)} to {clockLabel(lunch.end)} (you can change it below).
           </p>
         </div>
-        <DatePicker date={date} onChange={setDate} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button tone="ghost" className="border border-line" onClick={copyEod}>
+            <Copy size={13} /> Copy EOD as TSV
+          </Button>
+          <Button tone="ghost" className="border border-line" onClick={downloadEod}>
+            <Download size={13} /> Download
+          </Button>
+          <DatePicker date={date} onChange={setDate} />
+        </div>
       </div>
       <section id="plan-your-day" aria-label="Plan your day" className="scroll-mt-20">
         <Card>
