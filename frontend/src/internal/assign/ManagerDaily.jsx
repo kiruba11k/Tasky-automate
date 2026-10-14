@@ -23,6 +23,7 @@ import {
   qe as Badge,
 } from '@/internal/min';
 import { EntriesLog } from '../daily/EntriesLog';
+import { WeeklyUpdate } from '../daily/WeeklyUpdate';
 import { leaveLabel, leaveOn } from '../lib/leave';
 
 /** Manager view of "/daily": team tasks update (daily or weekly). */
@@ -213,7 +214,7 @@ export function ManagerDaily() {
               {view === 'daily' ? (
                 <EntriesLog personId={r.id} date={date} readOnly />
               ) : (
-                <EntriesLog personId={r.id} date={date} kind="week" readOnly />
+                <WeeklyUpdate personId={r.id} date={date} readOnly />
               )}
             </div>
           ))}

@@ -39,7 +39,7 @@ export function UpdateCard({
         )}
       </div>
       <div className="flex-1 space-y-4 p-5">{showView ? view : children}</div>
-      {showView && (
+      {showView && onEdit && (
         <div className="border-t border-line px-5 py-3">
           <Button tone="ghost" className="border border-line" onClick={onEdit}>
             <Pencil size={13} /> Edit

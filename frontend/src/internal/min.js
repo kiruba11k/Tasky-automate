@@ -1,5 +1,4 @@
 // GENERATED barrel: original (minified) identifier -> ported module. Used while integrating the port.
-export { WeekProgressList as $M } from './daily/WeekProgressList.jsx';
 export { formatShortDate as $P } from './dashboard/ProjectTimeline.jsx';
 export { DayPlanStrip as $R } from './dashboard/DayPlanStrip.jsx';
 export { ReviewRow as $U } from './dashboard/ReviewRow.jsx';
@@ -85,7 +84,6 @@ export { AssignedTaskRow as Kle } from './assign/AssignedTaskRow.jsx';
 export { buildPeriod as Ko } from './lib/dates.js';
 export { ProjectCard as Kw } from './dashboard/ProjectCard.jsx';
 export { formatClock as L1 } from './daily/dateHelpers.js';
-export { WeekHours as LM } from './daily/WeekHours.jsx';
 export { RATE_FIELDS as LP } from './manager/setupFormShared.js';
 export { ProjectProgress as LR } from './dashboard/ProjectProgress.jsx';
 export { PROGRESS_FILL_CLASSES as LU } from './dashboard/progressTones.js';
@@ -135,7 +133,6 @@ export { monthOptions as RU } from './dashboard/weekOptions.js';
 export { staticPersonName as RV } from './lib/domain.js';
 export { validateCustomStandards as Rg } from './lib/domain.js';
 export { ProgressBar as Rh } from './ui/ProgressBar.jsx';
-export { WeekCards as Rle } from './daily/WeekCards.jsx';
 export { DEFAULT_STANDARDS as Rw } from './lib/domain.js';
 export { metricSeriesFull as SR } from './lib/domain.js';
 export { Mascot as SU } from './shell/Mascot.jsx';

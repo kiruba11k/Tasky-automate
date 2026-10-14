@@ -133,28 +133,8 @@ export function buildDayRows(tasks, projects, personId, date, record, kinds) {
 export function buildWeekRows(tasks, personId, weekDate, record, kinds, daily, projects = []) {
   const mon = weekStart(weekDate);
   const progress = weekProgress({ tasks, projects, daily: daily ?? {}, weekly: record ? { [`${personId}|${mon}`]: record } : {} }, personId, mon);
-  let rows = toDisplayRows(progress.rows, sumAssignedByType(tasks, personId, mon, addDays(mon, 6), record?.entries ?? [], projects), progress.sent);
-  let soFar = false;
-  if (!progress.sent && daily) {
-    const totals = new Map();
-    for (let i = 0; i < 7; i++) {
-      const snapshot = daily[`${personId}|${addDays(mon, i)}`]?.eodSnapshot;
-      if (snapshot) {
-        soFar = true;
-        Object.entries(snapshot.byType).forEach(([key, v]) => {
-          if (!key.startsWith('row:')) totals.set(key, (totals.get(key) ?? 0) + (v.actual || 0));
-        });
-      }
-    }
-    if (soFar) {
-      rows = rows.map((r) =>
-        r.kind !== 'task'
-          ? r
-          : { ...r, actual: totals.get(r.key) ?? 0, pct: percentOf(totals.get(r.key) ?? 0, r.target) },
-      );
-    }
-  }
-  return { rows: kinds ? rows.filter((r) => kinds.includes(r.kind)) : rows, sent: progress.sent, soFar };
+  const rows = toDisplayRows(progress.rows, sumAssignedByType(tasks, personId, mon, addDays(mon, 6), record?.entries ?? [], projects), progress.sent);
+  return { rows: kinds ? rows.filter((r) => kinds.includes(r.kind)) : rows, sent: progress.sent, soFar: false };
 }
 
 /** How many rows with a target have met it. */

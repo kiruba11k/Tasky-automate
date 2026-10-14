@@ -34,6 +34,7 @@ export const formatDayClock = (iso) =>
   iso ? `${WEEKDAY_SHORT[new Date(iso).getDay()]} ${formatClock(iso)}` : '';
 
 /** "<Monday> to <Friday>" label for a week starting on `monday`. */
+export { formatShortDate };
 export const formatWeekRange = (monday) => `${formatShortDate(monday)} to ${formatShortDate(addDays(monday, 4))}`;
 
 /** [monday, friday] date keys of the week containing `date` (YYYY-MM-DD). */

@@ -219,3 +219,11 @@ The back-to-top **rocket** (cartoon art) shows for everyone, founders included, 
 - **project numbers** (messages, 2nd level, decks) count done work logged in the day tables beyond what submitted tasks already count.
 - **Tasks done and the fun layer:** a row ticked *Done* counts as a done task in performance ("Tasks done", on-time % from its estimate vs actual) and keeps one Completed record for the levels, streaks and quests, unless a submitted task already covers the same project and kind of work that day. Unticking or removing the row takes it back.
 - **Weekly targets:** with no saved plan, a project's weekly numbers (messages, 2nd level, decks) are what the team planned in *Weekly targets by project*, added up for everyone and updating live (project page, this week's numbers, the plan prefill, and a "Project targets this week" line in each weekly table). A plan saved by the project manager always wins.
+
+## Internal UI update (weeks, part approval, leave)
+
+- Project weeks default to Mon-Fri from the start date; managers can set custom weeks and months (with a bin to restore deleted ones) and plan Number / Milestone / Text targets per week.
+- A reviewer can approve part of a task; the rest returns to the assignee as a rework task.
+- Lunch is set on the profile; leaves (full or half day) live on the profile and show on task-update sheets.
+- Tasks update has a plan card (Plan / Extra hours), day tables with a two-stage lock (targets, then actuals and "Send end of day"), and weekly update / hours cards.
+- Anyone on a project can assign its tasks.

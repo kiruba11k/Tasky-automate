@@ -9,7 +9,9 @@ import { formatClock, formatDayClock } from './dateHelpers';
 /** Manager-facing card summarising one person's day/week update. */
 export function PersonUpdateCard({ r, view }) {
   const met = countTargetsMet(r.rows);
-  const status = r.sentAt ? (
+  const status = r.leave && !r.sentAt ? (
+    <Badge tone="lavender">{r.leave}</Badge>
+  ) : r.sentAt ? (
     <Badge tone="mint">
       {view === 'daily' ? `End of day sent ${formatClock(r.sentAt)}` : `End of week sent ${formatDayClock(r.sentAt)}`}
     </Badge>
