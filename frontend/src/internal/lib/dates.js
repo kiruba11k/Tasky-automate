@@ -47,7 +47,8 @@ export const GRANULARITY_LABELS = {
 export const LUNCH_BLOCK = { start: "13:00", end: "14:00" };
 
 /** The lunch break for a person's day: the one they set for that day, else the latest one they set before it, else 1pm to 2pm. */
-export function lunchFor(daily, personId, date) {
+export function lunchFor(daily, personId, date, profiles) {
+  if (profiles?.[personId]?.lunch) return profiles[personId].lunch; // a lunch set on the profile applies to every day
   const own = daily[`${personId}|${date}`]?.lunch;
   if (own) return own;
   let best = null;

@@ -56,6 +56,7 @@ export function taskLinksProblem(task) {
   if (!Array.isArray(task.links) || task.links.length > 10 || !task.links.every(isLink)) return 'Links must be web addresses (at most 10).';
   return null;
 }
+const ENTRY_KINDS = ['number', 'milestone', 'text'];
 const short = (v, n) => v === undefined || (typeof v === 'string' && v.length <= n);
 const count = (v) => v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1e7);
 /** Why the task rows of a day or week ("Daily update", "Weekly targets by project") are refused, or null. */
@@ -64,12 +65,21 @@ export function entriesProblem(doc) {
   const rows = doc.entries;
   if (!Array.isArray(rows) || rows.length > 300) return 'Too many task rows.';
   const ok = rows.every((r) => r && typeof r === 'object' && typeof r.id === 'string' && r.id.length <= 60 && typeof r.projectId === 'string' && r.projectId.length <= 200
-    && typeof r.task === 'string' && r.task.length <= 200 && short(r.custom, 200) && short(r.desc, 500) && short(r.remarks, 1000) && count(r.qty) && count(r.estMin) && count(r.actualMin) && count(r.doneQty));
+    && typeof r.task === 'string' && r.task.length <= 200 && short(r.custom, 200) && short(r.desc, 500) && short(r.remarks, 1000) && count(r.qty) && count(r.estMin) && count(r.actualMin) && count(r.doneQty)
+    && (r.kind === undefined || ENTRY_KINDS.includes(r.kind)) && short(r.targetText, 1000) && short(r.actualText, 1000) && short(r.status, 40) && short(r.achieved, 1000));
   return ok ? null : 'A task row is not valid.';
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Why a day's lunch break is refused, or null. It is a start and an end time within the working day. */
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** Why a profile's leave list is refused, or null. Each leave is a day, "full" or "half", and a short note. */
+export function leavesProblem(doc) {
+  if (doc?.leaves === undefined) return null;
+  const l = doc.leaves;
+  const ok = Array.isArray(l) && l.length <= 400 && l.every((x) => x && typeof x === 'object' && DAY.test(x.date) && ['full', 'half'].includes(x.kind) && short(x.note, 300));
+  return ok ? null : 'A leave needs a day, full or half, and a short note.';
+}
 export function lunchProblem(doc) {
   if (doc?.lunch === undefined) return null;
   const l = doc.lunch;
@@ -137,6 +147,13 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     return (await live()).some((x) => x.id === data.reviewerId);
   }
 
+  /** The rest of a part-approved task: a new "changes" task (rework) cloned from one the user is reviewing. */
+  async function reworkOk(u, data) {
+    if (!data?.reworkOf || data.status !== 'changes') return false;
+    const orig = (await find('task', data.reworkOf))?.data;
+    return !!orig && orig.reviewerId === u.id && orig.assigneeId === data.assigneeId && orig.projectId === data.projectId;
+  }
+
   /** A team member's own assignment: a new to-do from them, for anyone, on an active project they are on. */
   async function assignOk(u, data) {
     if (!data || data.assignedById !== u.id || data.status !== 'todo' || data.reviewerId || data.adhoc || data.approvedAt || (data.reviews || []).length) return false;
@@ -153,6 +170,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         const t = prev || data;
         if (!prev) {
           if (lead(u) && (mine(data.assignedById) || leadership(u))) return true; // managers and PMs give out tasks
+          if (await reworkOk(u, data)) return true; // the reviewer sends the rest of a part-approved task back
           if (await adhocApprovalOk(u, data)) return true; // anyone may send their own unassigned work for approval
           return assignOk(u, data); // and a resource may hand a task to anyone, on a project they are on
         }
@@ -266,6 +284,10 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       }
       if (kind === 'daily' || kind === 'weekly') {
         const why = entriesProblem(data) || lunchProblem(data);
+        if (why) { results.push({ ...id, ok: false, error: why }); continue; }
+      }
+      if (kind === 'profile') {
+        const why = leavesProblem(data) || lunchProblem(data);
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }

@@ -112,19 +112,41 @@ export function finalizeProjectsForDay(projects, personId, day, at, daily) {
 
 // ---------------------------------------------------------- project planning
 
-/** `di` - first day of the project's own 7-day week that contains `date` (weeks count from the project's start date).
- *  Dates before the start, or a project with no start yet, fall back to the Monday of that week. */
+/** Mon-Fri chunks from `from` to `to` (a weekend is skipped; the first and last chunk may be shorter). */
+export function defaultWeeks(from, to) {
+  const out = [];
+  let cur = from;
+  while (cur <= to && out.length < 120) {
+    const dow = parseDateKey(cur).getDay();
+    if (dow === 0 || dow === 6) {
+      cur = addDays(cur, dow === 6 ? 2 : 1);
+      continue;
+    }
+    const friday = addDays(cur, 5 - dow);
+    out.push({ start: cur, end: friday > to ? to : friday });
+    cur = addDays(friday, 3);
+  }
+  return out;
+}
+
+/** `ea` - first day of the project's week that contains `date`: one of its own custom weeks, else the Mon-Fri week counted
+ *  from the start date. Dates outside any week (a weekend, before the start) fall back to the Monday of that week. */
 export function projectWeekStart(project, date) {
-  if (!project?.startDate || date < project.startDate) return weekStart(date);
-  const days = Math.round((parseDateKey(date).getTime() - parseDateKey(project.startDate).getTime()) / 864e5);
-  return addDays(project.startDate, Math.floor(days / 7) * 7);
+  const custom = project?.customWeeks?.find((w) => w.start <= date && date <= w.end);
+  if (custom) return custom.start;
+  if (project?.startDate && date >= project.startDate) {
+    const end = project.endDate && project.endDate >= date ? project.endDate : date;
+    const hit = defaultWeeks(project.startDate, end).find((w) => w.start <= date && date <= w.end);
+    if (hit) return hit.start;
+  }
+  return weekStart(date);
 }
 
 /** `yf` - weekly target for the week containing `date`: the saved plan, else the default plus what the team planned in
  *  "Weekly targets by project" (pass `weekly`, the store's weekly records, to include that). Plans saved before weeks started on
  *  the project's start date are still found under their Monday. */
 export function weekTargetFor(project, date, weekly) {
-  const start = projectWeekStart({ startDate: project.startDate ?? "" }, date);
+  const start = projectWeekStart(project, date);
   const saved = project.weekPlans?.[start] ?? project.weekPlans?.[weekStart(date)];
   if (saved) return saved;
   if (!weekly) return project.weekTarget;
@@ -134,7 +156,7 @@ export function weekTargetFor(project, date, weekly) {
 
 /** The plan saved for the week containing `date`, if there is one (under the project's week start, or the Monday older plans used). */
 export const savedWeekPlan = (project, date) =>
-  project.weekPlans?.[projectWeekStart({ startDate: project.startDate ?? "" }, date)] ?? project.weekPlans?.[weekStart(date)];
+  project.weekPlans?.[projectWeekStart(project, date)] ?? project.weekPlans?.[weekStart(date)];
 
 /** `bV` - Mon-Fri status (finalized or not) of a week. */
 export function weekDayStatus(project, week = currentWeekStart(0)) {
@@ -151,21 +173,27 @@ export function weekDayStatus(project, week = currentWeekStart(0)) {
   });
 }
 
-/** `qw` - the project's 7-day weeks, numbered from the start date. With an end date it runs to the end; without one,
- *  `weeksAhead` weeks past today (or past the start, if that is still ahead). */
+/** `qw` - the project's weeks: the ones its managers set (custom weeks), else Mon-Fri weeks from the start date. With an end
+ *  date the default runs to the end; without one, `weeksAhead` weeks past today (or past the start, if that is still ahead). */
 export function projectWeeks(project, weeksAhead = 4) {
-  if (!project.startDate) return [];
   const today = todayKey(0);
+  const label = (n, w) => `Week ${n} · ${formatDayMonth(w.start)} to ${formatDayMonth(w.end)}`;
+  if (project.customWeeks?.length)
+    return [...project.customWeeks]
+      .sort((a, b) => a.start.localeCompare(b.start))
+      .map((w, i) => ({ n: i + 1, start: w.start, end: w.end, label: label(i + 1, w), plannedAhead: w.start > today }));
+  if (!project.startDate) return [];
   const last =
     project.endDate && project.endDate >= project.startDate
       ? project.endDate
       : addDays(today > project.startDate ? today : project.startDate, weeksAhead * 7);
-  const out = [];
-  for (let c = project.startDate, n = 1; c <= last && n <= 104; c = addDays(c, 7), n++) {
-    const end = addDays(c, 6) > last ? last : addDays(c, 6);
-    out.push({ n, start: c, end, label: `Week ${n} · ${formatDayMonth(c)} to ${formatDayMonth(end)}`, plannedAhead: c > today });
-  }
-  return out;
+  return defaultWeeks(project.startDate, last).map((w, i) => ({
+    n: i + 1,
+    start: w.start,
+    end: w.end,
+    label: label(i + 1, w),
+    plannedAhead: w.start > today,
+  }));
 }
 
 /** `kV` - roll a project's week / month counters over when a new week / month began. */

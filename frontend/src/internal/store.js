@@ -131,7 +131,7 @@ export const useStore = create()(
         const project = requireProject(draft.projectId);
         // the owner or an admin of the project assigns its tasks; a resource on the project may hand tasks to anyone too
         if (!canManageProject(project, me) && !(roleOf(me) === "resource" && project.teamIds.includes(me)))
-          throw new Error(`Only the owner or an admin of ${project.name} can assign its tasks.`);
+          throw new Error(`Only people on ${project.name} can assign its tasks.`);
         if (project.status !== "active")
           throw new Error(`${project.name} is still waiting for approval.`);
         let typeId = draft.typeId;
@@ -312,6 +312,57 @@ export const useStore = create()(
             history: [...(task.history ?? []), { at, by: get().me, action: "approved" }],
           });
           notify(task.assigneeId, `${firstName(get().me)} approved ${task.title} ✓`);
+        },
+        /** Approve some of a submitted task and send the rest back for rework as a new task. */
+        approvePart: (id, count, note) => {
+          const task = requireTask(id);
+          requireReviewer(task);
+          requireWaiting(task);
+          const submitted = task.doneQty ?? task.qty;
+          const part = Math.round(count);
+          if (!(part >= 1) || part >= task.qty)
+            throw new Error(`Approve between 1 and ${task.qty - 1} (or use Approve for all of it).`);
+          if (part > submitted) throw new Error(`Only ${submitted} were submitted.`);
+          if (!note.trim()) throw new Error("Say what needs rework for the rest.");
+          const at = nowIso();
+          const me = get().me;
+          const rest = task.qty - part;
+          const mins = (n) => Math.max(1, Math.round((task.targetMinutes * n) / task.qty));
+          const title = (n) => (/^\d+/.test(task.title) ? task.title.replace(/^\d+/, String(n)) : `${n} of ${task.title}`);
+          patchTask(id, {
+            status: "done",
+            qty: part,
+            doneQty: part,
+            title: title(part),
+            targetMinutes: mins(part),
+            standardMinutes: task.standardMinutes ? Math.round((task.standardMinutes * part) / task.qty) : undefined,
+            approvedAt: at,
+            reviews: [...task.reviews, { by: me, verdict: "approved", at }],
+            history: [
+              ...(task.history ?? []),
+              { at, by: me, action: "approved", note: `Approved ${part} of ${task.qty}; ${rest} sent back for rework` },
+            ],
+          });
+          const redo = {
+            ...task,
+            id: newId(),
+            qty: rest,
+            doneQty: undefined,
+            minutes: undefined,
+            title: title(rest),
+            targetMinutes: mins(rest),
+            standardMinutes: task.standardMinutes ? Math.round((task.standardMinutes * rest) / task.qty) : undefined,
+            status: "changes",
+            reworkOf: id,
+            feedback: [...task.feedback, { by: me, text: note.trim(), at }],
+            reviews: [{ by: me, verdict: "feedback", at }],
+            approvedAt: undefined,
+            submittedAt: undefined,
+            resubmits: 0,
+            history: [...(task.history ?? []), { at, by: me, action: "feedback", note: `${rest} of ${task.qty} need rework: ${note.trim()}` }],
+          };
+          set((s) => ({ tasks: [redo, ...s.tasks] }));
+          notify(task.assigneeId, `${firstName(me)} approved ${part} of ${task.qty} on ${task.title}. ${rest} need rework: ${note.trim()}`);
         },
         sendBack: (id, text) => {
           const task = requireTask(id);
@@ -534,7 +585,7 @@ export const useStore = create()(
               )
                 throw new Error("Actual time must be between 0 and 12 hours.");
             }
-            const lunch = next.lunch ?? lunchFor(get().daily, personId, day);
+            const lunch = next.lunch ?? lunchFor(get().daily, personId, day, get().profiles);
             for (const block of next.plan)
               if (block.start < lunch.end && block.end > lunch.start)
                 throw new Error(`${clockLabel(lunch.start)} to ${clockLabel(lunch.end)} is lunch 🍽, move that block around it.`);
@@ -960,6 +1011,112 @@ export const useStore = create()(
             const plans = { ...p.weekPlans };
             delete plans[monday];
             return { ...p, weekPlans: plans };
+          });
+        },
+        /** Replace a project's weeks wholesale (each `{ start, end }`; they may not overlap). */
+        setCustomWeeks: (projectId, weeks) => {
+          requireManage(projectId);
+          const sorted = [...weeks].sort((a, b) => a.start.localeCompare(b.start));
+          sorted.forEach((w, i) => {
+            if (!w.start || !w.end || w.end < w.start) throw new Error("A week must end on or after the day it starts.");
+            if (i && sorted[i - 1].end >= w.start) throw new Error("Two weeks overlap. Pick days that are not in another week.");
+          });
+          patchProject(projectId, (p) => ({ ...p, customWeeks: sorted }));
+        },
+        /** Add a week (`from` null) or change the dates of one; its plan and text move with it. */
+        setWeekDates: (projectId, from, to) => {
+          const project = requireManage(projectId);
+          if (!to.start || !to.end || to.end < to.start) throw new Error("A week must end on or after the day it starts.");
+          const others = (project.customWeeks ?? []).filter((w) => w.start !== from);
+          if (others.some((w) => w.start <= to.end && to.start <= w.end)) throw new Error("Those days are already in another week.");
+          patchProject(projectId, (p) => {
+            const plans = { ...p.weekPlans };
+            const text = { ...p.weekText };
+            const off = { ...p.weekOff };
+            if (from && from !== to.start) {
+              for (const m of [plans, text, off]) if (m[from]) { m[to.start] = m[from]; delete m[from]; }
+            }
+            return { ...p, customWeeks: [...others, to].sort((a, b) => a.start.localeCompare(b.start)), weekPlans: plans, weekText: text, weekOff: off };
+          });
+        },
+        removeWeek: (projectId, start) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => {
+            const plans = { ...p.weekPlans };
+            const text = { ...p.weekText };
+            delete plans[start];
+            delete text[start];
+            return { ...p, customWeeks: (p.customWeeks ?? []).filter((w) => w.start !== start), weekPlans: plans, weekText: text };
+          });
+        },
+        /** Move a week or a month to the bin, keeping its plan so it can come back. */
+        binPeriod: (projectId, period, start) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => {
+            const week = period === "week";
+            const list = (week ? p.customWeeks : p.customMonths) ?? [];
+            const found = list.find((w) => w.start === start);
+            if (!found) return p;
+            const plans = { ...(week ? p.weekPlans : p.monthPlans) };
+            const text = { ...(week ? p.weekText : p.monthText) };
+            const off = { ...(week ? p.weekOff : p.monthOff) };
+            const entry = { id: newId(), period, week: found, plan: plans[start], text: text[start], off: off[start], deletedAt: nowIso(), by: get().me };
+            delete plans[start];
+            delete text[start];
+            delete off[start];
+            const left = list.filter((w) => w.start !== start);
+            const bin = [entry, ...(p.periodBin ?? [])];
+            return week
+              ? { ...p, customWeeks: left, weekPlans: plans, weekText: text, weekOff: off, periodBin: bin }
+              : { ...p, customMonths: left, monthPlans: plans, monthText: text, monthOff: off, periodBin: bin };
+          });
+        },
+        restorePeriod: (projectId, binId) => {
+          const project = requireManage(projectId);
+          const entry = project.periodBin?.find((b) => b.id === binId);
+          if (!entry) throw new Error("That item is no longer in the bin.");
+          const week = entry.period === "week";
+          const list = (week ? project.customWeeks : project.customMonths) ?? [];
+          if (list.some((w) => w.start <= entry.week.end && entry.week.start <= w.end))
+            throw new Error(`Those days are already used by another ${entry.period}. Change or delete it first.`);
+          patchProject(projectId, (p) => {
+            const rest = { ...p, periodBin: (p.periodBin ?? []).filter((b) => b.id !== binId) };
+            const put = (m, v) => (v === undefined ? (m ?? {}) : { ...m, [entry.week.start]: v });
+            const sorted = [...list, entry.week].sort((a, b) => a.start.localeCompare(b.start));
+            return week
+              ? { ...rest, customWeeks: sorted, weekPlans: put(p.weekPlans, entry.plan), weekText: put(p.weekText, entry.text), weekOff: put(p.weekOff, entry.off) }
+              : { ...rest, customMonths: sorted, monthPlans: put(p.monthPlans, entry.plan), monthText: put(p.monthText, entry.text), monthOff: put(p.monthOff, entry.off) };
+          });
+        },
+        purgePeriod: (projectId, binId) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => ({ ...p, periodBin: (p.periodBin ?? []).filter((b) => b.id !== binId) }));
+        },
+        /** Merge month fields (customMonths, monthPlans, monthText, monthOff) into the project. */
+        setMonthData: (projectId, data) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => ({ ...p, ...data }));
+        },
+        setWeekOff: (projectId, start, ids) => {
+          requireManage(projectId);
+          patchProject(projectId, (p) => ({ ...p, weekOff: { ...p.weekOff, [start]: ids } }));
+        },
+        setWeekText: (projectId, start, rows) => {
+          requireManage(projectId);
+          const clean = rows
+            .map((r) => ({ ...r, label: r.label.trim(), target: (r.target ?? "").trim() }))
+            .filter((r) => r.label || r.target || r.targetNum != null);
+          patchProject(projectId, (p) => ({ ...p, weekText: { ...p.weekText, [start]: clean } }));
+        },
+        /** What was achieved in a project week; `lock` stamps the week as done. */
+        saveWeekActuals: (projectId, start, numbers, rows, lock) => {
+          requireManage(projectId);
+          if (Object.values(numbers).some((n) => !Number.isFinite(n) || n < 0)) throw new Error("Numbers must be zero or more.");
+          patchProject(projectId, (p) => {
+            const done = { ...p.weekDoneAt };
+            if (lock) done[start] = nowIso();
+            else delete done[start];
+            return { ...p, weekActuals: { ...p.weekActuals, [start]: numbers }, weekText: { ...p.weekText, [start]: rows }, weekDoneAt: done };
           });
         },
         addCustomStandard: (projectId, standard) => {
