@@ -107,10 +107,11 @@ export const rowKey = (row) => `${row.projectId}|${row.task}|${(row.custom ?? ""
 /**
  * The rows of a person's "Weekly update": every row of the week's Monday to Friday day tables plus the rows added to the week
  * itself, with the same work added up into one row (targets, achieved, estimated and taken time, latest status / text, notes
- * joined). `overrides` are numbers or statuses typed over the sums in the week table, by `rowKey`.
+ * joined). `overrides` are numbers or statuses typed over the sums in the week table, by `rowKey`. `assignedRows` are the
+ * week's assigned-task rows (`weekAssignedRows`), added up with the rest.
  */
-export function weekRows(personId, monday, daily, weekEntries = [], overrides = {}) {
-  const all = [...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i))), ...weekEntries];
+export function weekRows(personId, monday, daily, weekEntries = [], overrides = {}, assignedRows = []) {
+  const all = [...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i))), ...assignedRows, ...weekEntries];
   const merged = new Map();
   all.forEach((row) => {
     const key = rowKey(row);
@@ -126,6 +127,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (row.targetText) sum.targetText = row.targetText;
     if (row.actualText) sum.actualText = row.actualText;
     if (row.status) sum.status = row.status;
+    if (row.assigned) sum.assigned = true;
     if (!sum.desc && row.desc) sum.desc = row.desc;
     if (row.remarks && !sum.remarks.includes(row.remarks)) sum.remarks = sum.remarks ? `${sum.remarks}; ${row.remarks}` : row.remarks;
   });

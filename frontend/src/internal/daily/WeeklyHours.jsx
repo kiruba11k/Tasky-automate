@@ -2,6 +2,7 @@ import { Se as useStore, We as formatMinutes, Mn as toMinutes, pu as projectColo
 import { addDays, weekStart } from '../lib/dates.js';
 import { CalendarRange } from 'lucide-react';
 import { dayHours } from '../lib/domain.js';
+import { recordWithAssigned } from '../lib/assigned.js';
 import { projectLabel } from './entryHelpers';
 import { formatWeekRange } from './dateHelpers';
 
@@ -11,13 +12,14 @@ const blockMinutes = (b) => Math.max(0, toMinutes(b.end) - toMinutes(b.start));
 
 /** "Weekly hours" card: planned, actual and extra time per day (Monday to Friday) and per project, from the day plans. */
 export function WeeklyHours({ personId, date }) {
-  const { daily, projects } = useStore();
+  const { daily, projects, tasks } = useStore();
   const mon = weekStart(date);
   const days = [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
-  const perDay = days.map((d) => ({ d, ...dayHours(daily[`${personId}|${d}`]) }));
+  const dayRecord = (d) => recordWithAssigned(tasks, daily, personId, d, { projects, carry: false });
+  const perDay = days.map((d) => ({ d, ...dayHours(dayRecord(d)) }));
   const byProject = new Map();
   days.forEach((d) => {
-    const rec = daily[`${personId}|${d}`];
+    const rec = dayRecord(d);
     const dayMap = new Map();
     (rec?.plan ?? []).forEach((b) => {
       if (b.id === 'lunch') return;

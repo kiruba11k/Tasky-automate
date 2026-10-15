@@ -27,6 +27,7 @@ import { LeaveBadge } from '../ui/LeaveBadge';
 import { HistoryCalendar } from './HistoryCalendar';
 import { TaskLine } from './TaskLine';
 import { dayHours, wasOnTime } from '../lib/domain';
+import { recordWithAssigned } from '../lib/assigned';
 import { leaveOn } from '../lib/leave';
 import { WEEKDAY_SHORT, formatDayMonth, isWeekday, parseDateKey, previousWeekday } from '../lib/dates';
 
@@ -37,7 +38,7 @@ export function PersonPage() {
   const { id = '' } = useParams();
   const analytics = useAnalytics();
   const calendar = useCalendar();
-  const { tasks, daily, profiles } = useStore();
+  const { tasks, daily, profiles, projects } = useStore();
   const person = PEOPLE.find((p) => p.id === id);
   const [gran, setGran] = useState('week');
   const options = buildPeriodOptions(gran, calendar);
@@ -180,7 +181,7 @@ export function PersonPage() {
                 const timed = submitted.map(wasOnTime).filter((v) => v != null);
                 const onTime = timed.length ? Math.round((timed.filter(Boolean).length / timed.length) * 100) : null;
                 const entry = daily[`${id}|${day}`];
-                const hours = dayHours(entry);
+                const hours = dayHours(recordWithAssigned(mine, daily, id, day, { projects, carry: false }));
                 return (
                   <tr key={day} className="border-b border-line/70 last:border-0" data-day-row={day}>
                     <td className="px-2 py-1.5 font-medium">

@@ -90,3 +90,73 @@ test('a project week with no saved plan takes its targets from what the team pla
   assert.deepEqual(weekTargetFor({ ...project, weekPlans: { '2026-10-07': { messages: 10 } } }, '2026-10-08', weekly), { messages: 10 }); // a saved plan wins
   assert.equal(weekTargetFor(project, '2026-10-08'), project.weekTarget);
 });
+
+import { assignedDay, dayRowsWithAssigned, weekAssignedRows } from './assigned.js';
+import { weekRows } from './entries.js';
+
+const OPTS = { projects: [], today: '2026-10-13' };
+const pair = (rows) => rows.map((r) => [r.qty, r.doneQty]);
+
+test('an assigned task shows as a read-only row of its project, whoever assigned it', () => {
+  const t = task({ typeId: 'prospect', qty: 40, targetMinutes: 60, assignedById: 'pm', priority: true });
+  const { rows } = assignedDay([t], ME, '2026-10-13', OPTS);
+  assert.equal(rows.length, 1);
+  assert.deepEqual([rows[0].assigned, rows[0].projectId, rows[0].task, rows[0].qty, rows[0].doneQty, rows[0].estMin], [true, P, 'prospect', 40, 0, 60]);
+  assert.deepEqual([rows[0].assignedBy, rows[0].priority], [['pm'], true]);
+  assert.equal(assignedDay([{ ...t, assigneeId: 'other' }], ME, '2026-10-13', OPTS).rows.length, 0); // someone else's task
+  assert.equal(assignedDay([{ ...t, assignedById: ME }], ME, '2026-10-13', OPTS).rows.length, 1); // self-assigned
+  const done = assignedDay([{ ...t, status: 'in_review', doneQty: 30, minutes: 50 }], ME, '2026-10-13', OPTS).rows[0];
+  assert.deepEqual([done.doneQty, done.actualMin], [30, 50]);
+});
+
+test('a logged row for the same work covers the assignment: the larger is used, never the sum', () => {
+  const t = task({ qty: 40, doneQty: 30, status: 'done', targetMinutes: 60 });
+  const logged = (o) => ({ [`${ME}|2026-10-13`]: { entries: [row({ id: 'r1', qty: 25, doneQty: 10, estMin: 30, ...o })] } });
+  const daily = logged();
+  const { rows, covers } = assignedDay([t], ME, '2026-10-13', { ...OPTS, logged: daily[`${ME}|2026-10-13`].entries });
+  assert.deepEqual(pair(rows), [[15, 20]]); // only the rest: 25 + 15 = 40, 10 + 20 = 30
+  const all = dayRowsWithAssigned([t], daily, ME, '2026-10-13', OPTS);
+  assert.deepEqual([all.reduce((s, r) => s + r.qty, 0), all.reduce((s, r) => s + r.doneQty, 0), all.reduce((s, r) => s + r.estMin, 0)], [40, 30, 60]);
+  assert.equal(covers.size, 0);
+  const small = assignedDay([task({ qty: 10, doneQty: 0 })], ME, '2026-10-13', { ...OPTS, logged: logged({ qty: 20, estMin: 60 })[`${ME}|2026-10-13`].entries });
+  assert.equal(small.rows.length, 0); // fully covered
+  assert.equal(small.covers.get('r1').qty, 0);
+  const sums = dayRowsWithAssigned([t], daily, ME, '2026-10-13', OPTS);
+  const report = targetVsActualRows([t], ME, '2026-10-13', '2026-10-13', { daily });
+  assert.deepEqual([sums.reduce((s, r) => s + r.qty, 0), sums.reduce((s, r) => s + r.doneQty, 0)], [report[0].target, report[0].actual]); // agrees with the reports
+});
+
+test('time on submitted tasks and typed time do not add up in the hours', () => {
+  const t = task({ status: 'done', doneQty: 10, minutes: 60 });
+  const day = '2026-10-13';
+  const withTyped = { [`${ME}|${day}`]: { entries: [row({ actualMin: 90 })] } };
+  const sumMin = (rows) => rows.reduce((s, r) => s + (r.actualMin ?? 0), 0);
+  assert.equal(sumMin(dayRowsWithAssigned([t], withTyped, ME, day, OPTS)), 90);
+  assert.equal(sumMin(dayRowsWithAssigned([t], {}, ME, day, OPTS)), 60);
+  assert.equal(sumMin(dayRowsWithAssigned([task({ status: 'done', doneQty: 10, minutes: 120 })], withTyped, ME, day, OPTS)), 120);
+  assert.equal(dayHours({ entries: dayRowsWithAssigned([t], {}, ME, day, OPTS) }).actualMin, dayLoggedMinutes([t], {}, ME, day));
+});
+
+test('unfinished tasks of earlier days are carried over to today only', () => {
+  const old = task({ date: '2026-10-12', status: 'in_progress', qty: 8 });
+  const finished = task({ date: '2026-10-12', status: 'done', doneQty: 8, qty: 8 });
+  const today = assignedDay([old, finished], ME, '2026-10-13', OPTS).rows;
+  assert.deepEqual(today.map((r) => [r.qty, r.carriedFrom]), [[8, '2026-10-12']]);
+  assert.equal(assignedDay([old], ME, '2026-10-12', OPTS).rows[0].carriedFrom, undefined); // on its own day it is just assigned
+  assert.equal(assignedDay([old], ME, '2026-10-14', { ...OPTS, today: '2026-10-13' }).rows.length, 0); // not carried to a later day
+  assert.equal(assignedDay([old], ME, '2026-10-13', { ...OPTS, carry: false }).rows.length, 0);
+});
+
+test('the weekly rows add the days\' assigned tasks up once, without the carried-over copy', () => {
+  const mon = '2026-10-12';
+  const tasks = [task({ date: '2026-10-12', qty: 10, doneQty: 10, status: 'done' }), task({ date: '2026-10-14', qty: 20, doneQty: 5, status: 'in_review' }), task({ date: '2026-10-12', typeId: 'deck', qty: 1, status: 'todo' })];
+  const daily = { [`${ME}|2026-10-13`]: { entries: [row({ qty: 5, doneQty: 5 })] } };
+  const assigned = weekAssignedRows(tasks, daily, ME, mon, OPTS);
+  const rows = weekRows(ME, mon, daily, [], {}, assigned);
+  const l2 = rows.find((r) => r.task === 'l2');
+  assert.deepEqual([l2.qty, l2.doneQty, l2.assigned], [35, 20, true]); // 10 + 5 logged + 20
+  assert.equal(rows.find((r) => r.task === 'deck').qty, 1);
+  const report = targetVsActualRows(tasks, ME, mon, '2026-10-18', { daily });
+  assert.equal(report.find((r) => r.key === 'l2').target, l2.qty);
+  assert.equal(weekAssignedRows(tasks, daily, ME, '2026-10-19', OPTS).length, 0); // another week
+});

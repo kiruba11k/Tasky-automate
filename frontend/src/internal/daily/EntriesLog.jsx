@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Copy, Lock, Pencil, Plus, Save, Send, Trash, X, Check } from 'lucide-react';
+import { ClipboardList, Copy, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -10,10 +10,12 @@ import {
   Ye as toast,
   We as formatMinutes,
   pu as projectColor,
+  nt as personName,
   Mn as toMinutes,
 } from '@/internal/min';
 import { previousWeekday } from '../lib/dates.js';
 import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
+import { assignedDay } from '../lib/assigned.js';
 import { DurationInput } from './DurationInput';
 import { EntryKindSelect } from './EntryKindSelect';
 import { formatClock, formatDayClock } from './dateHelpers';
@@ -36,13 +38,53 @@ export const EDIT_DAY_TASKS = 'ls-edit-day-tasks';
 const OTHER = 'other:';
 const FIELD = 'focus-ring w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink';
 
+const assignerText = (r) =>
+  r.assignedBy?.length ? `assigned by ${r.assignedBy.map((id) => personName(id).split(' ')[0]).join(', ')}` : 'assigned to you';
+
+const STATUS_LABEL = { todo: 'To do', in_progress: 'In progress', in_review: 'In review', changes: 'Changes asked', done: 'Done' };
+
+/** A task assigned to the person, in the project's day table: read-only and never saved with the day's rows. */
+function AssignedRow({ r, project, showRemoveCell }) {
+  const by = r.assignedBy.map((id) => personName(id).split(' ')[0]).join(', ');
+  const titles = r.titles.filter((t) => t && t !== r.label);
+  return (
+    <tr data-entry={r.id} data-assigned="true" className="border-t border-line bg-sky/10 align-middle">
+      <td className="px-3 py-2">
+        <span className="font-medium">{entryName(r, project)}</span>
+        {titles.length > 0 && <span className="block text-xs text-muted">{titles.join('; ')}</span>}
+        <span className="mt-0.5 flex flex-wrap items-center gap-1">
+          <span className="rounded bg-sky px-1.5 py-px text-[10px] font-bold text-sky-ink" data-testid="assigned-badge">
+            Assigned{by ? ` by ${by}` : ''}
+          </span>
+          {r.priority && <Star size={11} className="fill-butter-ink text-butter-ink" aria-label="Priority" />}
+          {r.carriedFrom && (
+            <span className="rounded bg-butter px-1.5 py-px text-[10px] font-bold text-butter-ink" data-testid="carried-badge">
+              Carried over
+            </span>
+          )}
+        </span>
+      </td>
+      <td className="px-2 py-2 text-xs text-muted">Number</td>
+      <td className="px-2 py-2 tabular-nums">{r.qty || '·'}</td>
+      <td className="px-2 py-2 tabular-nums">{r.doneQty || '·'}</td>
+      <td className="px-2 py-2 tabular-nums">{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
+      <td className="px-2 py-2 tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</td>
+      <td className="px-2 py-2 text-xs text-muted">
+        {[...new Set(r.statuses.map((s) => STATUS_LABEL[s] ?? s))].join(', ')}
+        {r.covering ? ' · rest of the assignment' : ''}
+      </td>
+      {showRemoveCell && <td />}
+    </tr>
+  );
+}
+
 /**
  * "Daily update": one table per project in the day's plan (and any extra project added here) with the tasks, their type
  * (number, milestone or text), target and actual, estimated and taken time and notes. Two locks: first the targets, then the
  * actuals; "Send end of day" is available once the actuals are locked. `readOnly` is the manager's view of someone else's.
  */
 export function EntriesLog({ personId, date, plan, extra, readOnly }) {
-  const { projects, daily, saveDaily } = useStore();
+  const { projects, daily, tasks, saveDaily } = useStore();
   const key = date;
   const record = daily[`${personId}|${key}`] ?? emptyDaily();
   const previous = daily[`${personId}|${previousWeekday(date)}`]?.entries ?? [];
@@ -83,6 +125,9 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
     !!record.entriesAt && !!actualsAt && !unlocked && (!record.entriesDoneAt || (record.actualsAt ?? '') > record.entriesDoneAt);
   const shown = readOnly ? stored : rows;
   const targetsEditable = !readOnly && !targetsLocked;
+  // Tasks assigned to this person for the day (and unfinished ones carried over to today): read-only rows next to the logged ones.
+  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown }), [tasks, personId, date, projects, shown]);
+  const assignedPids = useMemo(() => new Set(assignedNow.rows.map((r) => r.projectId)), [assignedNow]);
 
   // Projects with a table, and the time planned for each (from the plan and the extra hours).
   const groups = useMemo(() => {
@@ -104,16 +149,19 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
     added.forEach((pid) => {
       if (!planned.has(pid)) planned.set(pid, 0);
     });
+    assignedPids.forEach((pid) => {
+      if (!planned.has(pid)) planned.set(pid, 0);
+    });
     return [...planned]
       .map(([pid, minutes]) => ({
         project: projects.find((p) => p.id === pid),
         pid,
         planned: minutes,
         name: projectLabel(pid, projects),
-        added: !fromPlan.has(pid),
+        added: !fromPlan.has(pid) && !assignedPids.has(pid),
       }))
       .filter((g) => g.project || g.pid.startsWith(OTHER));
-  }, [blocks, extras, shown, projects, added]);
+  }, [blocks, extras, shown, projects, added, assignedPids]);
 
   const removeGroup = (pid, name) => {
     if (shown.some((r) => r.projectId === pid && (r.task || r.desc)) && !window.confirm(`Remove ${name} and its tasks from this day?`)) return;
@@ -197,7 +245,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
   const lock = (which) =>
     guarded(() => {
       const kept = rows.filter((r) => r.task && (r.task !== CUSTOM_TASK || r.custom?.trim()));
-      if (!kept.length) throw new Error('Add at least one task before locking.');
+      if (!kept.length && !assignedNow.rows.length) throw new Error('Add at least one task before locking.');
       const at = new Date().toISOString();
       const withActuals = which === 'actuals' || !!actualsAt;
       save({
@@ -233,7 +281,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
       : 'Fill in the actuals and lock them first'
     : 'Lock your targets first';
 
-  const totals = shown.reduce((t, r) => ({ est: t.est + r.estMin, act: t.act + (r.actualMin ?? 0) }), { est: 0, act: 0 });
+  const totals = [...shown, ...assignedNow.rows].reduce((t, r) => ({ est: t.est + (r.estMin ?? 0), act: t.act + (r.actualMin ?? 0) }), { est: 0, act: 0 });
   const plannedTotal = groups.reduce((sum, g) => sum + g.planned, 0);
 
   return (
@@ -295,8 +343,9 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
         {groups.map(({ project, pid, planned, name, added: isAdded }) => {
           const choices = taskChoices(project);
           const mine = shown.filter((r) => r.projectId === pid);
-          const est = mine.reduce((s, r) => s + r.estMin, 0);
-          const act = mine.reduce((s, r) => s + (r.actualMin ?? 0), 0);
+          const assignedMine = assignedNow.rows.filter((r) => r.projectId === pid);
+          const est = [...mine, ...assignedMine].reduce((s, r) => s + (r.estMin ?? 0), 0);
+          const act = [...mine, ...assignedMine].reduce((s, r) => s + (r.actualMin ?? 0), 0);
           return (
             <section
               key={pid}
@@ -389,7 +438,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {mine.length === 0 && (
+                    {mine.length === 0 && assignedMine.length === 0 && (
                       <tr>
                         <td colSpan={8} className="px-3 py-3 text-xs text-muted">
                           No tasks yet.
@@ -432,6 +481,11 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
                               <span className="font-medium">
                                 {entryName(r, project)}
                                 {r.desc && <span className="block text-xs font-normal text-muted">{r.desc}</span>}
+                              </span>
+                            )}
+                            {assignedNow.covers.has(r.id) && (
+                              <span className="mt-0.5 block text-[11px] font-normal text-muted" data-testid="covers-assigned">
+                                Covers the task {assignerText(assignedNow.covers.get(r.id))}
                               </span>
                             )}
                           </td>
@@ -557,6 +611,9 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
                         </tr>
                       );
                     })}
+                    {assignedMine.map((r) => (
+                      <AssignedRow key={r.id} r={r} project={project} showRemoveCell={targetsEditable} />
+                    ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-line bg-surface-2/40 text-xs font-semibold">

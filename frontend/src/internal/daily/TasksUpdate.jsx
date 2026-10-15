@@ -12,6 +12,7 @@ import {
 } from '@/internal/min';
 import { leaveLabel, leaveOn } from '../lib/leave.js';
 import { emptyDaily } from '../lib/domain.js';
+import { dayRowsWithAssigned } from '../lib/assigned.js';
 import { DatePicker } from './DatePicker';
 import { HoursStats } from './HoursStats';
 import { UpdateCard } from './UpdateCard';
@@ -30,7 +31,7 @@ import { nonEmptyExtras } from './planHelpers';
 
 /** Member "Tasks update" page (route /daily). */
 export function TasksUpdate() {
-  const { me, tasks, daily, saveDaily, profiles } = useStore();
+  const { me, tasks, daily, projects, saveDaily, profiles } = useStore();
   const [date, setDate] = useState(latestWorkday);
   const leave = leaveOn(profiles, me, date);
   const key = `${me}|${date}`;
@@ -63,7 +64,9 @@ export function TasksUpdate() {
 
   const dayTasks = useMemo(() => tasks.filter((t) => t.assigneeId === me && t.date === date), [tasks, me, date]);
   const eodSent = !!record.eodAt;
-  const hours = computeDayHours({ plan, extra, eodAt: record.eodAt, entries: record.entries });
+  // the day's rows include the assigned tasks, so the estimates and times agree with the Daily update tables
+  const dayRows = useMemo(() => dayRowsWithAssigned(tasks, daily, me, date, { projects, carry: false }), [tasks, daily, me, date, projects]);
+  const hours = computeDayHours({ plan, extra, eodAt: record.eodAt, entries: dayRows });
 
   return (
     <div className="space-y-6">
@@ -187,7 +190,7 @@ export function TasksUpdate() {
               <HoursStats t={hours} sent={eodSent} />
             </div>
             {plan.length || extra.length ? (
-              <TimeTable plan={plan} extra={nonEmptyExtras(extra)} entries={record.entries ?? []} sent={eodSent} />
+              <TimeTable plan={plan} extra={nonEmptyExtras(extra)} entries={dayRows} sent={eodSent} />
             ) : (
               <p className="text-sm text-muted">No plan for this day yet. Add blocks in Plan your day.</p>
             )}

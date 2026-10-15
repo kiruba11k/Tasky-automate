@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Pencil } from 'lucide-react';
-import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor } from '@/internal/min';
+import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, nt as personName } from '@/internal/min';
 import { weekStart } from '../lib/dates.js';
 import { rowKey, weekRows } from '../lib/entries.js';
+import { dayRowsWithAssigned, weekAssignedRows } from '../lib/assigned.js';
 import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
 
@@ -62,11 +63,13 @@ function TextBox({ value, onSave, label }) {
  * with `editable` the week's numbers and statuses can be typed over right here.
  */
 export function EntriesProgress({ personId, date, kind, editable }) {
-  const { projects, daily, weekly, saveWeekly } = useStore();
+  const { projects, daily, weekly, tasks, saveWeekly } = useStore();
   const monday = weekStart(date);
   const record = weekly[`${personId}|${monday}`];
   const rows =
-    kind === 'day' ? (daily[`${personId}|${date}`]?.entries ?? []) : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides);
+    kind === 'day'
+      ? dayRowsWithAssigned(tasks, daily, personId, date, { projects })
+      : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
   const override = (row, patch) => {
     const key = rowKey(row);
     saveWeekly(personId, monday, {
@@ -137,6 +140,13 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                   >
                     <span className="truncate" title={r.desc}>
                       {name}
+                      {r.assigned && (
+                        <span className="text-muted">
+                          {' · '}
+                          {r.assignedBy?.length ? `assigned by ${r.assignedBy.map((id) => personName(id).split(' ')[0]).join(', ')}` : 'assigned'}
+                          {r.carriedFrom ? ' · carried over' : ''}
+                        </span>
+                      )}
                       {r.desc && <span className="text-muted"> · {r.desc}</span>}
                     </span>
                     {editable && r.kind === 'milestone' ? (

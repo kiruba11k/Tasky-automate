@@ -3,6 +3,7 @@ import { CalendarRange, Pencil, Send } from 'lucide-react';
 import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Ye as toast, We as formatMinutes } from '@/internal/min';
 import { weekStart } from '../lib/dates.js';
 import { weekRows } from '../lib/entries.js';
+import { weekAssignedRows } from '../lib/assigned.js';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
@@ -12,7 +13,7 @@ import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
  * taken time, an Edit mode to type over the numbers, and "Submit end of week". `readOnly` is the manager's view.
  */
 export function WeeklyUpdate({ personId, date, readOnly }) {
-  const { daily, weekly, saveWeekly } = useStore();
+  const { daily, weekly, tasks, projects, saveWeekly } = useStore();
   const mon = weekStart(date);
   const record = weekly[`${personId}|${mon}`];
   const [editing, setEditing] = useState(false);
@@ -29,7 +30,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
     return () => window.removeEventListener(EDIT_WEEK, open);
   }, [readOnly]);
 
-  const rows = weekRows(personId, mon, daily, record?.entries ?? []);
+  const rows = weekRows(personId, mon, daily, record?.entries ?? [], undefined, weekAssignedRows(tasks, daily, personId, mon, { projects }));
   const estimated = rows.reduce((sum, r) => sum + r.estMin, 0);
   const taken = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
   const submit = () =>
@@ -54,7 +55,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
             Weekly update
           </h2>
           <p className="text-xs text-muted">
-            {formatWeekRange(mon)} · fills in from your daily updates. The same task on different days adds up in one row.
+            {formatWeekRange(mon)} · fills in from your daily updates and assigned tasks. The same task on different days adds up in one row.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
