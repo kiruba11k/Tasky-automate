@@ -15,6 +15,8 @@ import { leaveLabel, leaveOn } from '../lib/leave.js';
 import { emptyDaily } from '../lib/domain.js';
 import { dayRowsWithAssigned } from '../lib/assigned.js';
 import { assignedMinutesByProject, autoPlanBlocks } from '../lib/autoPlan.js';
+import { changeProject } from '../lib/changeProject.js';
+import { PROJECT_CHANGED } from './ProjectChanger';
 import { isWeekday, lunchFor, todayKey } from '../lib/dates.js';
 import { DatePicker } from './DatePicker';
 import { HoursStats } from './HoursStats';
@@ -98,6 +100,43 @@ export function TasksUpdate() {
     toast({ title: `Added ${formatMinutes(total)}${first} from tasks assigned to you`, tone: 'success' });
   }, [tasks, me, date, projects, profiles, editable, record.plan, record.extra, record.autoPlanned, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Change the project of one block / extra row (or, with no id, of every block of `from`), also when the day is locked or sent.
+   * Saves at once: the plan, the Daily update rows that follow it, the autoPlanned bookkeeping and, once sent, the eod snapshot.
+   */
+  const changeBlockProject = ({ lane, id, from, to }) =>
+    guarded(() => {
+      const st = useStore.getState();
+      const r = st.daily[key] ?? emptyDaily();
+      const res = changeProject({
+        plan,
+        extra: nonEmptyExtras(extra),
+        entries: r.entries ?? [],
+        autoPlanned: r.autoPlanned ?? {},
+        assigned: assignedMinutesByProject(st.tasks, me, date, { projects: st.projects }),
+        projects: st.projects,
+        from,
+        to,
+        ...(id ? (lane === 'extra' ? { extraId: id } : { blockId: id }) : {}),
+      });
+      if (!res) return;
+      saveDaily(me, date, {
+        plan: res.plan,
+        extra: res.extra,
+        entries: res.entries,
+        autoPlanned: res.autoPlanned,
+        ...(r.eodAt ? { eodAt: r.eodAt } : {}), // same time again: rebuilds the saved end-of-day snapshot, the day stays sent
+      });
+      syncPlanFromStore();
+      if (res.movedEntries) window.dispatchEvent(new CustomEvent(PROJECT_CHANGED, { detail: { from, to } }));
+      toast({ title: r.eodAt ? 'Project changed. Your sent update was refreshed.' : 'Project changed and saved', tone: 'success' });
+    });
+  const lockNote = record.eodAt
+    ? 'Works after you sent the day; the sent update is refreshed.'
+    : record.sodAt || record.entriesAt
+      ? 'Works even though the day is locked.'
+      : '';
+
   const dayTasks = useMemo(() => tasks.filter((t) => t.assigneeId === me && t.date === date), [tasks, me, date]);
   const eodSent = !!record.eodAt;
   // the day's rows include the assigned tasks, so the estimates and times agree with the Daily update tables
@@ -135,7 +174,16 @@ export function TasksUpdate() {
               Blocks marked Auto come from your assigned tasks. Change or delete them freely, they will not come back.
             </p>
           )}
-          <PlanBuilder plan={plan} setPlan={setPlan} extra={extra} setExtra={setExtra} personId={me} date={date} />
+          <PlanBuilder
+            plan={plan}
+            setPlan={setPlan}
+            extra={extra}
+            setExtra={setExtra}
+            personId={me}
+            date={date}
+            onChangeProject={changeBlockProject}
+            lockNote={lockNote}
+          />
           <div className="mt-4 flex justify-end">
             <Button
               onClick={() =>
@@ -151,7 +199,7 @@ export function TasksUpdate() {
           </div>
         </Card>
       </section>
-      <EntriesLog personId={me} date={date} plan={plan} extra={extra} />
+      <EntriesLog personId={me} date={date} plan={plan} extra={extra} onChangeProject={changeBlockProject} lockNote={lockNote} />
       <div className="border-t-2 border-dashed border-line pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Auto-filled updates</h2>

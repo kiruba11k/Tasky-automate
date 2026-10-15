@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, Reorder, motion, useReducedMotion } from 'framer-motion';
-import { CalendarClock, Copy, GripVertical, Lock, Plus, Trash, WandSparkles } from 'lucide-react';
+import { CalendarClock, Copy, GripVertical, Lock, Pencil, Plus, Trash, WandSparkles } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -14,6 +14,7 @@ import { lunchFor, previousWeekday } from '../lib/dates';
 import { DurationInput } from './DurationInput';
 import { LunchRow } from './LunchRow';
 import { ReorderRow } from './ReorderRow';
+import { ProjectChanger } from './ProjectChanger';
 import {
   CUSTOM_PROJECT,
   OTHER_PREFIX,
@@ -38,7 +39,7 @@ const STRIPES = 'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.22) 0 6px,
  * to reorder (blocks flow one after another around lunch) and set planned / actual time per block.
  * `plan` holds the day's time blocks, `extra` the extra hours; both are edited through `setPlan` / `setExtra`.
  */
-export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) {
+export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, onChangeProject, lockNote }) {
   const { projects, daily, profiles } = useStore();
   const reduced = useReducedMotion();
   const [lunch, setLunch] = useState(() => lunchFor(daily, personId, date, profiles));
@@ -62,6 +63,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
   const [minutes, setMinutes] = useState(60);
   const [lane, setLane] = useState('plan');
   const [drag, setDrag] = useState(null);
+  const [editing, setEditing] = useState(null); // { id, lane } of the row whose project is being changed
   const [overTrash, setOverTrash] = useState(false);
   const lineRef = useRef(null);
   const trashRef = useRef(null);
@@ -527,7 +529,19 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
                   <span className="w-5 text-xs font-bold text-muted">{index + 1}</span>
                   <span className="inline-block h-3 w-3 rounded-full" style={{ background: blockColor(group.projectId, group.custom, projects) }} />
                   <span className="min-w-[10rem] flex-1 font-semibold">
-                    {blockLabel(group.projectId, group.custom, projects)}
+                    {editing?.id === group.id && editing.lane === 'plan' ? (
+                      <ProjectChanger
+                        current={group.projectId}
+                        projects={projects}
+                        onCancel={() => setEditing(null)}
+                        onSave={(to) => {
+                          setEditing(null);
+                          onChangeProject?.({ lane: 'plan', id: group.id, from: group.projectId, to });
+                        }}
+                      />
+                    ) : (
+                      blockLabel(group.projectId, group.custom, projects)
+                    )}
                     {group.auto && (
                       <span title="Added automatically from your assigned tasks" className="ml-2 rounded-full bg-lavender/60 px-2 py-0.5 text-[10px] font-bold uppercase text-accent-ink">
                         Auto
@@ -557,6 +571,17 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
                       onChange={(m) => commitPlan(groups.map((g) => (g.id === group.id ? { ...g, actual: m ?? undefined } : g)))}
                     />
                   </label>
+                  {onChangeProject && (
+                    <button
+                      aria-label="Edit block project"
+                      title={lockNote ? `Change project. ${lockNote}` : 'Change project'}
+                      data-testid="edit-block"
+                      className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink"
+                      onClick={() => setEditing({ id: group.id, lane: 'plan' })}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
                   <button
                     aria-label="Remove block"
                     className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink"
@@ -590,7 +615,19 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
                     <span className="rounded bg-lavender-strong px-1.5 py-0.5 text-[9px] font-bold text-white">EXTRA</span>
                     <span className="inline-block h-3 w-3 rounded-full" style={{ background: blockColor(item.projectId, undefined, projects) }} />
                     <span className="min-w-[10rem] flex-1 font-semibold">
-                      {blockLabel(item.projectId, undefined, projects)}
+                      {editing?.id === item.id && editing.lane === 'extra' ? (
+                        <ProjectChanger
+                          current={item.projectId}
+                          projects={projects}
+                          onCancel={() => setEditing(null)}
+                          onSave={(to) => {
+                            setEditing(null);
+                            onChangeProject?.({ lane: 'extra', id: item.id, from: item.projectId, to });
+                          }}
+                        />
+                      ) : (
+                        blockLabel(item.projectId, undefined, projects)
+                      )}
                       <span className="block text-xs font-normal text-muted">
                         <CalendarClock size={11} className="mr-1 inline" />
                         {laid?.start} to {laid?.end}
@@ -605,6 +642,16 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
                         onChange={(m) => m && m >= 5 && commitExtra(extras.map((x) => (x.id === item.id ? { ...x, minutes: m } : x)))}
                       />
                     </label>
+                    {onChangeProject && (
+                      <button
+                        aria-label="Edit extra hours project"
+                        title={lockNote ? `Change project. ${lockNote}` : 'Change project'}
+                        className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink"
+                        onClick={() => setEditing({ id: item.id, lane: 'extra' })}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     <button
                       aria-label="Remove extra hours"
                       className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink"

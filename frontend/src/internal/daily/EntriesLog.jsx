@@ -18,6 +18,8 @@ import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
 import { assignedDay } from '../lib/assigned.js';
 import { DurationInput } from './DurationInput';
 import { EntryKindSelect } from './EntryKindSelect';
+import { ProjectChanger, PROJECT_CHANGED } from './ProjectChanger';
+import { moveEntries } from '../lib/changeProject.js';
 import { formatClock, formatDayClock } from './dateHelpers';
 import { blockMinutes } from './planHelpers';
 import {
@@ -83,7 +85,7 @@ function AssignedRow({ r, project, showRemoveCell }) {
  * (number, milestone or text), target and actual, estimated and taken time and notes. Two locks: first the targets, then the
  * actuals; "Send end of day" is available once the actuals are locked. `readOnly` is the manager's view of someone else's.
  */
-export function EntriesLog({ personId, date, plan, extra, readOnly }) {
+export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProject, lockNote }) {
   const { projects, daily, tasks, saveDaily } = useStore();
   const key = date;
   const record = daily[`${personId}|${key}`] ?? emptyDaily();
@@ -98,6 +100,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
   const [pick, setPick] = useState('');
   const [otherName, setOtherName] = useState('');
   const [renaming, setRenaming] = useState(null);
+  const [changing, setChanging] = useState(null); // pid of the table whose project is being changed
 
   useEffect(() => {
     setRows(stored);
@@ -115,6 +118,18 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
     };
     window.addEventListener(EDIT_DAY_TASKS, open);
     return () => window.removeEventListener(EDIT_DAY_TASKS, open);
+  }, [readOnly]);
+
+  // A project change saved from the plan (or from a table header): rows still being edited here follow it too.
+  useEffect(() => {
+    if (readOnly) return undefined;
+    const follow = (e) => {
+      const { from, to } = e.detail ?? {};
+      setRows((list) => moveEntries(list, from, to, useStore.getState().projects));
+      setAdded((list) => (list.includes(from) ? [...new Set(list.map((p) => (p === from ? to : p)))] : list));
+    };
+    window.addEventListener(PROJECT_CHANGED, follow);
+    return () => window.removeEventListener(PROJECT_CHANGED, follow);
   }, [readOnly]);
 
   const targetsLocked = !!record.entriesAt && !unlocked;
@@ -187,6 +202,21 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
     setAdded((list) => [...list.filter((p) => p !== renaming.pid), next]);
     if (stored.some((r) => r.projectId === renaming.pid)) save({ entries: rename(stored) });
     setRenaming(null);
+  };
+  /** Change a table's project: plan blocks and saved rows move together (saved straight away, also when locked or sent). */
+  const changeTableProject = (pid, to) => {
+    setChanging(null);
+    if (to === pid) return;
+    const inPlan = blocks.some((b) => (b.custom ? (b.custom.projectId ?? b.projectId) : b.projectId) === pid) || extras.some((x) => x.projectId === pid || (!x.projectId && `${OTHER}${x.work}` === pid));
+    if (inPlan && onChangeProject) {
+      onChangeProject({ from: pid, to });
+      return;
+    }
+    const next = to; // rows join the table of the new project when it already exists
+    setRows((list) => moveEntries(list, pid, next, projects));
+    setAdded((list) => [...new Set(list.map((p) => (p === pid ? next : p)))]);
+    if (stored.some((r) => r.projectId === pid))
+      save({ entries: moveEntries(stored, pid, next, projects), ...(record.eodAt ? { eodAt: record.eodAt } : {}) });
   };
   const addable = projects.filter((p) => p.status === 'active' && !groups.some((g) => g.pid === p.id));
   const addProject = (value) => {
@@ -375,10 +405,23 @@ export function EntriesLog({ personId, date, plan, extra, readOnly }) {
                       <X size={14} />
                     </button>
                   </span>
+                ) : changing === pid ? (
+                  <ProjectChanger current={pid} projects={projects} label="Table project" onCancel={() => setChanging(null)} onSave={(to) => changeTableProject(pid, to)} />
                 ) : (
                   <p className="flex items-center gap-1.5 font-semibold">
                     {name}
                     {!project && <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-bold text-muted">OTHER WORK</span>}
+                    {!readOnly && !assignedPids.has(pid) && (
+                      <button
+                        aria-label={`Change project of ${name}`}
+                        title={lockNote ? `Change project. ${lockNote}` : 'Change project'}
+                        data-testid="change-table-project"
+                        className="focus-ring flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] font-semibold text-accent-ink hover:bg-surface-2"
+                        onClick={() => setChanging(pid)}
+                      >
+                        <Pencil size={11} /> Change project
+                      </button>
+                    )}
                     {!readOnly && isAdded && !project && (
                       <button
                         aria-label={`Rename ${name}`}
