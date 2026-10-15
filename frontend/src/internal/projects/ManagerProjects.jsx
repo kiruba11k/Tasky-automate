@@ -1,3 +1,4 @@
+import { mineFirst } from '@/internal/lib/mine';
 import { ReadMore } from '@/internal/ui/ReadMore';
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
@@ -13,9 +14,11 @@ export function ManagerProjects() {
   // proposals this person sent that are still waiting: they show here so the sender can see they were sent
   const sent = projects.filter((p) => p.status === 'pending' && p.pmId === me);
   const [onboardOpen, setOnboardOpen] = useState(false);
-  const active = projects
-    .map((p, i) => ({ p, color: PROJECT_COLORS[i % PROJECT_COLORS.length] }))
-    .filter(({ p }) => p.status === 'active');
+  const colorOf = (p) => PROJECT_COLORS[projects.indexOf(p) % PROJECT_COLORS.length];
+  // the projects this person owns or is on come first
+  const active = mineFirst(projects, me)
+    .filter((p) => p.status === 'active')
+    .map((p) => ({ p, color: colorOf(p) }));
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">

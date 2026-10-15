@@ -1,3 +1,4 @@
+import { mineFirst } from '@/internal/lib/mine';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -39,8 +40,8 @@ export function Dashboard() {
       ...projects.filter((p) => p.status === 'active' && (p.hours[me] ?? 0) > 0).map((p) => p.id),
       ...myTasks.map((t) => t.projectId),
     ]);
-    return projects
-      .map((p, i) => ({ p, color: PROJECT_COLORS[i % PROJECT_COLORS.length], hours: p.hours[me] ?? 0 }))
+    return mineFirst(projects, me)
+      .map((p) => ({ p, color: PROJECT_COLORS[projects.indexOf(p) % PROJECT_COLORS.length], hours: p.hours[me] ?? 0 }))
       .filter((x) => ids.has(x.p.id));
   }, [projects, myTasks, me]);
 

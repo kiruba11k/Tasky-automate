@@ -88,10 +88,15 @@ export function AnonymousChat({ onClose }) {
   }, [burst]);
   const isNew = (m) => seen.current && seen.current.convId === active?.id && !seen.current.initial?.has(m.id) && Date.now() - new Date(m.at).getTime() < 4000;
 
-  const convTitle = (conv) =>
-    conv.group
-      ? conv.name
-      : `${conv.anonymous === false ? 'Chat' : 'Anonymous chat'} with ${conv.anonymous === false ? fullName(conv.memberIds.find((id) => id !== me) ?? '') : firstName(conv.memberIds.find((id) => id !== me) ?? '')}`;
+  // An anonymous one-to-one chat names nobody: the other person would otherwise see exactly who started it.
+  // Several of them are told apart by a number.
+  const anonDirect = myConvs.filter((c) => !c.group && c.anonymous !== false);
+  const convTitle = (conv) => {
+    if (conv.group) return conv.name;
+    const other = conv.memberIds.find((id) => id !== me) ?? '';
+    if (conv.anonymous === false) return `Chat with ${fullName(other)}`;
+    return anonDirect.length > 1 ? `Anonymous chat ${anonDirect.findIndex((c) => c.id === conv.id) + 1}` : 'Anonymous chat';
+  };
   const submit = (text) => {
     const t = text.trim();
     if (!t || !active) return;

@@ -1,3 +1,4 @@
+import { mineFirst } from '@/internal/lib/mine';
 import { ReadMore } from '@/internal/ui/ReadMore';
 import React from 'react';
 import { Check, X, CalendarClock } from 'lucide-react';
@@ -34,7 +35,7 @@ export function ManagerDashboard() {
   const { me, projects, tasks, decideProject } = useStore();
   const canDecide = isApprover(me);
   const pending = projects.filter((p) => p.status === 'pending');
-  const active = projects.filter((p) => p.status === 'active');
+  const active = mineFirst(projects, me).filter((p) => p.status === 'active');
   const today = dayKey(0);
   const meetings = active
     .flatMap((p) => p.meetings.filter((m) => m.date >= today).map((m) => ({ ...m, project: p.name })))

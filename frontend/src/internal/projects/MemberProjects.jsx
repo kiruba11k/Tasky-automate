@@ -1,3 +1,4 @@
+import { mineFirst } from '@/internal/lib/mine';
 import { ReadMore } from '@/internal/ui/ReadMore';
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
@@ -10,9 +11,9 @@ import { ProjectFormModal } from './ProjectFormModal';
 export function MemberProjects() {
   const { me, projects } = useStore();
   const [proposeOpen, setProposeOpen] = useState(false);
-  const mine = projects
-    .map((p, i) => ({ p, color: PROJECT_COLORS[i % PROJECT_COLORS.length] }))
-    .filter(({ p }) => p.pmId === me || p.teamIds.includes(me) || (p.admins ?? []).includes(me));
+  const mine = mineFirst(projects, me)
+    .filter((p) => p.pmId === me || p.teamIds.includes(me) || (p.admins ?? []).includes(me))
+    .map((p) => ({ p, color: PROJECT_COLORS[projects.indexOf(p) % PROJECT_COLORS.length] }));
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">

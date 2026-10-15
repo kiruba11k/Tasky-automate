@@ -1,3 +1,4 @@
+import { mineFirst } from '@/internal/lib/mine';
 import { ReadMore } from '@/internal/ui/ReadMore';
 import { isAdminTier } from '@/internal/lib/constants';
 import React, { useState, useEffect } from 'react';
@@ -42,7 +43,7 @@ export function AssignTasks() {
   const { me, tasks, projects, assignMany } = useStore();
   const myRole = PEOPLE.find((G) => G.id === me)?.role;
   const isManager = isAdminTier(myRole);
-  const myProjects = projects.filter(
+  const myProjects = mineFirst(projects, me).filter(
     (G) => G.status === 'active' && (canAssignOnProject(G, me) || G.teamIds.includes(me)),
   );
   const [projectId, setProjectId] = useState(myProjects[0]?.id ?? '');
