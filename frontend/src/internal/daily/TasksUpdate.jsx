@@ -9,10 +9,13 @@ import {
   lt as guarded,
   Ye as toast,
   zw as computeDayHours,
+  We as formatMinutes,
 } from '@/internal/min';
 import { leaveLabel, leaveOn } from '../lib/leave.js';
 import { emptyDaily } from '../lib/domain.js';
 import { dayRowsWithAssigned } from '../lib/assigned.js';
+import { assignedMinutesByProject, autoPlanBlocks } from '../lib/autoPlan.js';
+import { isWeekday, lunchFor, todayKey } from '../lib/dates.js';
 import { DatePicker } from './DatePicker';
 import { HoursStats } from './HoursStats';
 import { UpdateCard } from './UpdateCard';
@@ -28,6 +31,7 @@ import { WeeklyUpdate } from './WeeklyUpdate';
 import { WeeklyHours } from './WeeklyHours';
 import { latestWorkday, formatShortDate } from './dateHelpers';
 import { nonEmptyExtras } from './planHelpers';
+import { blocksKey } from './planBlocks';
 
 /** Member "Tasks update" page (route /daily). */
 export function TasksUpdate() {
@@ -62,6 +66,38 @@ export function TasksUpdate() {
     }
   };
 
+  // The plan follows the assigned work: top it up with the minutes assigned per project that it does not hold yet. Only on the
+  // owner's own editable day, and never over unsaved edits in the builder.
+  const editable = date >= todayKey(0) && isWeekday(date) && !record.eodAt && !(leave && leave.kind !== 'half');
+  useEffect(() => {
+    if (!editable) return;
+    const st = useStore.getState();
+    const r = st.daily[`${me}|${date}`] ?? emptyDaily();
+    const sameExtra = (a, b) => (a ?? []).map((x) => `${x.id}|${x.minutes}`).join() === (b ?? []).map((x) => `${x.id}|${x.minutes}`).join();
+    const byStart = (l) => blocksKey([...l].sort((a, b) => a.start.localeCompare(b.start)));
+    if (byStart(plan) !== byStart(r.plan ?? []) || !sameExtra(extra, r.extra)) return; // unsaved edits in the builder
+    const assigned = assignedMinutesByProject(st.tasks, me, date, { projects: st.projects });
+    const names = Object.fromEntries(st.projects.map((p) => [p.id, p.name]));
+    const res = autoPlanBlocks({
+      plan: r.plan ?? [],
+      extra: r.extra ?? [],
+      autoPlanned: r.autoPlanned ?? {},
+      assigned,
+      lunch: lunchFor(st.daily, me, date, st.profiles),
+      names,
+    });
+    if (!res) return;
+    try {
+      st.saveDaily(me, date, { plan: res.plan, extra: res.extra, autoPlanned: res.autoPlanned });
+    } catch {
+      return;
+    }
+    syncPlanFromStore();
+    const total = Object.values(res.added).reduce((a, b) => a + b, 0);
+    const first = Object.keys(res.added).length === 1 ? ` ${names[Object.keys(res.added)[0]] ?? ''}` : '';
+    toast({ title: `Added ${formatMinutes(total)}${first} from tasks assigned to you`, tone: 'success' });
+  }, [tasks, me, date, projects, profiles, editable, record.plan, record.extra, record.autoPlanned, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const dayTasks = useMemo(() => tasks.filter((t) => t.assigneeId === me && t.date === date), [tasks, me, date]);
   const eodSent = !!record.eodAt;
   // the day's rows include the assigned tasks, so the estimates and times agree with the Daily update tables
@@ -94,6 +130,11 @@ export function TasksUpdate() {
             <h2 className="text-base font-bold">Plan your day</h2>
             <HoursStats t={hours} sent={eodSent} />
           </div>
+          {(plan.some((b) => b.auto) || extra.some((x) => x.auto)) && (
+            <p className="mb-2 text-xs text-muted" data-testid="auto-plan-note">
+              Blocks marked Auto come from your assigned tasks. Change or delete them freely, they will not come back.
+            </p>
+          )}
           <PlanBuilder plan={plan} setPlan={setPlan} extra={extra} setExtra={setExtra} personId={me} date={date} />
           <div className="mt-4 flex justify-end">
             <Button

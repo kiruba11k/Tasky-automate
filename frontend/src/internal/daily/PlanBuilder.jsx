@@ -107,6 +107,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
         minutes: item.minutes,
         work: saved?.work || blockLabel(item.projectId, undefined, projects),
         projectId: !item.projectId.startsWith(OTHER_PREFIX) ? item.projectId : undefined,
+        ...(saved?.auto ? { auto: true } : {}),
       };
       at += item.minutes;
       return out;
@@ -527,6 +528,11 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date }) 
                   <span className="inline-block h-3 w-3 rounded-full" style={{ background: blockColor(group.projectId, group.custom, projects) }} />
                   <span className="min-w-[10rem] flex-1 font-semibold">
                     {blockLabel(group.projectId, group.custom, projects)}
+                    {group.auto && (
+                      <span title="Added automatically from your assigned tasks" className="ml-2 rounded-full bg-lavender/60 px-2 py-0.5 text-[10px] font-bold uppercase text-accent-ink">
+                        Auto
+                      </span>
+                    )}
                     <span className="block text-xs font-normal text-muted">
                       <CalendarClock size={11} className="mr-1 inline" />
                       {pieces.map((b) => `${b.start} to ${b.end}`).join(', ')}

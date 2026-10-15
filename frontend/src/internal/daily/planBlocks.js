@@ -51,7 +51,7 @@ export function groupBlocks(blocks) {
         group.minutes += minutes;
         if (block.actualMinutes != null) group.actual = (group.actual ?? 0) + block.actualMinutes;
       } else {
-        groups.set(id, { id, projectId: block.projectId, minutes, actual: block.actualMinutes, custom: block.custom });
+        groups.set(id, { id, projectId: block.projectId, minutes, actual: block.actualMinutes, custom: block.custom, auto: block.auto });
       }
     });
   return [...groups.values()];
@@ -83,6 +83,7 @@ export function flowBlocks(groups, lunch) {
         taskIds: [],
         custom: group.custom,
         actualMinutes: actual,
+        ...(group.auto ? { auto: true } : {}),
       });
     });
   });
