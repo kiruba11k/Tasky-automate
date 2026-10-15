@@ -64,12 +64,12 @@ export const makeCounts = (messages, responses, l2, calls, interest, meetings, d
 
 // ------------------------------------------------------ roles / permissions
 
-/** `ea` - owner, admin or leadership may manage a project. */
+/** `ea` - only the project's owner, its admins and the main admins (managers, founders) may manage a project. */
 export function canManageProject(project, personId) {
   return project
     ? project.pmId === personId ||
         (project.admins ?? []).includes(personId) ||
-        isAdminTier(roleOf(personId))
+        isLeadership(roleOf(personId)) // managers and founders; a project manager only manages their own projects
     : false;
 }
 

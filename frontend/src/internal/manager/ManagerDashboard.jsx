@@ -1,3 +1,4 @@
+import { ReadMore } from '@/internal/ui/ReadMore';
 import React from 'react';
 import { Check, X, CalendarClock } from 'lucide-react';
 import {
@@ -61,7 +62,7 @@ export function ManagerDashboard() {
                     {'Proposed by '}
                     {firstName(project.pmId)}
                     {' · '}
-                    {project.description || 'No description'}
+                    <ReadMore as="span" text={project.description || 'No description'} limit={120} />
                     {' · '}
                     {formatDate(project.startDate)}
                     {' to '}

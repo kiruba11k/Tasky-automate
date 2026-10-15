@@ -1,3 +1,4 @@
+import { ReadMore } from '@/internal/ui/ReadMore';
 import { isAdminTier } from '@/internal/lib/constants';
 import React, { useState, useEffect } from 'react';
 import { RotateCcwClock, Plus, Gauge, ShoppingBasket, Trash, Send, Star } from 'lucide-react';
@@ -280,7 +281,7 @@ export function AssignTasks() {
                 ))}
               </div>
               {project.description && (
-                <p className="mt-2 rounded-xl bg-surface-2 p-3 text-sm text-muted">{project.description}</p>
+                <ReadMore text={project.description} className="mt-2 rounded-xl bg-surface-2 p-3 text-sm text-muted" />
               )}
             </div>
             <div>

@@ -1,7 +1,7 @@
 // The tracker store. Its data lives on the server and is kept in step by sync.js.
 import { create } from "zustand";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel } from "./lib/dates.js";
-import { PEOPLE, TASK_TYPES, isAdminTier, isApprover, approverNames, roleOf } from "./lib/constants.js";
+import { PEOPLE, TASK_TYPES, isAdminTier, isLeadership, isApprover, approverNames, roleOf } from "./lib/constants.js";
 import {
   DEFAULT_METRICS,
   EMPTY_COUNTS,
@@ -113,7 +113,7 @@ export const useStore = create()(
       /** `f` - project must be owned by me (or I am leadership). */
       const requireOwner = (id) => {
         const project = requireProject(id);
-        if (project.pmId !== get().me && !isAdminTier(roleOf(get().me)))
+        if (project.pmId !== get().me && !isLeadership(roleOf(get().me)))
           throw new Error("Only the project owner can do this.");
         return project;
       };

@@ -51,6 +51,17 @@ describe('send for approval: anyone sends their own unassigned work to a reviewe
   });
   after(() => server.close());
 
+  test('only the project owner, its admins and the main admins edit a project', async () => {
+    const admin = await login('boss@example.com');
+    assert.equal((await put(tok.pm, 'project', 'p1', { description: 'by owner' })).ok, true);
+    assert.equal((await put(tok.other, 'project', 'p1', { description: 'by another project manager' })).ok, false);
+    assert.equal((await put(tok.res, 'project', 'p1', { description: 'by a team member' })).ok, false);
+    assert.equal((await put(admin, 'project', 'p1', { description: 'by a main admin' })).ok, true);
+    assert.equal((await put(tok.pm, 'project', 'p1', { admins: [ids.other] })).ok, true);
+    assert.equal((await put(tok.other, 'project', 'p1', { description: 'by a project admin' })).ok, true);
+    assert.equal((await put(tok.pm, 'project', 'p1', { admins: [] })).ok, true);
+  });
+
   test('a team member sends their own work to the project manager', async () => {
     assert.equal((await put(tok.res, 'task', 'a1', adhoc('res'))).ok, true);
   });

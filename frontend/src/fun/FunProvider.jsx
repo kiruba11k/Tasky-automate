@@ -83,7 +83,9 @@ const JOKES = [
   'Stretch break? I will guard your tasks. 🧘',
 ];
 
-function FunProviderFull({ children }) {
+/** The playful layer's engine: all its state, timers and overlays. It does not wrap the app; it hands its context value to FunProvider
+ *  (`publish`), so switching Fun mode on or off never remounts the app underneath. */
+function FunEngine({ publish }) {
   const { user } = useAuth();
   const [settings, setSettingsState] = useState(loadSettings);
   const [mood, setMood] = useState('happy');
@@ -365,9 +367,9 @@ function FunProviderFull({ children }) {
   const value = useMemo(() => ({ settings, setSettings, stats, celebrate, say, mood, refreshStats: loadStats }), [settings, setSettings, stats, celebrate, say, mood, loadStats]);
 
   const scope = `fun-scope${settings.cartoon ? ' fun' : ''}${settings.anim === 'calm' ? ' calm' : ''}`;
+  useEffect(() => { publish(value); }, [publish, value]);
   return (
-    <FunContext.Provider value={value}>
-      {children}
+    <>
       <div id="fun-portal" className={scope} />
       <div className={scope}>
       {settings.mascot && (
@@ -410,7 +412,7 @@ function FunProviderFull({ children }) {
       {scene && <ChaseCutscene key={scene.id} kind={scene.kind} onDone={() => setScene(null)} />}
       <BadgeUnlock badge={badgeQueue[0]} onClose={() => setBadgeQueue((q) => q.slice(1))} />
       </div>
-    </FunContext.Provider>
+    </>
   );
 }
 
@@ -419,20 +421,27 @@ const noop = () => {};
 const PRO_VALUE = { settings: PRO_SETTINGS, setSettings: noop, stats: null, celebrate: noop, say: noop, mood: 'happy', refreshStats: noop };
 
 /** Founder view: no mascot, 3D, sounds, effects or games. Same data and permissions as an admin, plain and professional. */
-function FunProviderPro({ children }) {
+function ProEffects() {
   useEffect(() => {
     document.body.classList.remove('fun', 'party');
     document.body.classList.add('calm', 'pro');
     return () => document.body.classList.remove('pro');
   }, []);
-  return <FunContext.Provider value={PRO_VALUE}>{children}</FunContext.Provider>;
+  return null;
 }
 
-/** `enabled` (the person's Fun mode switch) turns the whole layer on; founders never get it. Without the prop, everyone but founders does. */
+/** `enabled` (the person's Fun mode switch) turns the whole layer on; founders never get it. Without the prop, everyone but founders does.
+ *  The app is always rendered in the same place, so turning the layer on or off changes only what sits beside it (no remount, no blink). */
 export function FunProvider({ children, enabled }) {
   const { user } = useAuth();
   const on = enabled === undefined ? !user?.founder : enabled && !user?.founder;
-  return on ? <FunProviderFull>{children}</FunProviderFull> : <FunProviderPro>{children}</FunProviderPro>;
+  const [engine, setEngine] = useState(null);
+  return (
+    <FunContext.Provider value={on && engine ? engine : PRO_VALUE}>
+      {children}
+      {on ? <FunEngine publish={setEngine} /> : <ProEffects />}
+    </FunContext.Provider>
+  );
 }
 
 /** The class that scopes the fun styles (see postcss.config.js), with the person's fun / calm choices. */

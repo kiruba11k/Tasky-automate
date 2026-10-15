@@ -61,8 +61,7 @@ export function Shell() {
   const unreadChat = notices.filter((n) => n.to === me && !n.read && (n.kind === 'chat' || n.text.includes('anonymous'))).length;
   const navigate = useNavigate();
   // new-notice cards and desktop alerts are shown by <Alerts /> (App.jsx)
-  // turning Fun mode on or off swaps the whole layer (the layout below remounts), so the Theme dialog is reopened afterwards
-  const [themeOpen, setThemeOpen] = useState(() => { try { const o = sessionStorage.getItem('tracker_theme_open') === '1'; sessionStorage.removeItem('tracker_theme_open'); return o; } catch { return false; } });
+  const [themeOpen, setThemeOpen] = useState(false);
   const hasFun = useFunMode().on; // the playful layer (3D scenes, hub, games, birds) is a per-person switch in the Theme dialog; founders never have it
   const isManager = isManagerRole(person.role); // manager or founder: the main admins
   const isAdmin = isAdminTier(person.role); // main admins and project managers

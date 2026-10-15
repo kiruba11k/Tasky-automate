@@ -1,4 +1,4 @@
-import { isAdminTier, isApprover, approverNames } from '@/internal/lib/constants';
+import { isLeadership, isApprover, approverNames } from '@/internal/lib/constants';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Crown, ArrowRightLeft, Plus, ShieldCheck, Trash, X } from 'lucide-react';
 import {
@@ -49,7 +49,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
   } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isManager = isApprover(me); // only approvers put a project live; everyone else sends it for approval
-  const isAdmin = isAdminTier(roleOf(me));
+  const isAdmin = isLeadership(roleOf(me));
   const ownerId = edit ? edit.pmId : me;
   const canManageAdmins = !edit || edit.pmId === me || isAdmin;
 

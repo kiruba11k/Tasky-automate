@@ -203,7 +203,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (!prev && data.status !== 'pending' && !approves) return false;
         if (deleting && !approves && !mine(p.pmId)) return false; // only an approver or the project's manager deletes a project
         if (prev?.status === 'pending' && (changed.includes('status') || deleting) && !approves && !(deleting && mine(prev.pmId))) return false;
-        if (lead(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true; // admins: managers, founders and PMs
+        if (leadership(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true; // only the project's owner, its admins and the main admins edit it
         // everyone else on the team may only record that a day was finalized (when they send their end of day)
         return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
       }

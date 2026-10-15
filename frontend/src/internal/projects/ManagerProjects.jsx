@@ -1,3 +1,4 @@
+import { ReadMore } from '@/internal/ui/ReadMore';
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Se as useStore, Te as Button, rt as Card, Kw as PendingPanel, Tr as PROJECT_COLORS } from '@/internal/min';
@@ -25,9 +26,10 @@ export function ManagerProjects() {
       </div>
       {sent.map((p) => (
         <PendingPanel key={p.id} color="#94A3B8" title={p.name} meta={`Sent for approval to ${approverNames()}`}>
-          <p className="p-4 text-sm text-muted">
-            {p.description || 'No description'} · Once approved you can set targets and assign tasks.
-          </p>
+          <div className="p-4 text-sm text-muted">
+            <ReadMore text={p.description || 'No description'} />
+            <p className="mt-1">Once approved you can set targets and assign tasks.</p>
+          </div>
         </PendingPanel>
       ))}
       {active.map(({ p, color }) => (

@@ -1,3 +1,4 @@
+import { ReadMore } from '@/internal/ui/ReadMore';
 import { useMemo, useState } from 'react';
 import { Sparkles, Trophy, Crown } from 'lucide-react';
 import {
@@ -103,7 +104,7 @@ export function Spotlight() {
     const project = winners.project;
     detail = (
       <div className="space-y-3">
-        <p className="text-sm text-muted">{project.description}</p>
+        <ReadMore text={project.description} className="text-sm text-muted" />
         <p className="text-sm">
           Led by <b>{firstName(project.pmId)}</b> · team {project.teamIds.map(firstName).join(', ')}
         </p>

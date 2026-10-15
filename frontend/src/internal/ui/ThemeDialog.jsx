@@ -64,7 +64,7 @@ export function ThemeDialog({ open, onClose }) {
   const [showCustom, setShowCustom] = useState(false);
   const custom = theme.custom;
   const fun = useFunMode();
-  const toggleFun = (value) => { try { sessionStorage.setItem('tracker_theme_open', '1'); } catch { /* ignore */ } fun.set(value); };
+  const toggleFun = (value) => fun.set(value); // the app is not remounted any more, so the dialog simply stays open
   const alertSound = useStore((st) => st.profiles[st.me]?.alertSound !== false);
   const mine = { ...MY_DEFAULT, ...useStore((st) => st.profiles[st.me]?.myTheme) };
   const cartoon = useStore((st) => Boolean(st.profiles[st.me]?.cartoon));

@@ -1,4 +1,5 @@
-import { isAdminTier } from '@/internal/lib/constants';
+import { ReadMore } from '@/internal/ui/ReadMore';
+import { isLeadership } from '@/internal/lib/constants';
 import React from 'react';
 import { Settings2, Crown, ShieldCheck } from 'lucide-react';
 import {
@@ -30,7 +31,7 @@ export function ProjectHero({ p, color, onEdit }) {
       ? 'You own this project'
       : p.admins.includes(me)
         ? 'You are a project admin'
-        : isAdminTier(roleOf(me))
+        : isLeadership(roleOf(me))
           ? 'Management'
           : 'You are on the team';
   const onTeam = p.teamIds.includes(me) || p.hours[me] != null;
@@ -61,7 +62,7 @@ export function ProjectHero({ p, color, onEdit }) {
             {p.client} · {role}
           </p>
           <h2 className="text-2xl font-extrabold text-white">{p.name}</h2>
-          {p.description && <p className="mt-1 max-w-2xl text-sm text-white/85">{p.description}</p>}
+          {p.description && <ReadMore text={p.description} className="mt-1 max-w-2xl text-sm text-white/85" buttonClassName="text-white" />}
         </div>
         {canEdit && onEdit && (
           <Button
