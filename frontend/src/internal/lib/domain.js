@@ -10,6 +10,7 @@ import {
   resolvePeriod,
   shiftPeriod,
   todayKey,
+  toDateKey,
   weekStart,
   WEEKDAY_SHORT,
 } from "./dates.js";
@@ -302,6 +303,19 @@ export function defaultTaskTitle(typeId, qty, variant) {
 /** `rc` - submitted for review or approved. */
 export const isSubmitted = (task) => task.status === "done" || task.status === "in_review";
 
+/**
+ * The day a submitted task's work counts for (Tasks done, time worked, on time): the day it was sent in, never before the day
+ * it was assigned for. A task carried over from an earlier day and finished today counts today; an open or never-sent task
+ * stays on its own day.
+ */
+export function workDate(task) {
+  if (!isSubmitted(task) || !task.submittedAt) return task.date;
+  const at = new Date(task.submittedAt);
+  if (Number.isNaN(at.getTime())) return task.date;
+  const day = toDateKey(at);
+  return day > task.date ? day : task.date;
+}
+
 /** `LV` - true/false when within target time, null when not measurable. */
 export function wasOnTime(task) {
   return !isSubmitted(task) || !task.minutes || !task.doneQty || !task.qty
@@ -473,15 +487,14 @@ export function targetVsActualRows(tasks, assigneeId, from, to, opts = {}) {
   tasks.forEach((t) => {
     if (
       (assigneeId && t.assigneeId !== assigneeId) ||
-      t.date < from ||
-      t.date > to ||
       (opts.projectId && t.projectId !== opts.projectId) ||
       (opts.includeHistoric === false && t.historic)
     )
       return;
-    const b = bucket(t.date, t.projectId, taskBreakdownKey(t));
-    b.tasksT += t.qty;
-    if (isSubmitted(t)) b.tasksA += t.doneQty ?? 0;
+    // the target belongs to the day the task was assigned for, the finished work to the day it was sent in
+    if (t.date >= from && t.date <= to) bucket(t.date, t.projectId, taskBreakdownKey(t)).tasksT += t.qty;
+    const done = workDate(t);
+    if (isSubmitted(t) && done >= from && done <= to) bucket(done, t.projectId, taskBreakdownKey(t)).tasksA += t.doneQty ?? 0;
   });
   const projectOf = (id) => opts.projects?.find((p) => p.id === id);
   if (opts.daily && assigneeId) {
@@ -632,21 +645,36 @@ export function projectEodStatus(project, state, day = todayKey(0)) {
   return { sent, pending: project.teamIds.filter((id) => !sent.includes(id)) };
 }
 
-/** Minutes logged on a day: per project the larger of the submitted tasks' time and the time typed in that day's tables. */
-export function dayLoggedMinutes(tasks, daily, personId, date) {
+/**
+ * A person's day record as the hours maths sees it: the saved record, its table rows, and for every project the part of the
+ * submitted tasks' time (tasks sent in that day) that the typed time does not reach yet, so a project's day is the larger of the two.
+ * This is the same record the "Tasks update" tables build (lib/assigned.js), kept here so metrics and pages cannot drift apart.
+ */
+export function dayRecordWithTaskTime(tasks, daily, personId, date) {
+  const record = daily?.[`${personId}|${date}`];
+  const rows = dayEntries(daily, personId, date);
   const taskMin = new Map();
-  tasks.forEach((t) => {
-    if (t.assigneeId === personId && t.date === date && isSubmitted(t) && t.minutes) taskMin.set(t.projectId, (taskMin.get(t.projectId) ?? 0) + t.minutes);
+  (tasks ?? []).forEach((t) => {
+    if (t.assigneeId === personId && t.minutes > 0 && isSubmitted(t) && workDate(t) === date) taskMin.set(t.projectId, (taskMin.get(t.projectId) ?? 0) + t.minutes);
   });
-  const rowMin = new Map();
-  dayEntries(daily, personId, date).forEach((e) => {
-    if (e.actualMin > 0) rowMin.set(e.projectId, (rowMin.get(e.projectId) ?? 0) + e.actualMin);
+  const typed = new Map();
+  rows.forEach((e) => {
+    if (e.actualMin > 0) typed.set(e.projectId, (typed.get(e.projectId) ?? 0) + e.actualMin);
   });
-  let total = 0;
-  new Set([...taskMin.keys(), ...rowMin.keys()]).forEach((id) => {
-    total += Math.max(taskMin.get(id) ?? 0, rowMin.get(id) ?? 0);
+  const extra = [];
+  taskMin.forEach((m, projectId) => {
+    const more = m - (typed.get(projectId) ?? 0);
+    if (more > 0) extra.push({ id: `task|${projectId}`, projectId, actualMin: more });
   });
-  return total;
+  return record || extra.length ? { ...record, entries: [...rows, ...extra] } : record;
+}
+
+/** The single source of truth for "hours worked" on a day: plan blocks, table time and task time, the larger per project. */
+export const dayWorkedMinutes = (tasks, daily, personId, date) => dayHours(dayRecordWithTaskTime(tasks, daily, personId, date)).actualMin;
+
+/** Minutes worked on a day (see dayWorkedMinutes); extra hours are separate. */
+export function dayLoggedMinutes(tasks, daily, personId, date) {
+  return dayWorkedMinutes(tasks, daily, personId, date);
 }
 
 /**
@@ -712,7 +740,7 @@ export const METRIC_LABELS = {
 export const METRIC_HELP = {
   onTime: "Share of submitted tasks finished within their target time",
   tasks: "Tasks submitted for approval or approved",
-  hours: "Time recorded on submitted tasks",
+  hours: "Time worked: plan blocks, day tables and submitted tasks (the larger per project), as in Weekly hours",
   extra: "Extra hours recorded in end-of-day updates",
   resubmits: "Times a task was sent again after feedback",
 };
@@ -744,17 +772,18 @@ export function personMetrics(tasks, daily, personId, from, to) {
   let timed = 0;
   let onTimeCount = 0;
   let resubmits = 0;
-  const taskMinutes = new Map(); // per day and project: time on submitted tasks
   const coveredWork = new Set(); // day, project and kind of work that submitted tasks already count
   tasks.forEach((t) => {
-    if (t.date < from || t.date > to) return;
-    assigned++;
-    resubmits += t.resubmits ?? 0;
+    if (t.date >= from && t.date <= to) {
+      assigned++;
+      resubmits += t.resubmits ?? 0;
+    }
     if (!isSubmitted(t)) return;
+    const done = workDate(t); // finished work counts on the day it was sent in
+    if (done < from || done > to) return;
+    if (t.date < from || t.date > to) assigned++; // assigned on an earlier day, finished in this period
     submitted++;
-    const bucket = `${t.date}|${t.projectId}`;
-    taskMinutes.set(bucket, (taskMinutes.get(bucket) ?? 0) + (t.minutes ?? 0));
-    coveredWork.add(`${t.date}|${t.projectId}|${t.typeId}`);
+    coveredWork.add(`${done}|${t.projectId}|${t.typeId}`);
     const ok = wasOnTime(t);
     if (ok !== null) {
       timed++;
@@ -775,19 +804,13 @@ export function personMetrics(tasks, daily, personId, from, to) {
       }
     });
   }
-  let extraMinutes = 0;
-  const loggedMinutes = new Map(); // per day and project: actual time typed into the day tables
-  for (let d = from; d <= to; d = addDays(d, 1)) {
-    extraMinutes += (daily[`${personId}|${d}`]?.extra ?? []).reduce((s, x) => s + (x.minutes || 0), 0);
-    dayEntries(daily, personId, d).forEach((e) => {
-      if (e.actualMin > 0) loggedMinutes.set(`${d}|${e.projectId}`, (loggedMinutes.get(`${d}|${e.projectId}`) ?? 0) + e.actualMin);
-    });
-  }
-  // hours logged: per day and project the larger of the submitted tasks' time and the time typed in the day tables
+  // hours: the same per-day figure as the person's own Weekly hours (plan blocks, table time and task time, larger per project)
   let minutes = 0;
-  new Set([...taskMinutes.keys(), ...loggedMinutes.keys()]).forEach((id) => {
-    minutes += Math.max(taskMinutes.get(id) ?? 0, loggedMinutes.get(id) ?? 0);
-  });
+  let extraMinutes = 0;
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    minutes += dayWorkedMinutes(tasks, daily, personId, d);
+    extraMinutes += dayHours(daily[`${personId}|${d}`]).extraMin;
+  }
   return {
     onTime: timed ? Math.round((onTimeCount / timed) * 100) : null,
     tasks: submitted,
@@ -944,13 +967,13 @@ export function timeBreakdown(state, range) {
   state.tasks.forEach((t) => {
     if (
       !people.includes(t.assigneeId) ||
-      t.date < range.from ||
-      t.date > range.to ||
       !isSubmitted(t) ||
-      !t.minutes
+      !t.minutes ||
+      workDate(t) < range.from ||
+      workDate(t) > range.to
     )
       return;
-    const b = slot(t.assigneeId, t.date, t.projectId);
+    const b = slot(t.assigneeId, workDate(t), t.projectId);
     b.tasks.push(t);
     b.taskMin += t.minutes;
   });

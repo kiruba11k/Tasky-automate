@@ -291,7 +291,7 @@ export function People() {
         </div>
         <p className="mt-3 text-xs text-muted">
           Click a column to sort, click a person to open their page. Flags compare each person with
-          the team in the same {noun}. Hours logged is time recorded on submitted tasks; extra hours
+          the team in the same {noun}. Hours logged is time worked (plan blocks, day tables and submitted tasks, as in each person's Weekly hours); extra hours
           come from end-of-day updates.
         </p>
       </Card>

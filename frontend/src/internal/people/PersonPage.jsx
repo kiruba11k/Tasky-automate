@@ -26,12 +26,11 @@ import {
 import { LeaveBadge } from '../ui/LeaveBadge';
 import { HistoryCalendar } from './HistoryCalendar';
 import { TaskLine } from './TaskLine';
-import { dayHours, wasOnTime } from '../lib/domain';
+import { dayHours, wasOnTime, workDate, isSubmitted } from '../lib/domain';
 import { recordWithAssigned } from '../lib/assigned';
 import { leaveOn } from '../lib/leave';
 import { WEEKDAY_SHORT, formatDayMonth, isWeekday, parseDateKey, previousWeekday } from '../lib/dates';
 
-const SUBMITTED = new Set(['in_review', 'done']);
 
 /** A person's own page (route "/people/:id"): performance by period, where time goes, task history, day by day, current tasks. (ede) */
 export function PersonPage() {
@@ -176,7 +175,7 @@ export function PersonPage() {
             <tbody className="tabular-nums">
               {days.map((day) => {
                 const assigned = mine.filter((t) => t.date === day);
-                const submitted = mine.filter((t) => t.submittedAt?.slice(0, 10) === day && SUBMITTED.has(t.status));
+                const submitted = mine.filter((t) => isSubmitted(t) && workDate(t) === day);
                 const approved = mine.filter((t) => t.approvedAt?.slice(0, 10) === day);
                 const timed = submitted.map(wasOnTime).filter((v) => v != null);
                 const onTime = timed.length ? Math.round((timed.filter(Boolean).length / timed.length) * 100) : null;

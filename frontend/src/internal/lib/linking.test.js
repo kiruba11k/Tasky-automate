@@ -160,3 +160,79 @@ test('the weekly rows add the days\' assigned tasks up once, without the carried
   assert.equal(report.find((r) => r.key === 'l2').target, l2.qty);
   assert.equal(weekAssignedRows(tasks, daily, ME, '2026-10-19', OPTS).length, 0); // another week
 });
+
+// ---------------------------------------------------------------- Team table sync
+import { dayWorkedMinutes, weekHours, workDate } from './domain.js';
+import { recordWithAssigned } from './assigned.js';
+import { addDays } from './dates.js';
+
+const block = (o) => ({ id: 'b' + Math.random(), start: '10:00', end: '12:00', projectId: P, ...o });
+
+test('a completed task with minutes shows in Tasks done, Hours logged and On time for its period', () => {
+  const t = task({ status: 'in_review', doneQty: 10, minutes: 20, targetMinutes: 30 });
+  const m = personMetrics([t], {}, ME, '2026-10-12', '2026-10-16');
+  assert.deepEqual([m.tasks, m.hours, m.onTime], [1, 0.3, 100]);
+  const other = personMetrics([t], {}, ME, '2026-10-05', '2026-10-09');
+  assert.deepEqual([other.tasks, other.hours, other.onTime], [0, 0, null]);
+});
+
+test('a task assigned earlier but finished later counts on the day it was sent in, in every view', () => {
+  const t = task({ date: '2026-10-12', status: 'in_review', doneQty: 10, minutes: 45, submittedAt: new Date(2026, 9, 15, 11, 0).toISOString() });
+  assert.equal(workDate(t), '2026-10-15');
+  assert.equal(personMetrics([t], {}, ME, '2026-10-12', '2026-10-13').tasks, 0);
+  const wk = personMetrics([t], {}, ME, '2026-10-12', '2026-10-16');
+  assert.deepEqual([wk.tasks, wk.hours], [1, 0.8]);
+  assert.equal(dayWorkedMinutes([t], {}, ME, '2026-10-15'), 45);
+  assert.equal(dayWorkedMinutes([t], {}, ME, '2026-10-12'), 0);
+  assert.equal(dayHours(recordWithAssigned([t], {}, ME, '2026-10-15', { carry: false })).actualMin, 45);
+  assert.equal(timeBreakdown({ projects: [], tasks: [t], daily: {} }, { personId: ME, from: '2026-10-15', to: '2026-10-15' }).totalMin, 45);
+});
+
+test('plan-block time, table time and task time are never added up: the larger per day and project', () => {
+  const day = '2026-10-13';
+  const key = `${ME}|${day}`;
+  const blocks = [block({ actualMinutes: 120 })];
+  const t = task({ status: 'done', doneQty: 10, minutes: 60 });
+  // plan block alone
+  assert.equal(personMetrics([], { [key]: { plan: blocks } }, ME, day, day).hours, 2);
+  // plan 120, task 60 -> task time (60) is the project's logged time and wins over the block, like Weekly hours
+  assert.equal(personMetrics([t], { [key]: { plan: blocks } }, ME, day, day).hours, 1);
+  // table 90 beats task 60; a bigger task beats the table
+  const withTable = { [key]: { plan: blocks, entries: [row({ actualMin: 90 })] } };
+  assert.equal(personMetrics([t], withTable, ME, day, day).hours, 1.5);
+  assert.equal(personMetrics([task({ status: 'done', doneQty: 10, minutes: 150 })], withTable, ME, day, day).hours, 2.5);
+  // another project's block still adds
+  const two = { [key]: { plan: [...blocks, block({ projectId: 'p2', actualMinutes: 30 })], entries: [row({ actualMin: 90 })] } };
+  assert.equal(personMetrics([t], two, ME, day, day).hours, 2);
+  // extra hours stay separate
+  const extra = { [key]: { plan: blocks, extra: [{ minutes: 45 }] } };
+  const m = personMetrics([], extra, ME, day, day);
+  assert.deepEqual([m.hours, m.extra], [2, 0.8]);
+});
+
+test('Team numbers equal the sums of the people, and a person\'s Weekly hours total equals their Hours logged', () => {
+  const mon = '2026-10-12';
+  const daily = {
+    [`${ME}|2026-10-12`]: { plan: [block({ actualMinutes: 100 })], extra: [{ minutes: 30 }] },
+    [`${ME}|2026-10-13`]: { plan: [block({ actualMinutes: 60 })], entries: [row({ actualMin: 75 })] },
+    [`${ME}|2026-10-14`]: { plan: [block({ projectId: 'p2' })], eodAt: '2026-10-14T18:00:00Z', extra: [{ minutes: 60 }] },
+    ['b|2026-10-13']: { entries: [row({ actualMin: 50, doneQty: 5, estMin: 60, task: 'l1' })] },
+  };
+  const tasks = [
+    task({ date: '2026-10-13', status: 'done', doneQty: 10, minutes: 100 }),
+    task({ date: '2026-10-14', status: 'in_review', doneQty: 10, minutes: 20, projectId: 'p3' }),
+    task({ assigneeId: 'b', date: '2026-10-15', status: 'done', doneQty: 10, minutes: 40 }),
+  ];
+  const people = [ME, 'b'];
+  const rows = people.map((id) => personMetrics(tasks.filter((t) => t.assigneeId === id), daily, id, mon, '2026-10-18'));
+  // the Team row adds the people up (people/peopleUtils.js totalKpis), so each person's figure must be right on its own
+  assert.deepEqual(rows.map((r) => r.tasks), [2, 2]); // me: two tasks; b: one task and one ticked-off table row
+  for (const id of people) {
+    const mine = tasks.filter((t) => t.assigneeId === id);
+    const days = [0, 1, 2, 3, 4].map((i) => dayHours(recordWithAssigned(mine, daily, id, addDays(mon, i), { carry: false })));
+    const weekly = days.reduce((s, d) => s + d.actualMin, 0);
+    const m = personMetrics(mine, daily, id, mon, addDays(mon, 6));
+    assert.equal(m.hours, Math.round((weekly / 60) * 10) / 10, id);
+    assert.equal(m.extra, Math.round((days.reduce((s, d) => s + d.extraMin, 0) / 60) * 10) / 10, id);
+  }
+});

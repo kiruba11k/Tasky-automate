@@ -6,7 +6,7 @@
 import { addDays, todayKey } from "./dates.js";
 import { CUSTOM_TASK, dayEntries, entryAsTask } from "./entries.js";
 import { TASK_TYPES } from "./constants.js";
-import { isSubmitted, taskBreakdownKey } from "./domain.js";
+import { isSubmitted, taskBreakdownKey, workDate } from "./domain.js";
 
 const projectOfRow = (projects, id) => projects?.find((p) => p.id === id);
 
@@ -27,17 +27,21 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
   tasks.forEach((t) => {
     if (t.assigneeId !== personId) return;
     const carried = carry && isCarriedOver(t, date, today);
-    if (t.date !== date && !carried) return;
+    const finishedHere = isSubmitted(t) && workDate(t) === date; // sent in today, though assigned for an earlier day
+    if (t.date !== date && !carried && !finishedHere) return;
+    const planned = t.date === date || carried; // the target belongs to the assigned (or carried-over) day
     const k = taskBreakdownKey(t);
     const id = `${t.projectId}|${k.key}`;
     const b = buckets.get(id) ?? { id, k, projectId: t.projectId, tasks: [], qty: 0, done: 0, est: 0, minutes: 0 };
     b.tasks.push({ t, carried: t.date !== date });
-    b.qty += t.qty ?? 0;
-    if (isSubmitted(t)) {
+    if (planned) {
+      b.qty += t.qty ?? 0;
+      b.est += t.targetMinutes ?? 0;
+    }
+    if (finishedHere) {
       b.done += t.doneQty ?? 0;
       b.minutes += t.minutes ?? 0;
     }
-    b.est += t.targetMinutes ?? 0;
     buckets.set(id, b);
   });
   const loggedBy = new Map();
