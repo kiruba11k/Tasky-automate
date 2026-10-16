@@ -46,11 +46,11 @@ export const PROJECT_TEMPLATES = [
     ],
     typesOff: OUTREACH_TYPES,
     customStandards: [
-      { name: "Build workflow", unit: "workflows", minutes: 90 },
-      { name: "Fix bug", unit: "bugs", minutes: 30 },
-      { name: "Test / QA", unit: "automations", minutes: 20 },
-      { name: "Deploy / release", unit: "releases", minutes: 30 },
-      { name: "Review / demo", unit: "demos", minutes: 45 },
+      { name: "Build workflow", metric: "workflows", unit: "workflows", minutes: 90 },
+      { name: "Fix bug", metric: "bugs", unit: "bugs", minutes: 30 },
+      { name: "Test / QA", metric: "tested", unit: "automations", minutes: 20 },
+      { name: "Deploy / release", metric: "releases", unit: "releases", minutes: 30 },
+      { name: "Review / demo", metric: "demos", unit: "demos", minutes: 45 },
     ],
     meetings: false,
   },
@@ -69,12 +69,12 @@ export const PROJECT_TEMPLATES = [
     ],
     typesOff: OUTREACH_TYPES,
     customStandards: [
-      { name: "Build agent", unit: "agents", minutes: 120 },
-      { name: "Write / tune prompt", unit: "prompts", minutes: 25 },
-      { name: "Test tool / eval", unit: "tests", minutes: 20 },
-      { name: "Fix bug", unit: "bugs", minutes: 30 },
-      { name: "Deploy", unit: "deployments", minutes: 30 },
-      { name: "Review / demo", unit: "demos", minutes: 45 },
+      { name: "Build agent", metric: "agents", unit: "agents", minutes: 120 },
+      { name: "Write / tune prompt", metric: "prompts", unit: "prompts", minutes: 25 },
+      { name: "Test tool / eval", metric: "evals", unit: "tests", minutes: 20 },
+      { name: "Fix bug", metric: "bugs", unit: "bugs", minutes: 30 },
+      { name: "Deploy", metric: "deploys", unit: "deployments", minutes: 30 },
+      { name: "Review / demo", metric: "demos", unit: "demos", minutes: 45 },
     ],
     meetings: false,
   },
@@ -89,6 +89,16 @@ export const PROJECT_TEMPLATES = [
     meetings: false,
   },
 ];
+
+/**
+ * Which tracked number a standard task counts toward. A project's custom standards carry it as `metric` (an id from the project's
+ * `metrics`); this is the fallback for projects made from a template before that field existed: the template's own mapping by name.
+ * (Outbound's built-in task types feed messages / 2nd level / decks through TASK_TYPE_KPI_KEYS, not through this.)
+ */
+export const templateStandardMetric = (templateId, standardName) => {
+  const name = String(standardName ?? "").trim().toLowerCase();
+  return name ? templateOf(templateId).customStandards.find((c) => c.name.toLowerCase() === name)?.metric : undefined;
+};
 
 /** The template for an id; unknown / missing ids fall back to outbound (old projects have none). */
 export const templateOf = (idOrProject) => {

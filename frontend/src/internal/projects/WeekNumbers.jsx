@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Pencil, Lock } from 'lucide-react';
 import {
   Se as useStore,
@@ -6,7 +6,6 @@ import {
   qe as Badge,
   AR as countWeek,
   tc as tracksPeriod,
-  Mt as weekStart,
   lt as attempt,
   Ye as toast,
 } from '@/internal/min';
@@ -33,7 +32,8 @@ function AchievedBar({ value, goal }) {
 }
 
 /** "This week's numbers" tab: pick a week, fill in what was achieved against each goal, Save or Lock. */
-function WeekNumbersTable({ p, canEdit, auto }) {
+function WeekNumbersTable({ p, canEdit }) {
+  const { tasks, daily } = useStore();
   const saveWeekActuals = useStore((s) => s.saveWeekActuals);
   const weeks = sortedWeeks(p);
   const today = todayKey(0);
@@ -53,7 +53,12 @@ function WeekNumbersTable({ p, canEdit, auto }) {
     setDraft(null);
   }, [selected]);
   const editable = canEdit && (!!draft || !lockedAt);
-  const startValue = (id) => String(actuals[id] ?? (isThisWeek ? (auto[id] ?? 0) : 0));
+  // what the team's day tables, submitted tasks and counters add up to for the chosen week (a week not yet begun has nothing)
+  const derived = useMemo(
+    () => (week && week.start <= today ? countWeek(p, tasks, daily, { kind: 'week', key: week.start, end: week.end }).counts : {}),
+    [p, tasks, daily, week, today],
+  );
+  const startValue = (id) => String(actuals[id] ?? derived[id] ?? 0);
   const current = draft ?? {
     m: Object.fromEntries(metrics.map((m) => [m.id, startValue(m.id)])),
     rows: textRows.map((r) => ({ ...r })),
@@ -235,9 +240,9 @@ function WeekNumbersTable({ p, canEdit, auto }) {
           </tbody>
         </table>
       )}
-      {editable && isThisWeek && (
+      {editable && week && week.start <= today && (
         <p className="text-xs text-muted">
-          Numbers start from what the team's daily updates and submitted tasks counted this week. Change anything, then
+          Numbers start from what the team's daily updates and submitted tasks counted {isThisWeek ? 'this week' : 'that week'}. Change anything, then
           Lock.
         </p>
       )}
@@ -247,9 +252,7 @@ function WeekNumbersTable({ p, canEdit, auto }) {
 
 /** Week numbers tab (project `p`; `canEdit` lets managers fill in and lock a week). */
 export function WeekNumbers({ p, canEdit }) {
-  const { tasks, daily } = useStore();
-  const { counts } = countWeek(p, tasks, daily, { kind: 'week', key: weekStart(0) });
-  return <WeekNumbersTable p={p} canEdit={canEdit} auto={counts} />;
+  return <WeekNumbersTable p={p} canEdit={canEdit} />;
 }
 
 export default WeekNumbers;

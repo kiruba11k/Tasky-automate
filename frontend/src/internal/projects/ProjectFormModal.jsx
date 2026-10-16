@@ -30,6 +30,7 @@ import { FormSection } from './FormSection';
 import { ConfirmModal } from '../kit/ConfirmModal';
 import { PersonPicker } from './PersonPicker';
 import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, templateOf, templateMetrics, newMetricId } from '../lib/projectTemplates.js';
+import { standardMetric } from '../lib/entries.js';
 
 const EMPTY_TASK = { name: '', unit: '', minutes: '' };
 // What the standard-time boxes start with: minutes per unit of every task type.
@@ -118,6 +119,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
             name: c.name,
             unit: c.unit,
             minutes: String(c.minutes),
+            metric: c.metric ?? standardMetric(edit, c) ?? '',
           })),
         );
         setAdmins(edit.admins ?? []);
@@ -141,7 +143,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
     setStandards(DEFAULT_STANDARD_INPUTS);
     setTypesOff([...t.typesOff]);
     setCustomTasks(
-      t.customStandards.map((c) => ({ key: newRowKey(), name: c.name, unit: c.unit, minutes: String(c.minutes) })),
+      t.customStandards.map((c) => ({ key: newRowKey(), name: c.name, unit: c.unit, minutes: String(c.minutes), metric: c.metric ?? '' })),
     );
     setMetrics(templateMetrics(t.id));
     setDefaultTargets({});
@@ -227,6 +229,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
       name: t.name,
       unit: t.unit,
       minutes: toNumber(t.minutes),
+      ...(t.metric && metrics.some((m) => m.id === t.metric) ? { metric: t.metric } : {}),
     }));
     return { standards: standardsOut, typeMinutes, typesOff: removed, hours, customStandards, template, metrics };
   };
@@ -614,7 +617,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
             {customTasks.map((t, index) => (
               <li
                 key={t.key}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_7rem_15rem_auto]"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_7rem_15rem_11rem_auto]"
               >
                 <input
                   aria-label="Custom task name"
@@ -644,6 +647,20 @@ export function ProjectFormModal({ open, onClose, edit }) {
                     {toNumber(t.minutes) > 0 ? ` · ${perHourLabel(toNumber(t.minutes))}` : ''}
                   </span>
                 </span>
+                <select
+                  aria-label={`Counts toward for ${t.name}`}
+                  title="Done work on this task adds to this number (optional)"
+                  className={clsx(INPUT_CLASS, 'col-span-2 py-1.5 text-ink sm:col-span-1')}
+                  value={metrics.some((m) => m.id === t.metric) ? t.metric : ''}
+                  onChange={(e) => updateCustomTask(index, { metric: e.target.value })}
+                >
+                  <option value="">Counts toward: nothing</option>
+                  {metrics.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      Counts toward: {m.label || 'unnamed number'}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   aria-label={`Delete ${t.name}`}

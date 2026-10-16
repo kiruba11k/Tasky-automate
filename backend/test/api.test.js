@@ -1184,6 +1184,23 @@ describe('tracker documents', () => {
     assert.equal((await doc()).template, 'agents');
   });
 
+  test('a standard task stores the number it counts toward, and the whole team reads the same day rows', async () => {
+    const proj = (token, patch) => put(token, 'project', 'pm2', patch);
+    assert.equal((await proj(fay, { id: 'pm2', name: 'PM2', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann, ids.bo], finalized: {}, template: 'automation', metrics: [{ id: 'workflows', label: 'Workflows built' }] })).ok, true);
+    const std = [{ id: 'cs-1', name: 'Build workflow', unit: 'workflows', minutes: 90, metric: 'workflows' }];
+    assert.equal((await proj(pm, { customStandards: std })).ok, true);
+    assert.equal((await proj(pm, { customStandards: [{ id: 'cs-1', name: 'x', metric: 5 }] })).ok, false, 'the number is an id');
+    assert.equal((await proj(pm, { customStandards: [{ id: 'cs-1', name: 'x', metric: 'm'.repeat(61) }] })).ok, false);
+    const row = { id: 'r1', projectId: 'pm2', task: 'std:cs-1', kind: 'milestone', status: 'Completed', estMin: 360, actualMin: 365 };
+    assert.equal((await put(ann, 'daily', `${ids.ann}|2026-10-15`, { entries: [row] })).ok, true);
+    const seen = (token) => call('GET', '/api/tracker/docs', token).then((r) => r.body.docs);
+    for (const token of [bo, pm]) {
+      const docs = await seen(token);
+      assert.equal(docs.find((d) => d.key === 'pm2').data.customStandards[0].metric, 'workflows');
+      assert.deepEqual(docs.find((d) => d.key === `${ids.ann}|2026-10-15`).data.entries[0].status, 'Completed');
+    }
+  });
+
   test('anonymous chat: members read the thread, outsiders do not, and aliases stay private', async () => {
     assert.equal((await put(ann, 'conv', 'c1', { id: 'c1', name: 'Ann & Bo', memberIds: [ids.ann, ids.bo] })).ok, true);
     assert.equal((await put(ann, 'alias', `${ids.ann}:c1`, { alias: 'Sneaky Otter' })).ok, true);

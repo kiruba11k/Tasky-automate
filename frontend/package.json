@@ -10,7 +10,7 @@
     "lint": "eslint src --ext .js,.jsx",
     "build:icons": "node scripts/build-emoji-icons.mjs",
     "build:palette": "node scripts/build-palette.mjs",
-    "test": "node --test src/internal/lib/linking.test.js src/hub/waterLogic.test.js src/hub/moodQuest.test.js src/internal/lib/alias.test.js src/internal/shell/alertSound.test.js src/themes/themes.test.js src/lib/spread.test.js src/internal/lib/diffPatch.test.js src/internal/lib/mine.test.js src/internal/lib/autoPlan.test.js src/internal/lib/changeProject.test.js src/internal/lib/typeMinutes.test.js src/internal/lib/pendingSync.test.js src/internal/lib/projectTemplates.test.js"
+    "test": "node --test src/internal/lib/linking.test.js src/hub/waterLogic.test.js src/hub/moodQuest.test.js src/internal/lib/alias.test.js src/internal/shell/alertSound.test.js src/themes/themes.test.js src/lib/spread.test.js src/internal/lib/diffPatch.test.js src/internal/lib/mine.test.js src/internal/lib/autoPlan.test.js src/internal/lib/changeProject.test.js src/internal/lib/typeMinutes.test.js src/internal/lib/pendingSync.test.js src/internal/lib/projectTemplates.test.js src/internal/lib/projectNumbers.test.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.2.0",

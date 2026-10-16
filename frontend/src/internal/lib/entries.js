@@ -4,6 +4,7 @@
 // same person, day, project and kind of work the larger of the two is used, never the sum.
 import { TASK_TYPES } from "./constants.js";
 import { addDays } from "./dates.js";
+import { templateStandardMetric } from "./projectTemplates.js";
 
 export const CUSTOM_TASK = "__custom";
 
@@ -83,6 +84,83 @@ export function loggedKpiExtras(projectId, tasks, daily, start, end) {
   logged.forEach((qty, id) => {
     const extra = qty - (taskDone.get(id) ?? 0);
     if (extra > 0) KPI_KEYS_BY_TYPE[id.split("|")[2]].forEach((key) => { out[key] = (out[key] ?? 0) + extra; });
+  });
+  return out;
+}
+
+// ---- tracked numbers fed by standard tasks (Automation, Agent building and custom projects) --------------------------------
+// A project's custom standard can carry `metric`: the id of one of the project's numbers it counts toward ("Build workflow" ->
+// workflows). Work logged against it in anyone's day table, or finished as an assigned task, then counts for that number.
+
+/** How much a table row counts as done: a milestone is 1 once Completed, a text row 0, a number row its achieved count. */
+export const rowDoneCount = (row) => {
+  const kind = row.kind ?? "number";
+  return kind === "milestone" ? (row.status === "Completed" ? 1 : 0) : kind === "text" ? 0 : (row.doneQty ?? 0);
+};
+
+/** The number (an id of the project's metrics) a custom standard counts toward, or undefined. */
+export function standardMetric(project, standard) {
+  if (!project || !standard) return undefined;
+  const id = standard.metric || templateStandardMetric(project.template, standard.name);
+  return id && (project.metrics ?? []).some((m) => m.id === id) ? id : undefined;
+}
+
+const findStandardByName = (project, name) => {
+  const needle = String(name ?? "").trim().toLowerCase();
+  return needle ? (project?.customStandards ?? []).find((c) => c.name.trim().toLowerCase() === needle) : undefined;
+};
+
+/** The number a day-table row counts toward: its custom standard ("std:<id>"), or a custom / "my:" row named like one. */
+export function rowMetric(project, row) {
+  const task = String(row.task ?? "");
+  if (task.startsWith("std:")) return standardMetric(project, (project?.customStandards ?? []).find((c) => `std:${c.id}` === task));
+  if (task === CUSTOM_TASK) return standardMetric(project, findStandardByName(project, row.custom));
+  if (task.startsWith("my:")) return standardMetric(project, findStandardByName(project, task.slice(3)));
+  return undefined;
+}
+
+/** The number an assigned task counts toward (a custom standard picked by id, or a custom task named like one). */
+export function taskMetric(project, task) {
+  const byId = (project?.customStandards ?? []).find((c) => c.id === task.typeId);
+  return standardMetric(project, byId ?? (TASK_TYPES.some((t) => t.id === task.typeId) ? undefined : findStandardByName(project, task.customName)));
+}
+
+/**
+ * Numbers fed by standard tasks over [start, end), from everyone's day tables: { metricId: n }. Per person, day and number the
+ * larger of the logged rows (achieved counts; Completed milestones = 1) and the person's approved assigned tasks, never the sum.
+ * `eodActuals` typed for that person, day and number are already counted by the caller, so only what exceeds them is returned
+ * (with `includeTyped` the full figure, for periods whose typed numbers the caller does not add).
+ */
+export function loggedMetricExtras(project, tasks, daily, start, end, { includeTyped = false } = {}) {
+  if (!project?.metrics?.length) return {};
+  const per = new Map();
+  const slot = (person, date, metric) => {
+    const id = `${person}|${date}|${metric}`;
+    if (!per.has(id)) per.set(id, { logged: 0, tasks: 0, typed: 0, metric });
+    return per.get(id);
+  };
+  Object.entries(daily ?? {}).forEach(([key, record]) => {
+    const [person, date] = key.split("|");
+    if (date < start || date >= end) return;
+    (record.entries ?? []).forEach((row) => {
+      if (row.projectId !== project.id) return;
+      const metric = rowMetric(project, row);
+      if (metric) slot(person, date, metric).logged += rowDoneCount(row);
+    });
+  });
+  (tasks ?? []).forEach((t) => {
+    if (t.historic || t.projectId !== project.id || t.date < start || t.date >= end || t.status !== "done" || !t.doneQty) return;
+    const metric = taskMetric(project, t);
+    if (metric) slot(t.assigneeId, t.date, metric).tasks += t.doneQty;
+  });
+  per.forEach((cell, id) => {
+    const [person, date] = id.split("|");
+    cell.typed = daily?.[`${person}|${date}`]?.eodActuals?.[project.id]?.[cell.metric] || 0;
+  });
+  const out = {};
+  per.forEach((cell) => {
+    const extra = Math.max(cell.logged, cell.tasks, cell.typed) - (includeTyped ? 0 : cell.typed);
+    if (extra > 0) out[cell.metric] = (out[cell.metric] ?? 0) + extra;
   });
   return out;
 }

@@ -14,7 +14,7 @@ import {
   weekStart,
   WEEKDAY_SHORT,
 } from "./dates.js";
-import { entryAsTask, entriesBetween, weeklyDone, dayEntries, dayAsg, plannedWeekTargets, CUSTOM_TASK } from "./entries.js";
+import { entryAsTask, entriesBetween, weeklyDone, dayEntries, dayAsg, plannedWeekTargets, rowDoneCount, CUSTOM_TASK } from "./entries.js";
 import {
   PEOPLE,
   TASK_TYPES,
@@ -846,7 +846,7 @@ export function personMetrics(tasks, daily, personId, from, to) {
       if (e.task === CUSTOM_TASK ? !e.custom?.trim() : !e.task) return;
       if (coveredWork.has(`${d}|${e.projectId}|${e.task}`)) return;
       assigned++;
-      if (!(e.doneQty > 0)) return;
+      if (!(rowDoneCount(e) > 0)) return;
       submitted++;
       if (e.estMin > 0 && e.actualMin > 0) {
         timed++;
@@ -860,7 +860,7 @@ export function personMetrics(tasks, daily, personId, from, to) {
     const record = daily?.[`${personId}|${d}`];
     if (!record) continue;
     (record.entries ?? []).forEach((e) => {
-      if (e.doneQty > 0) coveredDays.add(`${d}|${e.projectId}`);
+      if (rowDoneCount(e) > 0) coveredDays.add(`${d}|${e.projectId}`);
     });
     workedPlanBlocks(record).forEach((b) => {
       const day = `${d}|${b.projectId}`;
@@ -1173,6 +1173,7 @@ export function validateCustomStandards(list) {
       name,
       unit: (c.unit ?? "").trim() || "items",
       minutes: Math.round(minutes * 100) / 100,
+      ...(String(c.metric ?? "").trim() ? { metric: String(c.metric).trim().slice(0, 60) } : {}), // the project number it counts toward
     };
   });
 }

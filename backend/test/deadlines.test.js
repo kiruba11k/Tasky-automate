@@ -47,3 +47,10 @@ test('a new week or month moves the numbers into the history, once', () => {
   assert.equal(rollProject(r, '2026-10-16'), r); // same week and month: untouched (same object)
   assert.equal(rollProject({ week: {}, month: {} }, '2026-10-14').weekOf, '2026-10-12'); // a project without markers gets them
 });
+
+test('rolling a project keeps counters of every number, including a template\'s own ids', () => {
+  const p = { week: { workflows: 1, bugs: 1 }, month: { workflows: 1 }, weekOf: '2026-10-05', monthOf: '2026-10', pastWeeks: [] };
+  const r = rollProject(p, '2026-10-14');
+  assert.deepEqual(r.pastWeeks[0], { start: '2026-10-05', counts: { workflows: 1, bugs: 1 } });
+  assert.deepEqual(r.month, { workflows: 1 }, 'same month: counters stay');
+});

@@ -168,6 +168,7 @@ export function projectProblem(patch) {
   if (!(patch.periodBin === undefined || patch.periodBin === null || (Array.isArray(patch.periodBin) && patch.periodBin.length <= 200 && patch.periodBin.every((b) => isMap(b) && typeof b.id === 'string' && ['week', 'month'].includes(b.period) && isMap(b.week))))) return 'The bin of weeks and months is not valid.';
   if (!(patch.typeMinutes === undefined || patch.typeMinutes === null || counts(patch.typeMinutes))) return 'Standard times must be numbers of zero or more.';
   if (!listOk(patch.typesOff) || !listOk(patch.meetings) || !listOk(patch.updates) || !listOk(patch.teamIds) || !listOk(patch.admins) || !listOk(patch.metrics) || !listOk(patch.customStandards)) return 'A list on the project is not valid.';
+  if (!(patch.customStandards === undefined || patch.customStandards === null || patch.customStandards.every((c) => isMap(c) && (c.metric === undefined || c.metric === null || text(c.metric, 60))))) return 'The number a standard task counts toward is not valid.';
   if (!(patch.status === undefined || ['pending', 'active'].includes(patch.status))) return 'The project status is not valid.';
   if (!(patch.template === undefined || patch.template === null || (typeof patch.template === 'string' && /^[a-z0-9_-]{1,40}$/.test(patch.template)))) return 'The project template is not valid.';
   if (!(patch.metrics === undefined || patch.metrics === null || (Array.isArray(patch.metrics) && patch.metrics.length <= 30
