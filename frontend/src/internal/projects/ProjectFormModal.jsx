@@ -21,7 +21,7 @@ import {
   Ge as INPUT_CLASS,
   _o as NUMBER_INPUT_CLASS,
   vb as SELECT_CLASS,
-  LP as STANDARD_FIELDS,
+  Cn as TASK_TYPES,
   FP as perHourLabel,
   BP as hoursLabel,
   br as toNumber,
@@ -32,9 +32,17 @@ import { ConfirmModal } from '../kit/ConfirmModal';
 import { PersonPicker } from './PersonPicker';
 
 const EMPTY_TASK = { name: '', unit: '', minutes: '' };
-// What the standard-time boxes show: minutes per unit, but per 10 for prospect mapping (see RATE_FIELDS).
-const DEFAULT_STANDARD_INPUTS = { prospect: '20', l1: '2', l2: '1.5' };
+// What the standard-time boxes start with: minutes per unit of every task type.
+// Prospect mapping is typed per 10 prospects and kept per prospect, so the maths elsewhere does not change.
+const PER = { prospect: 10 };
 const roundMin = (n) => Math.round(n * 100) / 100;
+const DEFAULT_STANDARD_INPUTS = Object.fromEntries(TASK_TYPES.map((t) => [t.id, String(roundMin(t.perUnit * (PER[t.id] ?? 1)))]));
+const STANDARD_HINTS = {
+  prospect: 'minutes per 10 prospects',
+  l1: 'minutes per personalised message (semi = ⅔, templated = ½)',
+  l2: 'minutes per message',
+};
+const LEGACY_TYPES = ['prospect', 'l1', 'l2'];
 
 /** Create ("Propose"/"Onboard") or edit a project. */
 export function ProjectFormModal({ open, onClose, edit }) {
@@ -60,6 +68,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
   const [endDate, setEndDate] = useState(dayKey(90));
   const [team, setTeam] = useState([]);
   const [standards, setStandards] = useState(DEFAULT_STANDARD_INPUTS);
+  const [typesOff, setTypesOff] = useState([]);
   const [customTasks, setCustomTasks] = useState([]);
   const [newTask, setNewTask] = useState(EMPTY_TASK);
   const [admins, setAdmins] = useState([]);
@@ -87,10 +96,13 @@ export function ProjectFormModal({ open, onClose, edit }) {
         setTeam(ids.map((id) => ({ id, h: String(edit.hours[id] ?? 0) })));
         const std = { ...DEFAULT_STANDARDS, ...edit.standards };
         setStandards({
+          ...DEFAULT_STANDARD_INPUTS,
+          ...Object.fromEntries(Object.entries(edit.typeMinutes ?? {}).map(([id, v]) => [id, String(v)])),
           prospect: String(roundMin(std.prospect * 10)),
           l1: String(std.l1),
           l2: String(std.l2),
         });
+        setTypesOff(edit.typesOff ?? []);
         setCustomTasks(
           (edit.customStandards ?? []).map((c) => ({
             key: c.id,
@@ -121,6 +133,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
     setDescription('');
     setTeam([]);
     setStandards(DEFAULT_STANDARD_INPUTS);
+    setTypesOff([]);
     setCustomTasks([]);
     setAdmins([]);
     setError('');
@@ -148,14 +161,17 @@ export function ProjectFormModal({ open, onClose, edit }) {
 
   /** Validate standards, hours and custom tasks; throws a readable Error. */
   const collectSettings = () => {
-    const standardsOut = Object.fromEntries(
-      STANDARD_FIELDS.map((f) => {
-        const v = toNumber(standards[f.key]);
-        if (!(v > 0))
-          throw new Error(`Set the standard time for ${f.label.toLowerCase()} (above 0 minutes).`);
-        return [f.key, f.per ? roundMin(v / f.per) : v]; // typed per 10 prospects, kept per prospect
-      }),
+    const used = TASK_TYPES.filter((t) => !typesOff.includes(t.id));
+    used.forEach((t) => {
+      if (!(toNumber(standards[t.id]) > 0))
+        throw new Error(`Set the standard time for ${t.name.toLowerCase()} (above 0 minutes), or remove it.`);
+    });
+    const pick = (id) => (toNumber(standards[id]) > 0 ? roundMin(toNumber(standards[id]) / (PER[id] ?? 1)) : DEFAULT_STANDARDS[id]);
+    const standardsOut = { prospect: pick('prospect'), l1: pick('l1'), l2: pick('l2') };
+    const typeMinutes = Object.fromEntries(
+      used.filter((t) => !LEGACY_TYPES.includes(t.id)).map((t) => [t.id, roundMin(toNumber(standards[t.id]) / (PER[t.id] ?? 1))]),
     );
+    const removed = [...typesOff];
     const hours = {};
     team.forEach((m) => {
       if (!m.h.trim())
@@ -171,7 +187,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
       unit: t.unit,
       minutes: toNumber(t.minutes),
     }));
-    return { standards: standardsOut, hours, customStandards };
+    return { standards: standardsOut, typeMinutes, typesOff: removed, hours, customStandards };
   };
 
   const submit = () => {
@@ -381,32 +397,67 @@ export function ProjectFormModal({ open, onClose, edit }) {
       <FormSection
         icon={<span>⏱️</span>}
         title="Standard time for this project"
-        hint="Every target time and on-time % for this project is measured against these. Different projects can have different standards."
+        hint="Every target time and on-time % for this project is measured against these. Change any time, or remove the ones this project does not use (you can add them back)."
       >
-        <div className="grid gap-3 sm:grid-cols-3">
-          {STANDARD_FIELDS.map((f) => (
-            <label key={f.key} className="rounded-xl border border-line bg-surface p-3 text-sm text-ink">
-              <span className="font-semibold">{f.label}</span>
-              <span className="mt-1.5 flex items-baseline gap-1.5">
+        <ul
+          className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface"
+          aria-label="Standard times"
+          data-testid="std-list"
+        >
+          {TASK_TYPES.filter((t) => !typesOff.includes(t.id)).map((t) => (
+            <li key={t.id} className="flex flex-wrap items-center gap-3 px-3 py-2" data-std={t.id}>
+              <span className="min-w-[10rem] flex-1 text-sm font-semibold text-ink">
+                {t.name}
+                <span className="block text-[11px] font-normal text-muted">
+                  {STANDARD_HINTS[t.id] ?? `minutes per ${t.unit.replace(/s$/, '')}`}
+                </span>
+              </span>
+              <span className="flex items-baseline gap-1.5">
                 <input
                   type="number"
                   inputMode="decimal"
                   min={0.1}
                   step={0.1}
-                  aria-label={`${f.label} standard minutes`}
-                  className={clsx(NUMBER_INPUT_CLASS, 'w-24 text-2xl')}
-                  value={standards[f.key]}
-                  onChange={(e) => setStandards({ ...standards, [f.key]: e.target.value })}
+                  aria-label={`${t.name} standard minutes`}
+                  className={clsx(NUMBER_INPUT_CLASS, 'w-20 text-lg')}
+                  value={standards[t.id] ?? ''}
+                  onChange={(e) => setStandards({ ...standards, [t.id]: e.target.value })}
                 />
-                <span className="text-sm font-semibold text-muted">min</span>
+                <span className="w-28 text-xs text-muted">
+                  min
+                  {toNumber(standards[t.id]) > 0 ? ` · ${perHourLabel(toNumber(standards[t.id]) / (PER[t.id] ?? 1))}` : ''}
+                </span>
               </span>
-              <span className="mt-1 block text-[11px] text-muted">
-                {f.hint}
-                {toNumber(standards[f.key]) > 0 ? ` · ${perHourLabel(toNumber(standards[f.key]) / (f.per ?? 1))}` : ''}
-              </span>
-            </label>
+              <button
+                type="button"
+                aria-label={`Remove ${t.name}`}
+                title="Not used on this project"
+                className="focus-ring rounded-lg p-2 text-muted hover:bg-coral hover:text-coral-ink"
+                onClick={() => setTypesOff((list) => [...list, t.id])}
+              >
+                <Trash size={15} />
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
+        {typesOff.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted">Removed from this project:</span>
+            {typesOff.map((id) => {
+              const t = TASK_TYPES.find((x) => x.id === id);
+              return t ? (
+                <button
+                  key={id}
+                  type="button"
+                  className="focus-ring inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-0.5 font-semibold text-accent-ink hover:bg-surface-2"
+                  onClick={() => setTypesOff((list) => list.filter((x) => x !== id))}
+                >
+                  <Plus size={11} /> {t.name}
+                </button>
+              ) : null;
+            })}
+          </div>
+        )}
       </FormSection>
 
       <FormSection

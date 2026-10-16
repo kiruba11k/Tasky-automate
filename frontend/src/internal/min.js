@@ -315,6 +315,7 @@ export { buildTodayDailyBase as sU } from './lib/seed.js';
 export { formatWeekRange as sk } from './daily/dateHelpers.js';
 export { KPI_SHORT_LABELS as sle } from './manager/periods.js';
 export { computeStandardMinutes as ss } from './lib/domain.js';
+export { projectTaskTypes as g3 } from './lib/domain.js';
 export { App as sue } from './App.jsx';
 export { kpiDifference as tL } from './manager/kpiDelta.js';
 export { ProjectHero as tW } from './projects/ProjectHero.jsx';

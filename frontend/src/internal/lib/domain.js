@@ -282,6 +282,8 @@ export function computeStandardMinutes(project, typeId, qty, variant, customRef)
     const custom = findCustomStandard(project, customRef ?? (typeId === "custom" ? undefined : typeId));
     return custom ? Math.max(1, Math.round(custom.minutes * qty)) : null;
   }
+  const perUnit = project?.typeMinutes?.[typeId];
+  if (perUnit && !["prospect", "l1", "l2"].includes(typeId)) return Math.max(1, Math.round(perUnit * qty));
   return standardMinutes(
     typeId,
     qty,
@@ -289,6 +291,10 @@ export function computeStandardMinutes(project, typeId, qty, variant, customRef)
     project?.standards ? { ...DEFAULT_STANDARDS, ...project.standards } : undefined,
   );
 }
+
+/** `g3` - the standard task types a project uses (all except those it removed via `typesOff`). */
+export const projectTaskTypes = (project) =>
+  TASK_TYPES.filter((t) => !project?.typesOff?.includes(t.id));
 
 /** `ff` - default task title, e.g. "30 personalised 1st level messages". */
 export function defaultTaskTitle(typeId, qty, variant) {

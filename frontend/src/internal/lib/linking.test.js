@@ -106,7 +106,9 @@ test('an assigned task shows as a read-only row of its project, whoever assigned
   assert.equal(assignedDay([{ ...t, assigneeId: 'other' }], ME, '2026-10-13', OPTS).rows.length, 0); // someone else's task
   assert.equal(assignedDay([{ ...t, assignedById: ME }], ME, '2026-10-13', OPTS).rows.length, 1); // self-assigned
   const done = assignedDay([{ ...t, status: 'in_review', doneQty: 30, minutes: 50 }], ME, '2026-10-13', OPTS).rows[0];
-  assert.deepEqual([done.doneQty, done.actualMin], [30, 50]);
+  assert.deepEqual([done.doneQty, done.actualMin, done.approved], [0, 50, false]); // awaiting approval: the number is not counted yet
+  const approved = assignedDay([{ ...t, status: 'done', doneQty: 30, minutes: 50 }], ME, '2026-10-13', OPTS).rows[0];
+  assert.deepEqual([approved.doneQty, approved.actualMin, approved.approved], [30, 50, true]);
 });
 
 test('a logged row for the same work covers the assignment: the larger is used, never the sum', () => {
@@ -154,7 +156,7 @@ test('the weekly rows add the days\' assigned tasks up once, without the carried
   const assigned = weekAssignedRows(tasks, daily, ME, mon, OPTS);
   const rows = weekRows(ME, mon, daily, [], {}, assigned);
   const l2 = rows.find((r) => r.task === 'l2');
-  assert.deepEqual([l2.qty, l2.doneQty, l2.assigned], [35, 20, true]); // 10 + 5 logged + 20
+  assert.deepEqual([l2.qty, l2.doneQty, l2.assigned], [35, 15, true]); // 10 + 5 logged + 20 (the 5 in review count once approved)
   assert.equal(rows.find((r) => r.task === 'deck').qty, 1);
   const report = targetVsActualRows(tasks, ME, mon, '2026-10-18', { daily });
   assert.equal(report.find((r) => r.key === 'l2').target, l2.qty);

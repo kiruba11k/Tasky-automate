@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { oe as cx, Se as useStore, Te as Button, Ye as toast } from '@/internal/min';
 import { rowKey } from '../lib/entries.js';
+import { useTaskMenu } from './TaskMenuSettings';
 import { CUSTOM_TASK, ROW_STATUSES, newEntryId, taskChoices } from './entryHelpers';
 
 const FIELD = 'focus-ring rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink';
@@ -22,7 +23,8 @@ export function AddToWeek({ personId, mon }) {
   const [targetText, setTargetText] = useState('');
   const [actualText, setActualText] = useState('');
   const [status, setStatus] = useState('Not started');
-  const choices = taskChoices(projects.find((p) => p.id === projectId));
+  const taskMenu = useTaskMenu(personId);
+  const choices = taskChoices(projects.find((p) => p.id === projectId), taskMenu);
 
   const add = () => {
     if (!task) {

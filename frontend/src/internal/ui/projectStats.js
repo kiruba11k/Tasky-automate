@@ -63,7 +63,7 @@ export function projectPeriodCounts(project, tasks, daily, period) {
         t.projectId === project.id &&
         t.date >= start &&
         t.date < end &&
-        (t.status === 'done' || t.status === 'in_review') &&
+        t.status === 'done' &&
         t.doneQty,
     )
     .forEach((t) => (TASK_TYPE_KPI_KEYS[t.typeId] ?? []).forEach((key) => add(key, t.doneQty)));

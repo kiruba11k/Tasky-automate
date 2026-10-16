@@ -10,17 +10,32 @@ let rowCounter = 0;
 export const newEntryId = () => `e${Date.now().toString(36)}${rowCounter++}`;
 export const blankEntry = (projectId) => ({ id: newEntryId(), projectId, task: '', desc: '', estMin: 0, achieved: '', remarks: '' });
 
-/** Task choices for a project: the standard task types plus the project's own custom standards. */
-export const taskChoices = (project) => [
-  ...TASK_TYPES.map((t) => ({ id: t.id, name: t.name })),
-  ...(project?.customStandards ?? []).map((t) => ({ id: `std:${t.id}`, name: t.name })),
-];
+/** Prefix of a person's own dropdown options (task id "my:Client call"): shown without it. */
+export const MY_PREFIX = 'my:';
+
+/** The standard task types a project offers (every one unless the project switched some off). */
+export const standardTypes = (project) => TASK_TYPES.filter((t) => !project?.typesOff?.includes(t.id));
+
+/**
+ * Task choices for a project's dropdown: the standard task types, the project's own custom standards and the person's own
+ * extra options, minus anything they hid or deleted (`taskMenu` = { hidden, extra, removed }).
+ */
+export const taskChoices = (project, taskMenu) => {
+  const all = [
+    ...standardTypes(project).map((t) => ({ id: t.id, name: t.name })),
+    ...(project?.customStandards ?? []).map((t) => ({ id: `std:${t.id}`, name: t.name })),
+    ...(taskMenu?.extra ?? []).map((name) => ({ id: `${MY_PREFIX}${name}`, name })),
+  ];
+  return all.filter((t) => !taskMenu?.hidden?.includes(t.id) && !taskMenu?.removed?.includes(t.id));
+};
 
 /** The name to show for a row. */
 export const entryName = (entry, project) =>
   entry.task === CUSTOM_TASK
     ? entry.custom || 'Custom task'
-    : (taskChoices(project).find((t) => t.id === entry.task)?.name ?? entry.task);
+    : entry.task.startsWith(MY_PREFIX)
+      ? entry.task.slice(MY_PREFIX.length)
+      : (taskChoices(project).find((t) => t.id === entry.task)?.name ?? entry.task);
 
 /** Two rows are the same piece of work (same project and task; custom tasks compare by name). */
 export const sameWork = (a, b) =>

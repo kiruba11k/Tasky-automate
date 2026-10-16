@@ -32,14 +32,17 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
     const planned = t.date === date || carried; // the target belongs to the assigned (or carried-over) day
     const k = taskBreakdownKey(t);
     const id = `${t.projectId}|${k.key}`;
-    const b = buckets.get(id) ?? { id, k, projectId: t.projectId, tasks: [], qty: 0, done: 0, est: 0, minutes: 0 };
+    const b = buckets.get(id) ?? { id, k, projectId: t.projectId, tasks: [], qty: 0, done: 0, est: 0, minutes: 0, approved: false };
     b.tasks.push({ t, carried: t.date !== date });
     if (planned) {
       b.qty += t.qty ?? 0;
       b.est += t.targetMinutes ?? 0;
     }
     if (finishedHere) {
-      b.done += t.doneQty ?? 0;
+      if (t.status === "done") {
+        b.done += t.doneQty ?? 0; // the number only counts once the task is approved
+        b.approved = true;
+      }
       b.minutes += t.minutes ?? 0;
     }
     buckets.set(id, b);
@@ -81,6 +84,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         kind: "number",
         qty: Math.max(0, b.qty - (l?.qty ?? 0)),
         doneQty: Math.max(0, b.done - (l?.done ?? 0)),
+        approved: b.approved, // false = the number "fills in with the approved number" and is still awaiting approval
         estMin: Math.max(0, b.est - (l?.est ?? 0)),
         actualMin,
         remarks: "",

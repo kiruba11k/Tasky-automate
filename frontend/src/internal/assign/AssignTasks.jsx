@@ -8,6 +8,7 @@ import {
   Qe as PEOPLE,
   ea as canAssignOnProject,
   Cn as STANDARD_TASK_TYPES,
+  g3 as projectTaskTypes,
   ia as previousWorkingDay,
   $e as dayKey,
   Xa as parseDay,
@@ -309,7 +310,7 @@ export function AssignTasks() {
             <div>
               <p className="mb-1.5 text-xs font-bold uppercase text-muted">Task</p>
               <div className="flex flex-wrap gap-2">
-                {STANDARD_TASK_TYPES.map((G) => (
+                {projectTaskTypes(project).map((G) => (
                   <Button
                     key={G.id}
                     tone={G.id === typeId ? 'primary' : 'ghost'}

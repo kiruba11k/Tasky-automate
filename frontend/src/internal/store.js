@@ -791,6 +791,8 @@ export const useStore = create()(
                 endDate: draft.endDate,
                 hours,
                 standards: draft.standards,
+                typeMinutes: draft.typeMinutes,
+                typesOff: draft.typesOff,
                 customStandards,
                 metrics: DEFAULT_METRICS.map((m) => ({ ...m })),
                 weekTarget: draft.weekTarget ? validateTargets(draft.weekTarget) : { ...EMPTY_COUNTS },

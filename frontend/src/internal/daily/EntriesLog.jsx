@@ -18,6 +18,7 @@ import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
 import { assignedDay } from '../lib/assigned.js';
 import { DurationInput } from './DurationInput';
 import { EntryKindSelect } from './EntryKindSelect';
+import { TaskMenuSettings, useTaskMenu } from './TaskMenuSettings';
 import { ProjectChanger, PROJECT_CHANGED } from './ProjectChanger';
 import { moveEntries } from '../lib/changeProject.js';
 import { formatClock, formatDayClock } from './dateHelpers';
@@ -31,6 +32,7 @@ import {
   newEntryId,
   parseQty,
   projectLabel,
+  MY_PREFIX,
   taskChoices,
 } from './entryHelpers';
 
@@ -52,23 +54,37 @@ function AssignedRow({ r, project, showRemoveCell }) {
   return (
     <tr data-entry={r.id} data-assigned="true" className="border-t border-line bg-sky/10 align-middle">
       <td className="px-3 py-2">
-        <span className="font-medium">{entryName(r, project)}</span>
-        {titles.length > 0 && <span className="block text-xs text-muted">{titles.join('; ')}</span>}
-        <span className="mt-0.5 flex flex-wrap items-center gap-1">
-          <span className="rounded bg-sky px-1.5 py-px text-[10px] font-bold text-sky-ink" data-testid="assigned-badge">
-            Assigned{by ? ` by ${by}` : ''}
-          </span>
-          {r.priority && <Star size={11} className="fill-butter-ink text-butter-ink" aria-label="Priority" />}
-          {r.carriedFrom && (
-            <span className="rounded bg-butter px-1.5 py-px text-[10px] font-bold text-butter-ink" data-testid="carried-badge">
-              Carried over
+        <span className="mb-1 flex flex-wrap items-center gap-1">
+          {r.carriedFrom ? (
+            <span
+              className="rounded bg-butter px-1.5 py-px text-[10px] font-bold text-butter-ink"
+              data-testid="carried-badge"
+              title={by ? `Assigned by ${by}` : undefined}
+            >
+              From yesterday's tasks
+            </span>
+          ) : (
+            <span
+              className="rounded bg-sky px-1.5 py-px text-[10px] font-bold text-sky-ink"
+              data-testid="assigned-badge"
+              title={by ? `Assigned by ${by}` : undefined}
+            >
+              Assigned
             </span>
           )}
+          {r.priority && <Star size={11} className="fill-butter-ink text-butter-ink" aria-label="Priority" />}
         </span>
+        <span className="font-medium">{entryName(r, project)}</span>
+        {titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
       </td>
       <td className="px-2 py-2 text-xs text-muted">Number</td>
       <td className="px-2 py-2 tabular-nums">{r.qty || '·'}</td>
-      <td className="px-2 py-2 tabular-nums">{r.doneQty || '·'}</td>
+      <td className="px-2 py-2">
+        <span className="tabular-nums" title="Fills in with the approved number">
+          {r.doneQty ?? 0}
+          <span className="ml-1 text-[10px] text-muted">{r.approved ? 'approved' : 'awaiting approval'}</span>
+        </span>
+      </td>
       <td className="px-2 py-2 tabular-nums">{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
       <td className="px-2 py-2 tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</td>
       <td className="px-2 py-2 text-xs text-muted">
@@ -87,6 +103,7 @@ function AssignedRow({ r, project, showRemoveCell }) {
  */
 export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProject, lockNote }) {
   const { projects, daily, tasks, saveDaily } = useStore();
+  const taskMenu = useTaskMenu(personId);
   const key = date;
   const record = daily[`${personId}|${key}`] ?? emptyDaily();
   const previous = daily[`${personId}|${previousWeekday(date)}`]?.entries ?? [];
@@ -241,7 +258,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   // The estimate follows the project's standard time for the task and target (per 10 prospects, per message...) until it is typed by hand.
   const standardFor = (row, qty) => {
     const project = projects.find((p) => p.id === row.projectId);
-    if (!project || !row.task || row.task === CUSTOM_TASK || !(qty > 0)) return null;
+    if (!project || !row.task || row.task === CUSTOM_TASK || row.task.startsWith(MY_PREFIX) || !(qty > 0)) return null;
     const builtIn = !row.task.startsWith('std:');
     return computeStandardMinutes(project, builtIn ? row.task : 'custom', qty, undefined, builtIn ? undefined : row.task.slice(4));
   };
@@ -350,6 +367,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
           ) : (
             record.entriesAt && <Badge tone="grey">End of day not sent</Badge>
           )}
+          {!readOnly && <TaskMenuSettings personId={personId} />}
           {!readOnly && targetsLocked && (
             <Button tone="ghost" className="border border-line" onClick={() => setUnlocked(true)}>
               <Pencil size={13} /> Update
@@ -371,7 +389,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       )}
       <div className="space-y-4 p-4">
         {groups.map(({ project, pid, planned, name, added: isAdded }) => {
-          const choices = taskChoices(project);
+          const choices = taskChoices(project, taskMenu);
           const mine = shown.filter((r) => r.projectId === pid);
           const assignedMine = assignedNow.rows.filter((r) => r.projectId === pid);
           const est = [...mine, ...assignedMine].reduce((s, r) => s + (r.estMin ?? 0), 0);
