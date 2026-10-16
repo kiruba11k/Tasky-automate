@@ -1,7 +1,7 @@
 import { Se as useStore, We as formatMinutes, Mn as toMinutes, pu as projectColor, yt as formatShortDate } from '@/internal/min';
 import { addDays, weekStart } from '../lib/dates.js';
 import { CalendarRange } from 'lucide-react';
-import { dayHours } from '../lib/domain.js';
+import { dayHours, dayHasTime } from '../lib/domain.js';
 import { recordWithAssigned } from '../lib/assigned.js';
 import { projectLabel } from './entryHelpers';
 import { formatWeekRange } from './dateHelpers';
@@ -10,13 +10,19 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const TH = 'pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted';
 const blockMinutes = (b) => Math.max(0, toMinutes(b.end) - toMinutes(b.start));
 
-/** "Weekly hours" card: planned, actual and extra time per day (Monday to Friday) and per project, from the day plans. */
+/**
+ * "Weekly hours" card: planned, actual and extra time per day and per project. Monday to Friday always; Saturday and Sunday only
+ * when there is any plan, table, task or extra time that day, so the total equals the person's Hours logged on the People page.
+ */
 export function WeeklyHours({ personId, date }) {
   const { daily, projects, tasks } = useStore();
   const mon = weekStart(date);
-  const days = [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
   const dayRecord = (d) => recordWithAssigned(tasks, daily, personId, d, { projects, carry: false });
-  const perDay = days.map((d) => ({ d, ...dayHours(dayRecord(d)) }));
+  const perDay = [0, 1, 2, 3, 4, 5, 6]
+    .map((i) => addDays(mon, i))
+    .map((d) => ({ d, ...dayHours(dayRecord(d)) }))
+    .filter((d, i) => i < 5 || dayHasTime(d));
+  const days = perDay.map((d) => d.d);
   const byProject = new Map();
   days.forEach((d) => {
     const rec = dayRecord(d);

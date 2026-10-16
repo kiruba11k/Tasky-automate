@@ -14,6 +14,7 @@ import {
   ek as useCalendar,
   Xu as buildPeriodOptions,
   ic as computeKpis,
+  mb as TAG_LABELS,
   Go as KPI_IDS,
   Yo as KPI_LABELS,
   sle as KPI_SHORT_LABELS,
@@ -26,10 +27,10 @@ import {
 import { LeaveBadge } from '../ui/LeaveBadge';
 import { HistoryCalendar } from './HistoryCalendar';
 import { TaskLine } from './TaskLine';
-import { dayHours, wasOnTime, workDate, isSubmitted } from '../lib/domain';
+import { dayHours, dayHasTime, personMetrics, isSubmitted, workDate, NOT_ENOUGH_DATA } from '../lib/domain';
 import { recordWithAssigned } from '../lib/assigned';
 import { leaveOn } from '../lib/leave';
-import { WEEKDAY_SHORT, formatDayMonth, isWeekday, parseDateKey, previousWeekday } from '../lib/dates';
+import { WEEKDAY_SHORT, addDays, formatDayMonth, isWeekday, parseDateKey } from '../lib/dates';
 
 
 /** A person's own page (route "/people/:id"): performance by period, where time goes, task history, day by day, current tasks. (ede) */
@@ -50,15 +51,22 @@ export function PersonPage() {
   const period = selected?.period;
   const mine = useMemo(() => tasks.filter((t) => t.assigneeId === id), [tasks, id]);
   const open = mine.filter((t) => t.status !== 'done').sort((a, b) => a.date.localeCompare(b.date));
+  // the last 10 working days; a Saturday or Sunday joins them when that day holds any time or finished work
   const days = useMemo(() => {
     const out = [];
-    let day = isWeekday(dayKey(0)) ? dayKey(0) : previousWeekday(dayKey(0));
-    while (out.length < 10) {
-      out.push(day);
-      day = previousWeekday(day);
+    let day = dayKey(0);
+    for (let n = 0; out.length < 10 && n < 60; n++, day = addDays(day, -1)) {
+      const hasWork =
+        dayHasTime(dayHours(recordWithAssigned(mine, daily, id, day, { projects, carry: false }))) ||
+        mine.some((t) => t.date === day || (isSubmitted(t) && workDate(t) === day));
+      if (isWeekday(day) || hasWork) out.push(day);
     }
     return out;
-  }, []);
+  }, [mine, daily, id, projects]);
+  const flagRow = useMemo(
+    () => (period ? computeKpis(analytics, gran, period.key).find((r) => r.personId === id) : undefined),
+    [analytics, gran, period, id],
+  );
 
   if (!person)
     return (
@@ -140,6 +148,18 @@ export function PersonPage() {
             </tbody>
           </table>
         </div>
+        {selected && flagRow && (
+          <p className="mt-2 text-xs text-muted" data-testid="person-flag">
+            {selected.label}:{' '}
+            {flagRow.tag ? (
+              <span title={flagRow.tagReason}>
+                <Badge tone={flagRow.tag === 'acknowledge' ? 'mint' : 'coral'}>{TAG_LABELS[flagRow.tag]}</Badge> {flagRow.tagReason}
+              </span>
+            ) : (
+              <span>{flagRow.tagReason || 'No flag'}{flagRow.tagReason === NOT_ENOUGH_DATA ? ' (needs 3 timed items)' : ''}</span>
+            )}
+          </p>
+        )}
       </Card>
       {period && (
         <Card>
@@ -174,11 +194,10 @@ export function PersonPage() {
             </thead>
             <tbody className="tabular-nums">
               {days.map((day) => {
-                const assigned = mine.filter((t) => t.date === day);
-                const submitted = mine.filter((t) => isSubmitted(t) && workDate(t) === day);
+                // the same figures as the Team table: tasks, ticked-off table rows and worked plan blocks
+                const m = personMetrics(mine, daily, id, day, day);
                 const approved = mine.filter((t) => t.approvedAt?.slice(0, 10) === day);
-                const timed = submitted.map(wasOnTime).filter((v) => v != null);
-                const onTime = timed.length ? Math.round((timed.filter(Boolean).length / timed.length) * 100) : null;
+                const onTime = m.onTime;
                 const entry = daily[`${id}|${day}`];
                 const hours = dayHours(recordWithAssigned(mine, daily, id, day, { projects, carry: false }));
                 return (
@@ -187,8 +206,8 @@ export function PersonPage() {
                       {WEEKDAY_SHORT[parseDateKey(day).getDay()]} {formatDayMonth(day)}{' '}
                       <LeaveBadge personId={id} date={day} />
                     </td>
-                    <td className="px-2 py-1.5 text-right">{assigned.length}</td>
-                    <td className="px-2 py-1.5 text-right">{submitted.length}</td>
+                    <td className="px-2 py-1.5 text-right">{m.assigned}</td>
+                    <td className="px-2 py-1.5 text-right">{m.tasks}</td>
                     <td className="px-2 py-1.5 text-right">{approved.length}</td>
                     <td className="px-2 py-1.5 text-right">
                       {onTime == null ? <span className="text-muted">n/a</span> : `${onTime}%`}

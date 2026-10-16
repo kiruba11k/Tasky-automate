@@ -162,7 +162,7 @@ test('the weekly rows add the days\' assigned tasks up once, without the carried
 });
 
 // ---------------------------------------------------------------- Team table sync
-import { dayWorkedMinutes, weekHours, workDate } from './domain.js';
+import { dayWorkedMinutes, workDate, weekHours } from './domain.js';
 import { recordWithAssigned } from './assigned.js';
 import { addDays } from './dates.js';
 
@@ -226,7 +226,7 @@ test('Team numbers equal the sums of the people, and a person\'s Weekly hours to
   const people = [ME, 'b'];
   const rows = people.map((id) => personMetrics(tasks.filter((t) => t.assigneeId === id), daily, id, mon, '2026-10-18'));
   // the Team row adds the people up (people/peopleUtils.js totalKpis), so each person's figure must be right on its own
-  assert.deepEqual(rows.map((r) => r.tasks), [2, 2]); // me: two tasks; b: one task and one ticked-off table row
+  assert.deepEqual(rows.map((r) => r.tasks), [4, 2]); // me: two tasks plus the worked plan blocks of 12th (p1) and 14th (p2); b: one task and one ticked-off table row
   for (const id of people) {
     const mine = tasks.filter((t) => t.assigneeId === id);
     const days = [0, 1, 2, 3, 4].map((i) => dayHours(recordWithAssigned(mine, daily, id, addDays(mon, i), { carry: false })));
@@ -235,4 +235,91 @@ test('Team numbers equal the sums of the people, and a person\'s Weekly hours to
     assert.equal(m.hours, Math.round((weekly / 60) * 10) / 10, id);
     assert.equal(m.extra, Math.round((days.reduce((s, d) => s + d.extraMin, 0) / 60) * 10) / 10, id);
   }
+});
+
+// ------------------------------------------------ weekends, plan-block work, where the time goes, flags
+import { dayProjectMinutes, workedPlanBlocks, dayHasTime, spotlight, comparablePrevious, MIN_TIMED } from './domain.js';
+import { buildPeriod } from './dates.js';
+
+const SAT = '2026-10-17'; const SUN = '2026-10-18'; const MON = '2026-10-12';
+
+test('weekHours lists Saturday / Sunday only when they hold time, and totals equal Hours logged and Extra', () => {
+  const daily = {
+    [`${ME}|2026-10-13`]: { plan: [block({ actualMinutes: 60 })] },
+    [`${ME}|${SAT}`]: { plan: [block({ actualMinutes: 90, projectId: 'p2' })], extra: [{ minutes: 30 }] },
+    [`${ME}|${SUN}`]: { plan: [], entries: [row({ doneQty: 0 })] }, // nothing worked: stays hidden
+  };
+  const tasks = [task({ date: SAT, status: 'done', doneQty: 10, minutes: 45, submittedAt: new Date(2026, 9, 17, 11).toISOString() })];
+  const wk = weekHours(daily, ME, MON, tasks);
+  assert.deepEqual(wk.days.map((d) => d.date), ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', SAT]);
+  const m = personMetrics(tasks, daily, ME, MON, SUN);
+  assert.equal(m.hours, Math.round((wk.actualMin / 60) * 10) / 10);
+  assert.equal(m.extra, Math.round((wk.extraMin / 60) * 10) / 10);
+  assert.equal(wk.actualMin, 60 + 90 + 45); // p2 block 90 plus the project task 45 on Saturday, and Tuesday's 60
+  assert.equal(dayHasTime(dayHours(daily[`${ME}|${SUN}`])), false);
+  assert.equal(weekHours(daily, ME, MON).days.length, 6); // saved records alone also show the weekend day
+});
+
+test('plan blocks with time worked count as done, assigned and timed work, without doubling tasks or table rows', () => {
+  const day = '2026-10-13';
+  const key = `${ME}|${day}`;
+  const plan = [block({ actualMinutes: 100, end: '12:00' }), block({ id: 'b2', start: '14:00', end: '15:00', actualMinutes: 90 }), block({ id: 'b3', start: '15:00', end: '16:00' })];
+  const m = personMetrics([], { [key]: { plan } }, ME, day, day);
+  assert.deepEqual([m.tasks, m.assigned, m.timed, m.onTimeCount, m.onTime, m.hours], [2, 2, 2, 1, 50, 3.2]); // 100 of 120 is on time, 90 of 60 is not; the untouched block is nothing
+  assert.equal(workedPlanBlocks({ plan: [...plan], eodAt: 'x' }).length, 3); // a sent day counts planned time
+  // a done task for the project covers its blocks
+  const withTask = personMetrics([task({ status: 'done', doneQty: 10, minutes: 20 })], { [key]: { plan } }, ME, day, day);
+  assert.equal(withTask.tasks, 1);
+  // so does a ticked-off table row; a not-done row does not
+  assert.equal(personMetrics([], { [key]: { plan, entries: [row({ doneQty: 5 })] } }, ME, day, day).tasks, 1);
+  assert.equal(personMetrics([], { [key]: { plan, entries: [row({ doneQty: 0 })] } }, ME, day, day).tasks, 2); // a row that is only planned covers nothing
+});
+
+test('where the time goes covers plan blocks and its total equals Hours logged for the period', () => {
+  const daily = {
+    [`${ME}|2026-10-12`]: { plan: [block({ actualMinutes: 100 }), block({ projectId: 'p2', actualMinutes: 30 })] },
+    [`${ME}|2026-10-13`]: { plan: [block({ actualMinutes: 60 })], entries: [row({ actualMin: 75 })], extra: [{ minutes: 20 }] },
+    [`${ME}|${SAT}`]: { plan: [block({ actualMinutes: 40, custom: { title: 'Admin' } })] },
+  };
+  const tasks = [task({ date: '2026-10-14', status: 'done', doneQty: 10, minutes: 50 }), task({ date: '2026-10-13', status: 'done', doneQty: 10, minutes: 25 })];
+  const state = { projects: [{ id: P, name: 'Northwind' }, { id: 'p2', name: 'Other' }], tasks, daily };
+  const t = timeBreakdown(state, { personId: ME, from: MON, to: SUN });
+  const m = personMetrics(tasks, daily, ME, MON, SUN);
+  const minutes = [0, 1, 2, 3, 4, 5, 6].reduce((sum, i) => sum + dayWorkedMinutes(tasks, daily, ME, addDays(MON, i)), 0);
+  assert.equal(t.totalMin, minutes);
+  assert.equal(m.hours, Math.round((minutes / 60) * 10) / 10);
+  assert.equal(t.byProject.reduce((s, x) => s + x.minutes, 0), t.totalMin);
+  assert.equal(t.byType.reduce((s, x) => s + x.minutes, 0), t.totalMin);
+  assert.equal(t.byType.find((x) => x.id === 'plan').minutes, 100 + 30 + 40); // blocks that nothing else covers
+  assert.equal(t.byProject.find((x) => x.id === 'p2').minutes, 30);
+  assert.equal(t.extraMin, 20); // extra hours stay apart, as in the Extra column
+  assert.equal(dayProjectMinutes(daily[`${ME}|2026-10-13`]).get(P), 75);
+});
+
+test('timed items from tasks, table rows and plan blocks all feed On time; 3 are enough for a flag; vs previous compares like with like', () => {
+  assert.equal(MIN_TIMED, 3);
+  const wk = '2026-09-14'; // a finished week
+  const days = [0, 1, 2].map((i) => addDays(wk, i));
+  const mk = (id, onTime) => {
+    const tasks = [task({ assigneeId: id, date: days[0], status: 'done', doneQty: 10, minutes: onTime ? 20 : 60, submittedAt: new Date(2026, 8, 14, 11).toISOString() })];
+    const daily = {
+      [`${id}|${days[1]}`]: { entries: [row({ task: 'l1', doneQty: 5, estMin: 30, actualMin: onTime ? 20 : 50 })] },
+      [`${id}|${days[2]}`]: { plan: [block({ projectId: 'p9', actualMinutes: onTime ? 100 : 150 })] },
+    };
+    return { tasks, daily };
+  };
+  const mix = ['a', 'b', 'c', 'd'].map((id, i) => mk(id, i < 2));
+  const state = { tasks: mix.flatMap((x) => x.tasks), daily: Object.assign({}, ...mix.map((x) => x.daily)) };
+  const rows = spotlight(state, 'week', wk, { people: ['a', 'b', 'c', 'd'] });
+  assert.deepEqual(rows.map((r) => [r.timed, r.tasks, r.onTime]), [[3, 3, 100], [3, 3, 100], [3, 3, 0], [3, 3, 0]]);
+  assert.ok(rows.every((r) => r.tagReason !== 'Not enough data yet'));
+  assert.ok(rows.some((r) => r.tag === 'support'));
+  const thin = spotlight({ tasks: [], daily: { [`a|${days[2]}`]: mix[0].daily[`a|${days[2]}`] } }, 'week', wk, { people: ['a'] });
+  assert.equal(thin[0].tagReason, 'Not enough data yet');
+  assert.equal(thin[0].change.onTime, null);
+  // a running period is compared with the same days of the previous one
+  const cur = { ...buildPeriod('week', '2026-10-12'), partial: true };
+  const prev = comparablePrevious(cur, '2026-10-14');
+  assert.deepEqual([prev.from, prev.to], ['2026-10-05', '2026-10-07']);
+  assert.equal(comparablePrevious({ ...cur, partial: false }, '2026-10-14').to, '2026-10-11');
 });

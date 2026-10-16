@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Se as useStore, oe as cn, $e as dayKey } from '@/internal/min';
+import { isSubmitted, workDate } from '../lib/domain';
 import { LeaveBadge } from '../ui/LeaveBadge';
 import { TaskLine } from './TaskLine';
 import { MONTH_SHORT, isWeekday, parseDateKey, previousWeekday } from '../lib/dates';
@@ -25,8 +26,8 @@ export function HistoryCalendar({ tasks, personId }) {
   const submittedByDay = useMemo(() => {
     const map = new Map();
     tasks.forEach((t) => {
-      if (t.submittedAt) {
-        const day = t.submittedAt.slice(0, 10);
+      if (isSubmitted(t)) {
+        const day = workDate(t); // the day the work counts for, as in Tasks done
         map.set(day, [...(map.get(day) ?? []), t]);
       }
     });

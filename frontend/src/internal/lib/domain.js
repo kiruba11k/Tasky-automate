@@ -677,6 +677,38 @@ export function dayLoggedMinutes(tasks, daily, personId, date) {
   return dayWorkedMinutes(tasks, daily, personId, date);
 }
 
+/** A plan block's project: a custom block's own project first. Empty for work not linked to a project. */
+const blockProject = (block) => (block.custom ? (block.custom.projectId ?? block.projectId) : block.projectId) || "";
+
+/** Planned and actual minutes of a plan block (a sent day counts the planned time when no actual was typed). */
+const blockTimes = (daily, block) => {
+  const planned = Math.max(0, clockToMinutes(block.end) - clockToMinutes(block.start));
+  return { planned, actual: block.actualMinutes ?? (daily.eodAt ? planned : 0) };
+};
+
+/**
+ * The time worked on a day split per project (Map projectId -> minutes; "" holds blocks that belong to no project). Actual time
+ * typed into a project's day table wins over the plan blocks' actual for that project. The sum is the day's worked time.
+ */
+export function dayProjectMinutes(daily) {
+  const out = new Map();
+  if (!daily) return out;
+  const byProject = new Map();
+  (daily.plan ?? []).forEach((block) => {
+    if (block.id === "lunch") return;
+    byProject.set(blockProject(block), (byProject.get(blockProject(block)) ?? 0) + blockTimes(daily, block).actual);
+  });
+  const logged = new Map();
+  (daily.entries ?? []).forEach((e) => {
+    if (e.actualMin > 0) logged.set(e.projectId, (logged.get(e.projectId) ?? 0) + e.actualMin);
+  });
+  new Set([...byProject.keys(), ...logged.keys()]).forEach((pid) => {
+    const m = pid && logged.has(pid) ? logged.get(pid) : (byProject.get(pid) ?? 0);
+    if (m > 0) out.set(pid, m);
+  });
+  return out;
+}
+
 /**
  * `zw` - planned / actual / extra minutes for one daily entry. Actual time typed into a project's day table wins over the
  * time block's actual for that project (the block's own actual, or the planned time once the day is sent, is the fallback).
@@ -684,36 +716,46 @@ export function dayLoggedMinutes(tasks, daily, personId, date) {
 export function dayHours(daily) {
   if (!daily) return { plannedMin: 0, actualMin: 0, extraMin: 0, sent: false };
   let planned = 0;
-  let loose = 0;
-  const byProject = new Map();
   (daily.plan ?? []).forEach((block) => {
-    if (block.id === "lunch") return;
-    const mins = Math.max(0, clockToMinutes(block.end) - clockToMinutes(block.start));
-    planned += mins;
-    const done = block.actualMinutes ?? (daily.eodAt ? mins : 0);
-    const pid = block.custom ? (block.custom.projectId ?? block.projectId) : block.projectId;
-    if (pid) byProject.set(pid, (byProject.get(pid) ?? 0) + done);
-    else loose += done;
+    if (block.id !== "lunch") planned += blockTimes(daily, block).planned;
   });
-  const logged = new Map();
-  (daily.entries ?? []).forEach((e) => {
-    if (e.actualMin > 0) logged.set(e.projectId, (logged.get(e.projectId) ?? 0) + e.actualMin);
-  });
-  let actual = loose;
-  new Set([...byProject.keys(), ...logged.keys()]).forEach((pid) => {
-    actual += logged.has(pid) ? logged.get(pid) : (byProject.get(pid) ?? 0);
-  });
+  let actual = 0;
+  dayProjectMinutes(daily).forEach((m) => (actual += m));
   const extra = (daily.extra ?? []).reduce((sum, x) => sum + (x.minutes || 0), 0);
   return { plannedMin: planned, actualMin: actual, extraMin: extra, sent: !!daily.eodAt };
 }
 
-/** `kR` - Mon-Fri hours roll-up for a person. `daily` is `state.daily`. */
-export function weekHours(daily, personId, week) {
+/** True when a day's hours hold any plan, table, task or extra time (an empty weekend day stays hidden in the week lists). */
+export const dayHasTime = (hours) => !!hours && (hours.plannedMin > 0 || hours.actualMin > 0 || hours.extraMin > 0);
+
+/**
+ * Plan blocks that were worked: [{ block, projectId, plannedMin, actualMin }] for every non-lunch block with actual time
+ * (typed, or the planned time once the day is sent). This is the completed plan work that Tasks done and On time count.
+ */
+export function workedPlanBlocks(daily) {
+  if (!daily) return [];
+  return (daily.plan ?? [])
+    .filter((b) => b.id !== "lunch")
+    .map((block) => {
+      const { planned, actual } = blockTimes(daily, block);
+      return { block, projectId: blockProject(block), plannedMin: planned, actualMin: actual };
+    })
+    .filter((b) => b.actualMin > 0);
+}
+
+/**
+ * `kR` - hours roll-up of a week for a person (`daily` is `state.daily`; pass `tasks` to include the time on submitted tasks, as
+ * the person's own Weekly hours do). Monday to Friday always; Saturday and Sunday only when that day holds any time, so the
+ * totals equal personMetrics for the whole week.
+ */
+export function weekHours(daily, personId, week, tasks) {
   const monday = weekStart(week);
-  const days = [0, 1, 2, 3, 4].map((i) => {
-    const date = addDays(monday, i);
-    return { date, ...dayHours(daily[`${personId}|${date}`]) };
-  });
+  const days = [0, 1, 2, 3, 4, 5, 6]
+    .map((i) => {
+      const date = addDays(monday, i);
+      return { date, ...dayHours(dayRecordWithTaskTime(tasks, daily, personId, date)) };
+    })
+    .filter((d, i) => i < 5 || dayHasTime(d));
   return {
     plannedMin: days.reduce((s, d) => s + d.plannedMin, 0),
     actualMin: days.reduce((s, d) => s + d.actualMin, 0),
@@ -738,8 +780,8 @@ export const METRIC_LABELS = {
 
 /** `Ca` */
 export const METRIC_HELP = {
-  onTime: "Share of submitted tasks finished within their target time",
-  tasks: "Tasks submitted for approval or approved",
+  onTime: "Share of timed work finished within its target time: submitted tasks, ticked-off day-table rows and worked plan blocks (actual time within the block's planned time)",
+  tasks: "Work done: tasks submitted for approval or approved, ticked-off day-table rows, and - for a day and project with neither - each plan block with time worked",
   hours: "Time worked: plan blocks, day tables and submitted tasks (the larger per project), as in Weekly hours",
   extra: "Extra hours recorded in end-of-day updates",
   resubmits: "Times a task was sent again after feedback",
@@ -773,8 +815,11 @@ export function personMetrics(tasks, daily, personId, from, to) {
   let onTimeCount = 0;
   let resubmits = 0;
   const coveredWork = new Set(); // day, project and kind of work that submitted tasks already count
+  const coveredDays = new Set(); // day and project that a done task or a ticked-off table row already counts (plan blocks then add nothing)
+  const assignedDays = new Set(); // day and project that already has an assigned task (a worked plan block there is not a new assignment)
   tasks.forEach((t) => {
     if (t.date >= from && t.date <= to) {
+      assignedDays.add(`${t.date}|${t.projectId}`);
       assigned++;
       resubmits += t.resubmits ?? 0;
     }
@@ -784,6 +829,7 @@ export function personMetrics(tasks, daily, personId, from, to) {
     if (t.date < from || t.date > to) assigned++; // assigned on an earlier day, finished in this period
     submitted++;
     coveredWork.add(`${done}|${t.projectId}|${t.typeId}`);
+    coveredDays.add(`${done}|${t.projectId}`);
     const ok = wasOnTime(t);
     if (ok !== null) {
       timed++;
@@ -801,6 +847,25 @@ export function personMetrics(tasks, daily, personId, from, to) {
       if (e.estMin > 0 && e.actualMin > 0) {
         timed++;
         if (e.actualMin <= e.estMin) onTimeCount++;
+      }
+    });
+  }
+  // completed plan work: for a day and project with no done task and no ticked-off table row, every plan block with actual time
+  // counts as one done item, timed against its planned length (on time when the actual time fits it)
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    const record = daily?.[`${personId}|${d}`];
+    if (!record) continue;
+    (record.entries ?? []).forEach((e) => {
+      if (e.doneQty > 0) coveredDays.add(`${d}|${e.projectId}`);
+    });
+    workedPlanBlocks(record).forEach((b) => {
+      const day = `${d}|${b.projectId}`;
+      if (coveredDays.has(day)) return;
+      if (!assignedDays.has(day)) assigned++;
+      submitted++;
+      if (b.plannedMin > 0) {
+        timed++;
+        if (b.actualMin <= b.plannedMin) onTimeCount++;
       }
     });
   }
@@ -857,6 +922,22 @@ export const SPOTLIGHT_TAGS = {
 export const percentileValue = (sorted, q) =>
   sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))];
 
+/** Timed items (tasks, ticked-off table rows, worked plan blocks) a person needs in a period before an on-time share is judged. */
+export const MIN_TIMED = 3;
+export const NOT_ENOUGH_DATA = "Not enough data yet";
+
+/**
+ * The part of the previous period to compare a period with: all of it, or - while the period is still running - only the same
+ * number of days from its start, so "vs previous" sets Mon-Wed so far against last Mon-Wed rather than a whole week.
+ */
+export function comparablePrevious(period, today = todayKey(0)) {
+  const prev = shiftPeriod(period, -1);
+  if (!period.partial || today < period.from || today > period.to) return prev;
+  const elapsed = Math.round((parseDateKey(today).getTime() - parseDateKey(period.from).getTime()) / 864e5);
+  const to = addDays(prev.from, elapsed);
+  return to < prev.to ? { ...prev, to } : prev;
+}
+
 /**
  * `ic` - team spotlight: per-person metrics for the period vs the previous
  * one, tagged "acknowledge" / "support" where there is enough data.
@@ -867,7 +948,7 @@ export const percentileValue = (sorted, q) =>
  */
 export function spotlight(state, gran, which = "current", opts = {}) {
   const period = resolvePeriod(gran, which);
-  const prevPeriod = shiftPeriod(period, -1);
+  const prevPeriod = comparablePrevious(period);
   const people = opts.people ?? TRACKED_PEOPLE_IDS;
   const byPerson = new Map(people.map((id) => [id, []]));
   state.tasks.forEach((t) => byPerson.get(t.assigneeId)?.push(t));
@@ -879,14 +960,15 @@ export function spotlight(state, gran, which = "current", opts = {}) {
       METRIC_KEYS.map((k) => {
         const a = cur[k];
         const b = prev[k];
+        // an on-time share is only compared when both periods have enough timed items to mean something
+        if (k === "onTime" && (cur.timed < MIN_TIMED || prev.timed < MIN_TIMED)) return [k, null];
         return [k, a == null || b == null ? null : roundOneDecimal(a - b)];
       }),
     );
     return { personId: id, name: staticPersonName(id), ...cur, prev, change, tag: null };
   });
-  const MIN_TIMED = 5;
   rows.forEach((r) => {
-    if (r.timed < MIN_TIMED) r.tagReason = "Not enough data yet";
+    if (r.timed < MIN_TIMED) r.tagReason = NOT_ENOUGH_DATA;
   });
   const eligible = rows.filter((r) => r.onTime != null && r.tasks > 0 && r.timed >= MIN_TIMED);
   if (eligible.length >= 3) {
@@ -943,77 +1025,67 @@ export function spotlight(state, gran, which = "current", opts = {}) {
 }
 
 /**
- * `JV` - minutes by project and by task type in a date range.
+ * `JV` - minutes worked by project and by task type in a date range. Built from the same per-day, per-project worked time as
+ * Hours logged (dayProjectMinutes: plan blocks, table time and task time, the larger per project), so `totalMin` equals the
+ * person's Hours logged for the range. Extra hours are not part of it: they are returned apart as `extraMin` / `extraByProject`.
  * @param {object} state
  * @param {{from:string,to:string,personId?:string}} range
  */
 export function timeBreakdown(state, range) {
   const people = range.personId ? [range.personId] : TRACKED_PEOPLE_IDS;
-  const projectName = (id) => state.projects?.find((p) => p.id === id)?.name ?? id;
+  const projectName = (id) => (id ? (state.projects?.find((p) => p.id === id)?.name ?? id) : "Not linked to a project");
   const byProject = new Map();
   const byType = new Map();
+  const extraByProject = new Map();
   const add = (map, id, label, minutes) => {
     const entry = map.get(id) ?? { id, label, minutes: 0 };
     entry.minutes += minutes;
     map.set(id, entry);
   };
-  // per person, day and project the larger of the submitted tasks' time and the time typed into the day tables
-  const seen = new Map();
-  const slot = (person, day, pid) => {
-    const id = `${person}|${day}|${pid}`;
-    if (!seen.has(id)) seen.set(id, { pid, tasks: [], rows: [], taskMin: 0, rowMin: 0 });
-    return seen.get(id);
+  const taskType = (t) => {
+    const type = TASK_TYPES.find((x) => x.id === t.typeId);
+    if (type) return { id: type.id, label: type.name };
+    const k = taskBreakdownKey(t);
+    return { id: k.key, label: k.label };
   };
-  state.tasks.forEach((t) => {
-    if (
-      !people.includes(t.assigneeId) ||
-      !isSubmitted(t) ||
-      !t.minutes ||
-      workDate(t) < range.from ||
-      workDate(t) > range.to
-    )
-      return;
-    const b = slot(t.assigneeId, workDate(t), t.projectId);
-    b.tasks.push(t);
-    b.taskMin += t.minutes;
-  });
+  let extraMin = 0;
   people.forEach((id) => {
-    entriesBetween(state.daily ?? {}, id, range.from, range.to).forEach(({ date, entry }) => {
-      if (!(entry.actualMin > 0)) return;
-      const b = slot(id, date, entry.projectId);
-      b.rows.push(entry);
-      b.rowMin += entry.actualMin;
-    });
-  });
-  seen.forEach((b) => {
-    const project = state.projects?.find((p) => p.id === b.pid);
-    if (b.taskMin >= b.rowMin) {
-      b.tasks.forEach((t) => {
-        add(byProject, t.projectId, projectName(t.projectId), t.minutes);
-        const type = TASK_TYPES.find((x) => x.id === t.typeId);
-        if (type) add(byType, type.id, type.name, t.minutes);
-        else {
-          const k = taskBreakdownKey(t);
-          add(byType, k.key, k.label, t.minutes);
-        }
-      });
-    } else {
-      b.rows.forEach((e) => {
-        add(byProject, b.pid, projectName(b.pid), e.actualMin);
-        const k = taskBreakdownKey(entryAsTask(e, project));
-        const type = TASK_TYPES.find((x) => x.id === e.task);
-        if (type) add(byType, type.id, type.name, e.actualMin);
-        else add(byType, k.key, k.label, e.actualMin);
-      });
-    }
-  });
-  people.forEach((id) => {
+    const mine = state.tasks.filter((t) => t.assigneeId === id);
     for (let d = range.from; d <= range.to; d = addDays(d, 1)) {
-      (state.daily[`${id}|${d}`]?.extra ?? []).forEach((x) => {
+      const record = dayRecordWithTaskTime(mine, state.daily, id, d);
+      const minutes = dayProjectMinutes(record);
+      if (minutes.size) {
+        const tasksOf = (pid) => mine.filter((t) => t.projectId === pid && t.minutes > 0 && isSubmitted(t) && workDate(t) === d);
+        const rowsOf = (pid) => dayEntries(state.daily, id, d).filter((e) => e.projectId === pid && e.actualMin > 0);
+        minutes.forEach((m, pid) => {
+          add(byProject, pid || "other", projectName(pid), m);
+          // the project's time came from the submitted tasks, the typed table rows or - when neither has time - the plan blocks
+          const tasks = pid ? tasksOf(pid) : [];
+          const rows = pid ? rowsOf(pid) : [];
+          const taskMin = tasks.reduce((sum, t) => sum + t.minutes, 0);
+          const rowMin = rows.reduce((sum, e) => sum + e.actualMin, 0);
+          if (taskMin > 0 && taskMin >= rowMin) {
+            tasks.forEach((t) => {
+              const type = taskType(t);
+              add(byType, type.id, type.label, t.minutes);
+            });
+          } else if (rowMin > 0) {
+            const project = state.projects?.find((p) => p.id === pid);
+            rows.forEach((e) => {
+              const type = TASK_TYPES.find((x) => x.id === e.task);
+              if (type) add(byType, type.id, type.name, e.actualMin);
+              else {
+                const k = taskBreakdownKey(entryAsTask(e, project));
+                add(byType, k.key, k.label, e.actualMin);
+              }
+            });
+          } else add(byType, "plan", "Planned work", m);
+        });
+      }
+      (state.daily?.[`${id}|${d}`]?.extra ?? []).forEach((x) => {
         if (x.minutes > 0) {
-          if (x.projectId) add(byProject, x.projectId, projectName(x.projectId), x.minutes);
-          else add(byProject, "other", "Not linked to a project", x.minutes);
-          add(byType, "extra", "Extra hours", x.minutes);
+          extraMin += x.minutes;
+          add(extraByProject, x.projectId || "other", projectName(x.projectId), x.minutes);
         }
       });
     }
@@ -1024,6 +1096,8 @@ export function timeBreakdown(state, range) {
     byProject: projects,
     byType: sorted(byType),
     totalMin: projects.reduce((s, p) => s + p.minutes, 0),
+    extraMin,
+    extraByProject: sorted(extraByProject),
   };
 }
 

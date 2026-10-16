@@ -151,7 +151,7 @@ export function Spotlight() {
           {weeklySeries.map((point) => (
             <div
               key={point.key}
-              title={`${point.title}: ${point.value == null ? 'no timed tasks' : `${point.value}% on time`}`}
+              title={`${point.title}: ${point.value == null ? 'not enough timed work' : `${point.value}% on time`}`}
               className="flex-1 rounded-t bg-accent/70"
               style={{ height: `${point.value ?? 0}%` }}
             />

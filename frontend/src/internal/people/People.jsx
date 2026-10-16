@@ -36,6 +36,8 @@ import { ManagePeople } from './ManagePeople';
 import { Button } from '../ui/Button';
 import { LeaveBadge } from '../ui/LeaveBadge';
 import { PEOPLE } from '../lib/constants';
+import { comparablePrevious, MIN_TIMED } from '../lib/domain';
+import { formatDayMonth } from '../lib/dates';
 
 const WHO_OPTIONS = [
   { id: 'all', label: 'Everyone' },
@@ -66,6 +68,7 @@ export function People() {
   const safeIndex = Math.min(index, options.length - 1);
   const period = options[safeIndex].period;
   const prevPeriod = shiftPeriod(period, -1);
+  const comparedPrev = comparablePrevious(period);
   const allRows = useMemo(
     () => computeKpis(analytics, gran, period.key),
     [analytics, gran, period.key],
@@ -166,7 +169,7 @@ export function People() {
         <p className="mt-2 text-xs text-muted">
           Showing <b className="text-ink">{period.title}</b>
           {period.partial ? ' (so far)' : ''}, compared with the previous {noun} (
-          {prevPeriod.title}).
+          {prevPeriod.title}{period.partial && comparedPrev.to < prevPeriod.to ? `, same days so far: up to ${formatDayMonth(comparedPrev.to)}` : ''}).
         </p>
       </Card>
       <Card>
@@ -291,8 +294,13 @@ export function People() {
         </div>
         <p className="mt-3 text-xs text-muted">
           Click a column to sort, click a person to open their page. Flags compare each person with
-          the team in the same {noun}. Hours logged is time worked (plan blocks, day tables and submitted tasks, as in each person's Weekly hours); extra hours
-          come from end-of-day updates.
+          the team in the same {noun}, and need at least {MIN_TIMED} timed items in the period. Hours logged is time worked (plan blocks,
+          day tables and submitted tasks, the larger per project, Saturdays and Sundays included, as in each person's Weekly hours); extra
+          hours come from end-of-day updates. Tasks done counts submitted tasks, work ticked off in the day tables and, for a day and project
+          that has neither, each plan block with time worked as one item. On time compares the time taken with the target: a task's target
+          minutes, a table row's estimate, or a plan block's planned length (a plan block is on time when its actual time is no more than
+          planned). While a {noun} is still running, vs previous sets it against the same number of days of the previous {noun}; an on-time
+          change is only shown when both {noun}s have at least {MIN_TIMED} timed items.
         </p>
       </Card>
     </div>

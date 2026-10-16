@@ -8,7 +8,6 @@ import {
   nt as personName,
   Qe as PEOPLE,
   B1 as dailyRowsFor,
-  zw as dailyHours,
   hL as weeklyRowsFor,
   kR as weeklyHours,
   UV as dailyStats,
@@ -25,6 +24,7 @@ import {
 import { EntriesLog } from '../daily/EntriesLog';
 import { WeeklyUpdate } from '../daily/WeeklyUpdate';
 import { leaveLabel, leaveOn } from '../lib/leave';
+import { dayHours as dailyHours, dayRecordWithTaskTime } from '../lib/domain';
 
 /** Manager view of "/daily": team tasks update (daily or weekly). */
 export function ManagerDaily() {
@@ -50,14 +50,14 @@ export function ManagerDaily() {
             sent,
             targetsAt: entry?.sodAt,
             sentAt: entry?.eodAt,
-            hours: dailyHours(entry),
+            hours: dailyHours(dayRecordWithTaskTime(tasks, daily, id, date)),
             note: (sent ? entry?.eodNote : entry?.sodNote) || entry?.sodNote,
             leave: leaveLabel(leaveOn(profiles, id, date)),
           };
         }
         const entry = weekly[`${id}|${weekKey}`];
         const { rows, sent } = weeklyRowsFor(tasks, id, weekKey, entry, undefined, daily, projects);
-        const hours = weeklyHours(daily, id, weekKey);
+        const hours = weeklyHours(daily, id, weekKey, tasks);
         return {
           id,
           name: personName(id),
