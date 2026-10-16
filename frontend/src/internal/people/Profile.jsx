@@ -205,7 +205,7 @@ export function Profile() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">
           <CardTitle>My task log</CardTitle>
-          <TaskLog tasks={myTasks} who="assignee" />
+          <TaskLog tasks={myTasks} who="assignee" personId={me} />
         </Card>
         <Card>
           <CardTitle>My review log</CardTitle>
