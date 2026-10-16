@@ -14,7 +14,7 @@ import {
   weekStart,
   WEEKDAY_SHORT,
 } from "./dates.js";
-import { entryAsTask, entriesBetween, weeklyDone, dayEntries, plannedWeekTargets, CUSTOM_TASK } from "./entries.js";
+import { entryAsTask, entriesBetween, weeklyDone, dayEntries, dayAsg, plannedWeekTargets, CUSTOM_TASK } from "./entries.js";
 import {
   PEOPLE,
   TASK_TYPES,
@@ -667,7 +667,11 @@ export function dayRecordWithTaskTime(tasks, daily, personId, date) {
   rows.forEach((e) => {
     if (e.actualMin > 0) typed.set(e.projectId, (typed.get(e.projectId) ?? 0) + e.actualMin);
   });
-  const extra = [];
+  const asgRows = Object.entries(dayAsg(daily, personId, date))
+    .filter(([, v]) => v?.projectId && v.actualMin > 0)
+    .map(([id, v]) => ({ id, projectId: v.projectId, actualMin: v.actualMin })); // time typed on assigned rows
+  asgRows.forEach((e) => typed.set(e.projectId, (typed.get(e.projectId) ?? 0) + e.actualMin));
+  const extra = [...asgRows];
   taskMin.forEach((m, projectId) => {
     const more = m - (typed.get(projectId) ?? 0);
     if (more > 0) extra.push({ id: `task|${projectId}`, projectId, actualMin: more });
@@ -1062,7 +1066,8 @@ export function timeBreakdown(state, range) {
       const minutes = dayProjectMinutes(record);
       if (minutes.size) {
         const tasksOf = (pid) => mine.filter((t) => t.projectId === pid && t.minutes > 0 && isSubmitted(t) && workDate(t) === d);
-        const rowsOf = (pid) => dayEntries(state.daily, id, d).filter((e) => e.projectId === pid && e.actualMin > 0);
+        const typedOnAssigned = Object.values(dayAsg(state.daily, id, d)).filter((v) => v?.task); // time typed on assigned rows
+        const rowsOf = (pid) => [...dayEntries(state.daily, id, d), ...typedOnAssigned].filter((e) => e.projectId === pid && e.actualMin > 0);
         minutes.forEach((m, pid) => {
           add(byProject, pid || "other", projectName(pid), m);
           // the project's time came from the submitted tasks, the typed table rows or - when neither has time - the plan blocks

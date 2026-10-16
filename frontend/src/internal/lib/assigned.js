@@ -4,7 +4,7 @@
 // project and kind of work for the day, the larger of the two is used, never the sum (see targetVsActualRows): the assigned
 // row only carries what the logged rows do not cover yet.
 import { addDays, todayKey } from "./dates.js";
-import { CUSTOM_TASK, dayEntries, entryAsTask } from "./entries.js";
+import { CUSTOM_TASK, dayAsg, dayEntries, entryAsTask } from "./entries.js";
 import { TASK_TYPES } from "./constants.js";
 import { isSubmitted, taskBreakdownKey, workDate } from "./domain.js";
 
@@ -22,7 +22,7 @@ export const isCarriedOver = (task, date, today = todayKey(0)) => date === today
  * logged row to the assigned tasks it stands in for. `carry: false` leaves out the carried-over tasks (used for week sums, where
  * the task is already on its own day).
  */
-export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true } = {}) {
+export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true, asg = {} } = {}) {
   const buckets = new Map();
   tasks.forEach((t) => {
     if (t.assigneeId !== personId) return;
@@ -59,6 +59,9 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
     loggedBy.set(id, cur);
     if (row.actualMin > 0) loggedMin.set(row.projectId, (loggedMin.get(row.projectId) ?? 0) + row.actualMin);
   });
+  Object.values(asg ?? {}).forEach((v) => {
+    if (v?.projectId && v.actualMin > 0) loggedMin.set(v.projectId, (loggedMin.get(v.projectId) ?? 0) + v.actualMin); // time typed on an assigned row
+  });
   // time on submitted tasks per project: only what the typed time does not reach yet is added, so the project's day is the larger of the two
   const projectMinutes = new Map();
   buckets.forEach((b) => projectMinutes.set(b.projectId, (projectMinutes.get(b.projectId) ?? 0) + b.minutes));
@@ -74,8 +77,12 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         projectMinutes.delete(b.projectId);
         if (extra > 0) actualMin = extra;
       }
+      const rowId = `asg|${personId}|${date}|${b.id}`;
+      const typed = asg?.[rowId];
+      const typedMin = typed?.actualMin > 0 ? typed.actualMin : undefined;
+      const totalMin = typedMin || actualMin ? (typedMin ?? 0) + (actualMin ?? 0) : undefined;
       const row = {
-        id: `asg|${personId}|${date}|${b.id}`,
+        id: rowId,
         assigned: true,
         projectId: b.projectId,
         task: TASK_TYPES.some((x) => x.id === b.tasks[0].t.typeId) ? b.tasks[0].t.typeId : CUSTOM_TASK,
@@ -86,8 +93,9 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         doneQty: Math.max(0, b.done - (l?.done ?? 0)),
         approved: b.approved, // false = the number "fills in with the approved number" and is still awaiting approval
         estMin: Math.max(0, b.est - (l?.est ?? 0)),
-        actualMin,
-        remarks: "",
+        actualMin: totalMin,
+        typedMin,
+        remarks: typed?.remarks ?? "",
         taskIds: b.tasks.map((x) => x.t.id),
         titles: b.tasks.map((x) => x.t.title),
         assignedBy: [...new Set(b.tasks.map((x) => x.t.assignedById).filter(Boolean))],
@@ -108,14 +116,14 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
 /** A person's logged rows for a day followed by the assigned rows they do not cover. */
 export function dayRowsWithAssigned(tasks, daily, personId, date, opts = {}) {
   const logged = dayEntries(daily, personId, date);
-  return [...logged, ...assignedDay(tasks ?? [], personId, date, { ...opts, logged }).rows];
+  return [...logged, ...assignedDay(tasks ?? [], personId, date, { ...opts, logged, asg: dayAsg(daily, personId, date) }).rows];
 }
 
 /** The assigned rows (no carried-over copies) of Monday to Friday of the week of `monday`, to add to the week's rows. */
 export function weekAssignedRows(tasks, daily, personId, monday, opts = {}) {
   return [0, 1, 2, 3, 4].flatMap((i) => {
     const date = addDays(monday, i);
-    return assignedDay(tasks ?? [], personId, date, { ...opts, carry: false, logged: dayEntries(daily, personId, date) }).rows;
+    return assignedDay(tasks ?? [], personId, date, { ...opts, carry: false, logged: dayEntries(daily, personId, date), asg: dayAsg(daily, personId, date) }).rows;
   });
 }
 

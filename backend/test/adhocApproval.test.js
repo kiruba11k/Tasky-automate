@@ -2,7 +2,7 @@ import test, { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, bootstrapAdmin } from '../src/app.js';
 import { MemoryStore } from '../src/store.js';
-import { entriesProblem, taskLinksProblem, lunchProblem } from '../src/tracker.js';
+import { entriesProblem, asgProblem, taskLinksProblem, lunchProblem } from '../src/tracker.js';
 
 test('links and task rows are checked', () => {
   assert.equal(taskLinksProblem({}), null);
@@ -114,4 +114,15 @@ describe('send for approval: anyone sends their own unassigned work to a reviewe
     assert.equal((await put(tok.res, 'daily', day, { entries: [{ ...row, qty: -5 }] })).ok, false);
     assert.equal((await put(tok.out, 'daily', day, { entries: [row] })).ok, false);
   });
+});
+
+test('time and notes typed on assigned rows of a day are checked', () => {
+  const ok = { 'asg|u|2026-10-16|p|l1': { projectId: 'p', task: 'l1', actualMin: 45, remarks: 'done early' } };
+  assert.equal(asgProblem({}), null);
+  assert.equal(asgProblem({ asg: ok }), null);
+  assert.ok(asgProblem({ asg: 'x' }));
+  assert.ok(asgProblem({ asg: [] }));
+  assert.ok(asgProblem({ asg: { a: { projectId: 'p', actualMin: -1 } } }));
+  assert.ok(asgProblem({ asg: { a: { actualMin: 5 } } }));
+  assert.ok(asgProblem({ asg: { a: { projectId: 'p', remarks: 'x'.repeat(1001) } } }));
 });

@@ -155,7 +155,7 @@ export function Shell() {
         <main className="shell-main mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>
             <Route path="/" element={isManager && !alsoWorks ? <ManagerDashboard /> : <MemberDashboard />} />
-            <Route path="/projects" element={isAdmin ? <ManagerProjects /> : <MemberProjects />} />
+            <Route path="/projects" element={isManager ? <ManagerProjects /> : <MemberProjects />} />
             <Route path="/daily" element={isManager && !alsoWorks ? <ManagerDaily /> : <MemberDaily />} />
             <Route path="/profile" element={<ProfilePage />} />
             {hasFun && <Route path="/hub" element={<HubPage />} />}

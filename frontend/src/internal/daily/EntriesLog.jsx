@@ -47,49 +47,63 @@ const assignerText = (r) =>
 
 const STATUS_LABEL = { todo: 'To do', in_progress: 'In progress', in_review: 'In review', changes: 'Changes asked', done: 'Done' };
 
-/** A task assigned to the person, in the project's day table: read-only and never saved with the day's rows. */
-function AssignedRow({ r, project, showRemoveCell }) {
+/**
+ * A task assigned to the person, in the project's day table. The row comes from the task itself (never saved with the day's rows);
+ * what the person types on it, the time taken and a note, is kept in the day record's `asg`.
+ */
+function AssignedRow({ r, project, showRemoveCell, locked, onType }) {
   const by = r.assignedBy.map((id) => personName(id).split(' ')[0]).join(', ');
   const titles = r.titles.filter((t) => t && t !== r.label);
+  const status = [...new Set(r.statuses.map((s) => STATUS_LABEL[s] ?? s))].join(', ');
+  const badgeTitle = [by ? `Assigned by ${by}` : '', status].filter(Boolean).join(' · ') || undefined;
   return (
-    <tr data-entry={r.id} data-assigned="true" className="border-t border-line bg-sky/10 align-middle">
+    <tr data-entry={r.id} data-assigned="true" className="border-t border-line align-middle">
       <td className="px-3 py-2">
-        <span className="mb-1 flex flex-wrap items-center gap-1">
+        <span className="mb-1 flex flex-wrap gap-1">
           {r.carriedFrom ? (
-            <span
-              className="rounded bg-butter px-1.5 py-px text-[10px] font-bold text-butter-ink"
-              data-testid="carried-badge"
-              title={by ? `Assigned by ${by}` : undefined}
-            >
+            <span className="rounded bg-butter px-1.5 py-px text-[10px] font-bold text-butter-ink" data-testid="carried-badge" title={badgeTitle}>
               From yesterday's tasks
             </span>
           ) : (
-            <span
-              className="rounded bg-sky px-1.5 py-px text-[10px] font-bold text-sky-ink"
-              data-testid="assigned-badge"
-              title={by ? `Assigned by ${by}` : undefined}
-            >
+            <span className="rounded bg-sky px-1.5 py-px text-[10px] font-bold text-sky-ink" data-testid="assigned-badge" title={badgeTitle}>
               Assigned
             </span>
           )}
-          {r.priority && <Star size={11} className="fill-butter-ink text-butter-ink" aria-label="Priority" />}
+          {r.priority && <Star size={11} className="self-center fill-butter-ink text-butter-ink" aria-label="Priority" />}
         </span>
-        <span className="font-medium">{entryName(r, project)}</span>
-        {titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
+        <span className="font-medium">
+          {entryName(r, project)}
+          {titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
+        </span>
       </td>
-      <td className="px-2 py-2 text-xs text-muted">Number</td>
-      <td className="px-2 py-2 tabular-nums">{r.qty || '·'}</td>
+      <td className="px-2 py-2">
+        <EntryKindSelect value="number" disabled />
+      </td>
+      <td className="px-2 py-2">
+        <span className="tabular-nums">{r.qty || '·'}</span>
+      </td>
       <td className="px-2 py-2">
         <span className="tabular-nums" title="Fills in with the approved number">
           {r.doneQty ?? 0}
           <span className="ml-1 text-[10px] text-muted">{r.approved ? 'approved' : 'awaiting approval'}</span>
         </span>
       </td>
-      <td className="px-2 py-2 tabular-nums">{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
-      <td className="px-2 py-2 tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</td>
-      <td className="px-2 py-2 text-xs text-muted">
-        {[...new Set(r.statuses.map((s) => STATUS_LABEL[s] ?? s))].join(', ')}
-        {r.covering ? ' · rest of the assignment' : ''}
+      <td className="px-2 py-2">
+        <span className="tabular-nums">{formatMinutes(r.estMin)}</span>
+      </td>
+      <td className="px-2 py-2">
+        {locked ? (
+          <span className="tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</span>
+        ) : (
+          <DurationInput label="Actual time" placeholder="..." value={r.actualMin} onChange={(m) => onType({ actualMin: m ?? undefined })} />
+        )}
+      </td>
+      <td className="px-2 py-2">
+        {locked ? (
+          <span>{r.remarks || '·'}</span>
+        ) : (
+          <input aria-label="Notes" className={FIELD} placeholder="Add note..." value={r.remarks ?? ''} onChange={(e) => onType({ remarks: e.target.value })} />
+        )}
       </td>
       {showRemoveCell && <td />}
     </tr>
@@ -112,6 +126,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const blocks = plan ?? record.plan;
   const extras = extra ?? record.extra ?? [];
   const [rows, setRows] = useState(stored);
+  const [asg, setAsg] = useState(record.asg ?? {}); // time and notes typed on assigned rows, saved with the actuals
   const [unlocked, setUnlocked] = useState(false);
   const [added, setAdded] = useState([]); // projects (or "other:" work) added below the tables
   const [pick, setPick] = useState('');
@@ -121,12 +136,16 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
 
   useEffect(() => {
     setRows(stored);
+    setAsg(record.asg ?? {});
     setUnlocked(false);
     setAdded([]);
   }, [personId, key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!unlocked) setRows(stored);
   }, [record.entries]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!unlocked) setAsg(record.asg ?? {});
+  }, [record.asg]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (readOnly) return undefined;
     const open = () => {
@@ -158,7 +177,8 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const shown = readOnly ? stored : rows;
   const targetsEditable = !readOnly && !targetsLocked;
   // Tasks assigned to this person for the day (and unfinished ones carried over to today): read-only rows next to the logged ones.
-  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown }), [tasks, personId, date, projects, shown]);
+  const shownAsg = readOnly ? (record.asg ?? {}) : asg;
+  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown, asg: shownAsg }), [tasks, personId, date, projects, shown, shownAsg]);
   const assignedPids = useMemo(() => new Set(assignedNow.rows.map((r) => r.projectId)), [assignedNow]);
 
   // Projects with a table, and the time planned for each (from the plan and the extra hours).
@@ -255,6 +275,13 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   };
 
   const update = (id, patch) => setRows((list) => list.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const typeOnAssigned = (row, patch) =>
+    setAsg((all) => {
+      const next = { ...(all[row.id] ?? { projectId: row.projectId, task: row.task, custom: row.custom }), ...patch };
+      const empty = !(next.actualMin > 0) && !next.remarks;
+      const { [row.id]: _gone, ...rest } = all; // eslint-disable-line no-unused-vars
+      return empty ? rest : { ...rest, [row.id]: next };
+    });
   // The estimate follows the project's standard time for the task and target (per 10 prospects, per message...) until it is typed by hand.
   const standardFor = (row, qty) => {
     const project = projects.find((p) => p.id === row.projectId);
@@ -297,6 +324,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       const withActuals = which === 'actuals' || !!actualsAt;
       save({
         entries: kept,
+        ...(Object.keys(asg).length || record.asg ? { asg } : {}),
         ...(which === 'targets' ? { entriesAt: at, ...(!record.sodAt ? { sodAt: at } : {}) } : {}),
         ...(withActuals ? { actualsAt: at } : {}),
       });
@@ -673,7 +701,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       );
                     })}
                     {assignedMine.map((r) => (
-                      <AssignedRow key={r.id} r={r} project={project} showRemoveCell={targetsEditable} />
+                      <AssignedRow key={r.id} r={r} project={project} showRemoveCell={targetsEditable} locked={actualsReadOnly} onType={(patch) => typeOnAssigned(r, patch)} />
                     ))}
                   </tbody>
                   <tfoot>

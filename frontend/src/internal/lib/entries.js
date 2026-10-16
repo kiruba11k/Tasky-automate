@@ -37,6 +37,12 @@ export function entryAsTask(entry, project) {
 /** The rows saved for one person on one day. */
 export const dayEntries = (daily, personId, date) => daily?.[`${personId}|${date}`]?.entries ?? [];
 
+/**
+ * Time and notes a person typed on the rows of their assigned tasks (the rows come from the tasks themselves, see assigned.js):
+ * kept in the day record as `asg`, { rowId: { projectId, actualMin, remarks } }.
+ */
+export const dayAsg = (daily, personId, date) => daily?.[`${personId}|${date}`]?.asg ?? {};
+
 /** [{ date, entry }] for a person over [from, to] (inclusive), from the day tables. */
 export function entriesBetween(daily, personId, from, to) {
   const out = [];

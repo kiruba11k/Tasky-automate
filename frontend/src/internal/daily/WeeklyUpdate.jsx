@@ -4,7 +4,6 @@ import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Y
 import { weekStart } from '../lib/dates.js';
 import { weekRows } from '../lib/entries.js';
 import { weekAssignedRows } from '../lib/assigned.js';
-import { TaskMenuSettings } from './TaskMenuSettings';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
@@ -56,7 +55,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
             Weekly update
           </h2>
           <p className="text-xs text-muted">
-            {formatWeekRange(mon)} · fills in from your daily updates and assigned tasks. The same task on different days adds up in one row.
+            {formatWeekRange(mon)} · fills in from your daily updates. The same task on different days adds up in one row.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -72,7 +71,6 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
           ) : (
             <Badge tone="grey">End of week not sent</Badge>
           )}
-          {!readOnly && <TaskMenuSettings personId={personId} />}
           {!readOnly && (
             <Button tone="ghost" className="border border-line" onClick={() => setEditing((v) => !v)}>
               <Pencil size={13} /> {editing ? 'Close edit' : 'Edit'}

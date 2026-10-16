@@ -75,6 +75,16 @@ export function entriesProblem(doc) {
   return ok ? null : 'A task row is not valid.';
 }
 
+/** Why the time and notes typed on assigned-task rows of a day ("asg": { rowId: { projectId, actualMin, remarks } }) are refused, or null. */
+export function asgProblem(doc) {
+  if (doc?.asg === undefined) return null;
+  const a = doc.asg;
+  const ok = a && typeof a === 'object' && !Array.isArray(a) && Object.keys(a).length <= 300
+    && Object.entries(a).every(([id, v]) => id.length <= 200 && v && typeof v === 'object' && typeof v.projectId === 'string' && v.projectId.length <= 200
+      && short(v.task, 200) && short(v.custom, 200) && count(v.actualMin) && short(v.remarks, 1000));
+  return ok ? null : 'A time or note on an assigned task is not valid.';
+}
+
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Why a day's lunch break is refused, or null. It is a start and an end time within the working day. */
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -288,7 +298,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
-        const why = entriesProblem(data) || lunchProblem(data);
+        const why = entriesProblem(data) || asgProblem(data) || lunchProblem(data);
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'profile') {
