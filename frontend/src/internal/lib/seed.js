@@ -705,7 +705,7 @@ export function buildHistoricDaily(projects, tasks) {
       const plan = defaultPlanBlocks(projects, person);
       if (rand() < 0.3 && plan.length) {
         const last = plan[plan.length - 1];
-        if (last.end > "17:00") {
+        if (last.end > "17:00" && last.start < "17:00") {
           last.end = "17:00";
           plan.push({
             id: newId(),

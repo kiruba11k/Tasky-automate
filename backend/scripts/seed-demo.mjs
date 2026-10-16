@@ -51,13 +51,22 @@ const docs = [];
 const add = (kind, collection, shape) => (shape === 'list' ? collection.map((d) => ({ kind, key: d.id, patch: swap(d) })) : Object.entries(collection).map(([k, d]) => ({ kind, key: swapKey(k), patch: swap(d) })));
 docs.push(...add('project', state.projects, 'list'), ...add('task', state.tasks, 'list'), ...add('daily', state.daily, 'map'), ...add('weekly', state.weekly, 'map'), ...add('profile', state.profiles, 'map'), ...add('notice', state.notices, 'list'));
 
-// Komala (manager, approver) may write every kind of these documents. The anonymous chat is left empty on purpose.
-const writer = await login(emailOf(DEMO_PEOPLE.find((p) => p.id === 'komala')));
+// Projects, tasks and notices are written by Komala (manager, approver). A person's own days, weeks and profile can only be written
+// by that person (the server refuses anyone else), so each of those documents is written signed in as its owner.
+// The anonymous chat is left empty on purpose.
+const demoOf = Object.fromEntries(Object.entries(uid).map(([demo, real]) => [real, demo]));
+const ownerOf = (d) => (['daily', 'weekly'].includes(d.kind) ? demoOf[d.key.split('|')[0]] : d.kind === 'profile' ? demoOf[d.key] : 'komala');
+const tokens = {};
 let ok = 0;
 const failed = [];
-for (let i = 0; i < docs.length; i += 400) {
-  const { results } = await call('POST', '/api/tracker/docs/batch', writer, { patches: docs.slice(i, i + 400) });
-  results.forEach((r) => (r.ok ? ok++ : failed.push(`${r.kind} ${r.key}: ${r.error}`)));
+const byOwner = new Map();
+for (const d of docs) byOwner.set(ownerOf(d), [...(byOwner.get(ownerOf(d)) ?? []), d]);
+for (const [who, list] of byOwner) {
+  tokens[who] ??= await login(emailOf(DEMO_PEOPLE.find((p) => p.id === who)));
+  for (let i = 0; i < list.length; i += 400) {
+    const { results } = await call('POST', '/api/tracker/docs/batch', tokens[who], { patches: list.slice(i, i + 400) });
+    results.forEach((r) => (r.ok ? ok++ : failed.push(`${r.kind} ${r.key}: ${r.error}`)));
+  }
 }
 console.log(`Seeded ${ok} documents for ${DEMO_PEOPLE.length} people.${failed.length ? ` ${failed.length} refused:\n${failed.slice(0, 10).join('\n')}` : ''}`);
 console.log('Sign in with an email only: ' + DEMO_PEOPLE.map((p) => `${p.name.split(' ')[0]} = ${emailOf(p)}`).join(', '));

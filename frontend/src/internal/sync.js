@@ -3,9 +3,8 @@
 // change to the server as a JSON merge patch, and (3) polls for other people's changes.
 import { request, getToken } from "@/api/client";
 import { useStore, emptyState } from "./store.js";
-import { diffPatch } from "./lib/diffPatch.js";
+import { buildBatch, settleBatch, docId } from "./lib/pendingSync.js";
 import { rollProjectPeriods, canManageProject } from "./lib/domain.js";
-import { isAdminTier, roleOf } from "./lib/constants.js";
 import { setPeople } from "./lib/people.js";
 import { toast } from "./kit/toast.js";
 
@@ -26,7 +25,6 @@ const BY_KIND = Object.fromEntries(Object.entries(COLLECTIONS).map(([name, c]) =
 const POLL_MS = 30000; // safety net only; changes arrive instantly over the live stream
 const FLUSH_MS = 120;
 
-const docId = (kind, key) => `${kind}\u0000${key}`;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 /** The documents of a state: Map docId -> { kind, key, data }. */
@@ -112,7 +110,7 @@ export async function startSync(user) {
     const days = [...new Set(Object.keys(daily).map((k) => k.split("|")[1]))].filter((d) => d >= limit);
     let changed = false;
     const next = projects.map((p) => {
-      if (p.status !== "active" || !p.teamIds?.length || !(p.teamIds.includes(me) || isAdminTier(roleOf(me)))) return p;
+      if (p.status !== "active" || !p.teamIds?.length || !(p.teamIds.includes(me) || canManageProject(p, me))) return p;
       const finalized = { ...p.finalized };
       for (const d of days) {
         if (finalized[d]) continue;
@@ -137,42 +135,48 @@ export async function startSync(user) {
     since = new Date(new Date(res.now).getTime() - 2000).toISOString();
   };
 
+  /** A refused change is dropped and the server's version of those documents shown again; other unsaved edits are kept. */
+  const showServerVersion = async (ids) => {
+    for (const id of ids) pending.delete(id);
+    const res = await request("GET", "/api/tracker/docs");
+    apply(res.docs);
+    const onServer = new Set(res.docs.map((d) => docId(d.kind, d.key)));
+    const gone = ids.filter((id) => !onServer.has(id));
+    if (!gone.length) return;
+    applying = true; // a refused new document disappears again
+    try {
+      useStore.setState((state) => {
+        const next = { ...state };
+        for (const id of gone) {
+          const [kind, key] = id.split("\u0000");
+          const c = BY_KIND[kind];
+          synced.delete(id);
+          if (!c) continue;
+          if (c.shape === "list") next[c.name] = next[c.name].filter((x) => x.id !== key);
+          else { next[c.name] = { ...next[c.name] }; delete next[c.name][key]; }
+        }
+        return next;
+      });
+    } finally { applying = false; }
+  };
+
   /** Sends what changed locally since the last save. */
   const flush = () => {
     busy = busy.then(async () => {
       if (stopped) return;
-      const patches = [];
-      const deletes = [];
-      const current = documents(useStore.getState());
-      for (const id of [...pending]) {
-        const doc = current.get(id);
-        if (!doc) { const [kind, key] = id.split("\u0000"); if (synced.has(id)) deletes.push({ kind, key }); continue; }
-        const patch = diffPatch(synced.get(id) ?? {}, doc.data);
-        if (patch !== undefined) patches.push({ kind: doc.kind, key: doc.key, patch, id, data: clone(doc.data) });
-      }
-      for (const id of pending) if (!patches.some((p) => p.id === id) && !deletes.some((d) => docId(d.kind, d.key) === id)) pending.delete(id);
+      const { patches, deletes } = buildBatch({ pending, synced, current: documents(useStore.getState()) });
       if (!patches.length && !deletes.length) return;
       try {
         const res = await request("POST", "/api/tracker/docs/batch", {
           patches: patches.map(({ kind, key, patch }) => ({ kind, key, patch })),
           deletes,
         });
-        let rejected = null;
-        for (const r of res.results) {
-          const id = docId(r.kind, r.key);
-          if (r.ok) {
-            const p = patches.find((x) => x.id === id);
-            if (p) synced.set(id, p.data); else synced.delete(id);
-            pending.delete(id);
-          } else rejected = rejected ?? r;
+        const rejected = settleBatch({ batch: { patches, deletes }, results: res.results, pending, synced, current: documents(useStore.getState()) });
+        if (rejected.length) {
+          toast({ title: "Some changes could not be saved", description: rejected[0].error || "You are not allowed to do that.", tone: "info" });
+          await showServerVersion(rejected.map((r) => docId(r.kind, r.key)));
         }
-        if (rejected) {
-          toast({ title: "Some changes could not be saved", description: rejected.error || "You are not allowed to do that.", tone: "info" });
-          pending.clear();
-          await pull(); // show the server's version again
-          since = "";
-          await pull();
-        }
+        if (pending.size) schedule(); // edits made while this request was on its way
       } catch (e) {
         toast({ title: "Could not reach the server", description: "Your last change is kept here and will be retried.", tone: "info" });
         flushTimer = setTimeout(flush, 4000);

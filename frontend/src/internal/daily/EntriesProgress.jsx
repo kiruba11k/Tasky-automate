@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pencil } from 'lucide-react';
-import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, nt as personName } from '@/internal/min';
+import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor } from '@/internal/min';
 import { weekStart } from '../lib/dates.js';
 import { rowKey, weekRows } from '../lib/entries.js';
 import { dayRowsWithAssigned, weekAssignedRows } from '../lib/assigned.js';
@@ -140,12 +140,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                   >
                     <span className="truncate" title={r.desc}>
                       {name}
-                      {r.assigned && (
-                        <span className="text-muted">
-                          {' · '}
-                          {r.assignedBy?.length ? `assigned by ${r.assignedBy.map((id) => personName(id).split(' ')[0]).join(', ')}` : 'assigned'}
-                          {r.carriedFrom ? ' · carried over' : ''}
-                        </span>
+                      {r.assigned && (r.titles ?? []).filter((x) => x && x !== name).length > 0 && (
+                        <span className="text-muted"> · {(r.titles ?? []).filter((x) => x && x !== name).join('; ')}</span>
                       )}
                       {r.desc && <span className="text-muted"> · {r.desc}</span>}
                     </span>

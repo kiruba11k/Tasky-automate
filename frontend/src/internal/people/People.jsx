@@ -36,8 +36,7 @@ import { ManagePeople } from './ManagePeople';
 import { Button } from '../ui/Button';
 import { LeaveBadge } from '../ui/LeaveBadge';
 import { PEOPLE } from '../lib/constants';
-import { comparablePrevious, MIN_TIMED } from '../lib/domain';
-import { formatDayMonth } from '../lib/dates';
+import { MIN_TIMED } from '../lib/domain';
 
 const WHO_OPTIONS = [
   { id: 'all', label: 'Everyone' },
@@ -68,7 +67,6 @@ export function People() {
   const safeIndex = Math.min(index, options.length - 1);
   const period = options[safeIndex].period;
   const prevPeriod = shiftPeriod(period, -1);
-  const comparedPrev = comparablePrevious(period);
   const allRows = useMemo(
     () => computeKpis(analytics, gran, period.key),
     [analytics, gran, period.key],
@@ -169,7 +167,7 @@ export function People() {
         <p className="mt-2 text-xs text-muted">
           Showing <b className="text-ink">{period.title}</b>
           {period.partial ? ' (so far)' : ''}, compared with the previous {noun} (
-          {prevPeriod.title}{period.partial && comparedPrev.to < prevPeriod.to ? `, same days so far: up to ${formatDayMonth(comparedPrev.to)}` : ''}).
+          {prevPeriod.title}).
         </p>
       </Card>
       <Card>

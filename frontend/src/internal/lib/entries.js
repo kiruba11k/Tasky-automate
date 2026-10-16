@@ -134,6 +134,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (row.actualText) sum.actualText = row.actualText;
     if (row.status) sum.status = row.status;
     if (row.assigned) sum.assigned = true;
+    if (row.titles?.length) sum.titles = [...new Set([...(sum.titles ?? []), ...row.titles])];
     if (!sum.desc && row.desc) sum.desc = row.desc;
     if (row.remarks && !sum.remarks.includes(row.remarks)) sum.remarks = sum.remarks ? `${sum.remarks}; ${row.remarks}` : row.remarks;
   });

@@ -227,3 +227,21 @@ The back-to-top **rocket** (cartoon art) shows for everyone, founders included, 
 - Lunch is set on the profile; leaves (full or half day) live on the profile and show on task-update sheets.
 - Tasks update has a plan card (Plan / Extra hours), day tables with a two-stage lock (targets, then actuals and "Send end of day"), and weekly update / hours cards.
 - Anyone on a project can assign its tasks.
+
+## What the tracker saves on the server (and who may write it)
+
+Nothing of the tracker lives only in the browser: every change is a JSON merge patch on a `TrackerDoc` (`kind`, `key`, `data`; the `data` column is JSON, so new fields need no schema change in the JSON store or Postgres). `frontend/src/internal/sync.js` sends the patches (a change made while an earlier save is on its way stays queued, `lib/pendingSync.js`), the server answers each one, and everyone else gets the change over the live stream.
+
+| Kind (key) | Holds | Written by |
+|---|---|---|
+| `task` (id) | status, reviewer, steps, links, feedback, history, part approvals | managers and PMs create; people involved update; only the reviewer approves / sends back |
+| `project` (id) | team, hours, standards (`typeMinutes`, `typesOff`, `customStandards`), `weekPlans` / `monthPlans`, `weekText` / `monthText`, `weekOff` / `monthOff`, `weekActuals`, `weekDoneAt`, `customWeeks` / `customMonths`, `periodBin`, metrics, meetings, updates, `finalized` | the owner and main admins everything; an admin everything except handing the project over or choosing other admins (they may step down); a team member only `finalized`; approvers put it live |
+| `daily` (`person\|day`) | `plan`, `extra`, `entries`, `asg`, `autoPlanned`, `sodAt` / `eodAt`, `actualsAt`, `entriesAt` / `entriesDoneAt`, notes, snapshots, `lunch` | that person only |
+| `weekly` (`person\|monday`) | `entries`, `overrides`, `targetsAt`, `eowAt`, notes, `eowSnapshot` | that person only |
+| `profile` (person) | `name`, `photo`, `emoji`, theme (`theme`, `dark`, `accent`, `myTheme`, `custom`, `cartoon`), `funOn`, `alertSound`, `qotd`, `lunch`, `leaves`, `taskMenu`, `prefs` | that person only |
+| `notice` (id) | alerts | anyone creates; only the recipient reads and marks read |
+| `conv`, `msg`, `alias` | anonymous chat | members only (never founders) |
+
+The server checks the shape of what a save writes (time blocks, extra hours, leaves, lunch, task menus, week / month days and targets, profile settings) and refuses the rest with a plain message; older data never blocks a later save. Saves are applied one at a time, so two people changing the same document in the same instant both keep their fields (arrays such as `meetings` or `updates` are replaced whole by a patch, so two people adding to the same list at the very same moment can still overwrite each other).
+
+`node backend/scripts/seed-demo.mjs` (server started with `REQUIRE_PASSWORD=off`) fills a development server with the demo team; each person's days, weeks and profile are written signed in as that person, projects, tasks and notices as the manager Komala.

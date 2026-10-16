@@ -1083,6 +1083,83 @@ describe('tracker documents', () => {
     assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann' })).ok, true);
   });
 
+  test('task list settings on a profile are lists of short names, written by the owner or leadership', async () => {
+    const menu = { hidden: ['l1'], extra: ['Client call'], removed: ['deck'] };
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', taskMenu: menu })).ok, true);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', taskMenu: { hidden: 'l1' } })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', taskMenu: { hidden: [1] } })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', taskMenu: { other: [] } })).ok, false);
+    assert.equal((await put(bo, 'profile', ids.ann, { name: 'Ann', taskMenu: menu })).ok, false, 'a colleague cannot change it');
+  });
+
+  test('a project admin edits the project but cannot hand it over, pick other admins, or remove anyone but themselves', async () => {
+    const patch = (token, p) => put(token, 'project', 'pa', p);
+    assert.equal((await patch(fay, { id: 'pa', name: 'PA', status: 'active', pmId: ids.pm, admins: [ids.ann, ids.bo], teamIds: [ids.ann, ids.bo], finalized: {} })).ok, true);
+    assert.equal((await patch(ann, { description: 'by an admin', teamIds: [ids.ann, ids.bo, ids.pm] })).ok, true, 'an admin edits the details');
+    assert.equal((await patch(ann, { pmId: ids.ann })).ok, false, 'but cannot take the project over');
+    assert.equal((await patch(ann, { admins: [ids.ann, ids.bo, ids.pm] })).ok, false, 'or add admins');
+    assert.equal((await patch(ann, { admins: [ids.ann] })).ok, false, 'or remove another admin');
+    assert.equal((await patch(pm, { admins: [ids.ann] })).ok, true, 'the owner does');
+    assert.equal((await patch(ann, { admins: [] })).ok, true, 'an admin can step down');
+    assert.equal((await patch(ann, { description: 'again' })).ok, false, 'and then no longer edits');
+  });
+
+  test('days, weeks and profiles are written only by their owner, not even by leadership', async () => {
+    assert.equal((await put(ann, 'daily', `${ids.ann}|2026-10-14`, { plan: [] })).ok, true);
+    assert.equal((await put(fay, 'daily', `${ids.ann}|2026-10-14`, { eodNote: 'x' })).ok, false, 'a founder cannot edit it');
+    assert.equal((await put(admin, 'daily', `${ids.ann}|2026-10-14`, { eodNote: 'x' })).ok, false, 'nor a manager');
+    assert.equal((await put(pm, 'weekly', `${ids.ann}|2026-10-12`, { eowNote: 'x' })).ok, false, 'nor a project manager');
+    assert.equal((await put(admin, 'weekly', `${ids.ann}|2026-10-12`, { eowNote: 'x' })).ok, false);
+    assert.equal((await put(admin, 'profile', ids.ann, { name: 'x' })).ok, false);
+    assert.equal((await put(ann, 'weekly', `${ids.ann}|2026-10-12`, { eowNote: 'mine' })).ok, true);
+    assert.ok((await call('GET', '/api/tracker/docs', pm)).body.docs.some((d) => d.key === `${ids.ann}|2026-10-14`), 'but the team can read them');
+  });
+
+  test('a day, a week and a profile are checked field by field: only what a save writes is judged', async () => {
+    const day = (patch) => put(ann, 'daily', `${ids.ann}|2026-10-15`, patch);
+    assert.equal((await day({ plan: [{ id: 'b1', start: '10:00', end: '11:00', projectId: 'p1', actualMinutes: 45 }], extra: [{ id: 'e1', work: 'Call', minutes: 30 }], sodAt: '2026-10-15T04:00:00.000Z' })).ok, true);
+    assert.equal((await day({ plan: [{ id: 'b1', start: '11:00', end: '11:00', projectId: 'p1' }] })).ok, false, 'a block must end after it starts');
+    assert.equal((await day({ plan: [{ id: 'b1', start: '10:00', end: '11:00', actualMinutes: 5000 }] })).ok, false);
+    assert.equal((await day({ plan: 'nope' })).ok, false);
+    assert.equal((await day({ extra: [{ work: 'x', minutes: 0 }] })).ok, false);
+    assert.equal((await day({ eodAt: { not: 'a time' } })).ok, false);
+    assert.equal((await day({ eodNote: 'y'.repeat(6000) })).ok, false);
+    assert.equal((await day({ eodNote: 'fine', eodAt: '2026-10-15T13:00:00.000Z' })).ok, true, 'a save that leaves the plan alone is not held up by it');
+    assert.equal((await put(ann, 'weekly', `${ids.ann}|2026-10-12`, { eowAt: 5 })).ok, false);
+    assert.equal((await put(ann, 'weekly', `${ids.ann}|2026-10-12`, { eowAt: '2026-10-16T13:00:00.000Z', eowSnapshot: { byType: {} } })).ok, true);
+    assert.equal((await put(ann, 'profile', ids.ann, { qotd: 'riddle' })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { dark: 'yes' })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { photo: 'http://evil/x.png' })).ok, false, 'a photo is an image saved in the profile');
+    assert.equal((await put(ann, 'profile', ids.ann, { qotd: 'joke', dark: true, accent: 'rose', photo: 'data:image/png;base64,AAAA', funOn: false, alertSound: false, myTheme: { neutral: {} } })).ok, true);
+    assert.equal((await put(ann, 'profile', ids.ann, { photo: null, emoji: null })).ok, true, 'removing a field is always fine');
+  });
+
+  test('a project keeps well-formed weeks, months, plans and texts; a project may use the whole set the screens save', async () => {
+    const proj = (token, patch) => put(token, 'project', 'pw', patch);
+    assert.equal((await proj(fay, { id: 'pw', name: 'PW', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann], finalized: {} })).ok, true);
+    const week = { messages: 5, calls: 2 };
+    assert.equal((await proj(pm, {
+      customWeeks: [{ start: '2026-10-12', end: '2026-10-16' }], customMonths: [{ start: '2026-10-01', end: '2026-10-31' }],
+      weekPlans: { '2026-10-12': week }, monthPlans: { '2026-10-01': week }, weekText: { '2026-10-12': [{ label: 'Goal', target: '5' }] }, weekOff: { '2026-10-12': ['Fri'] },
+      weekActuals: { '2026-10-12': week }, weekDoneAt: { '2026-10-16': '2026-10-16T12:00:00.000Z' }, typeMinutes: { prospect: 3 }, typesOff: ['deck'],
+      periodBin: [{ id: 'x1', period: 'week', week: { start: '2026-10-05', end: '2026-10-09' }, deletedAt: 'now', by: ids.pm }],
+    })).ok, true);
+    assert.equal((await proj(pm, { weekPlans: { 'NaN-NaN-NaN': week } })).ok, false, 'a plan is filed under the first day of its week');
+    assert.equal((await proj(pm, { weekPlans: { '2026-10-19': { messages: -1 } } })).ok, false);
+    assert.equal((await proj(pm, { weekPlans: { '2026-10-12': { messages: null } } })).ok, true, 'a number can be removed');
+    assert.equal((await proj(pm, { customWeeks: [{ start: '2026-10-16', end: '2026-10-12' }] })).ok, false, 'a week ends on or after its first day');
+    assert.equal((await proj(pm, { customMonths: [{ start: 'soon', end: 'later' }] })).ok, false);
+    assert.equal((await proj(pm, { periodBin: [{ id: 'x', period: 'year', week: {} }] })).ok, false);
+    assert.equal((await proj(pm, { typeMinutes: { prospect: 'slow' } })).ok, false);
+    assert.equal((await proj(pm, { weekText: { '2026-10-12': 'text' } })).ok, false);
+    assert.equal((await proj(pm, { weekPlans: { '2026-10-12': null }, weekText: { '2026-10-12': null } })).ok, true, 'removing a week takes its plan and text away');
+    assert.equal((await proj(pm, { status: 'archived' })).ok, false);
+    assert.equal((await proj(ann, { weekPlans: { '2026-10-12': week } })).ok, false, 'a team member cannot plan the weeks');
+    const doc = (await call('GET', '/api/tracker/docs', ann)).body.docs.find((d) => d.key === 'pw').data;
+    assert.deepEqual(doc.weekPlans, {});
+    assert.deepEqual(doc.customWeeks, [{ start: '2026-10-12', end: '2026-10-16' }]);
+  });
+
   test('anonymous chat: members read the thread, outsiders do not, and aliases stay private', async () => {
     assert.equal((await put(ann, 'conv', 'c1', { id: 'c1', name: 'Ann & Bo', memberIds: [ids.ann, ids.bo] })).ok, true);
     assert.equal((await put(ann, 'alias', `${ids.ann}:c1`, { alias: 'Sneaky Otter' })).ok, true);
@@ -1266,5 +1343,37 @@ describe('tracker tasks feed the fun layer', () => {
     assert.ok(after.xp >= 10);
     assert.equal((await batch(pm, { deletes: [{ kind: 'task', key: 'ft1' }] })).ok, true);
     assert.equal((await call('POST', '/api/me/sync', ann, { today })).body.completed_total, 0, 'a deleted task stops counting');
+  });
+});
+
+describe('tracker documents saved at the same moment', () => {
+  // A store whose reads and writes take a moment (like a database over the network), so requests really overlap.
+  class SlowStore extends MemoryStore {
+    async list(...a) { await new Promise((r) => setTimeout(r, 3)); return super.list(...a); }
+    async update(...a) { await new Promise((r) => setTimeout(r, 3)); return super.update(...a); }
+  }
+  test('two people changing the same project do not lose each other\'s field', async () => {
+    const store = new SlowStore();
+    await store.init();
+    await bootstrapAdmin(store, { email: 'boss@example.com' });
+    const server = createApp({ store, jwtSecret: 's' }).listen(0);
+    const base = `http://localhost:${server.address().port}`;
+    const call = async (method, url, token, body) => (await fetch(base + url, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: body && JSON.stringify(body) })).json();
+    const login = async (email) => (await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) })).json()).token;
+    try {
+      const admin = await login('boss@example.com');
+      const ids = {};
+      for (const [n, role, extra] of [['pm', 'team_leader'], ['ann', 'team_member'], ['bo', 'team_member'], ['fay', 'team_member', { founder: true, approver: true }]]) ids[n] = (await call('POST', '/api/entities/User', admin, { full_name: n, email: `${n}@x.com`, role, ...extra })).id;
+      const t = {}; for (const n of ['pm', 'ann', 'bo', 'fay']) t[n] = await login(`${n}@x.com`);
+      const send = (n, patch) => call('POST', '/api/tracker/docs/batch', t[n], { patches: [{ kind: 'project', key: 'pr', patch }] });
+      assert.equal((await send('fay', { id: 'pr', name: 'PR', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann, ids.bo], finalized: {}, week: {} })).results[0].ok, true);
+      for (let i = 0; i < 8; i++) {
+        const out = await Promise.all([send('ann', { finalized: { [`2026-11-${String(i + 1).padStart(2, '0')}`]: 'a' } }), send('bo', { finalized: { [`2026-12-${String(i + 1).padStart(2, '0')}`]: 'b' } }), send('pm', { week: { [`k${i}`]: i } })]);
+        assert.ok(out.every((r) => r.results[0].ok), JSON.stringify(out));
+      }
+      const doc = (await call('GET', '/api/tracker/docs', t.pm)).docs.find((d) => d.key === 'pr').data;
+      assert.equal(Object.keys(doc.week).length, 8, 'every manager change survived');
+      assert.equal(Object.keys(doc.finalized).length, 16, 'and every finalized day');
+    } finally { server.close(); }
   });
 });

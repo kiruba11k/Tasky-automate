@@ -95,10 +95,81 @@ export function leavesProblem(doc) {
   const ok = Array.isArray(l) && l.length <= 400 && l.every((x) => x && typeof x === 'object' && DAY.test(x.date) && ['full', 'half'].includes(x.kind) && short(x.note, 300));
   return ok ? null : 'A leave needs a day, full or half, and a short note.';
 }
+/** Why a profile's task-dropdown settings are refused, or null: lists of short names, nothing else. */
+export function taskMenuProblem(doc) {
+  const m = doc?.taskMenu;
+  if (m === undefined) return null;
+  const list = (v) => v === undefined || (Array.isArray(v) && v.length <= 100 && v.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 120));
+  const ok = m && typeof m === 'object' && !Array.isArray(m) && Object.keys(m).every((k) => ['hidden', 'extra', 'removed'].includes(k)) && list(m.hidden) && list(m.extra) && list(m.removed);
+  return ok ? null : 'The task list settings are not valid.';
+}
 export function lunchProblem(doc) {
   if (doc?.lunch === undefined) return null;
   const l = doc.lunch;
   return l && typeof l === 'object' && HHMM.test(l.start) && HHMM.test(l.end) && l.start < l.end && l.start >= '10:00' && l.end <= '19:00' ? null : 'Lunch needs a start and an end between 10:00 and 19:00.';
+}
+
+const isMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const when = (v) => v === undefined || v === null || (typeof v === 'string' && v.length <= 40); // a saved time (ISO text), or none
+const text = (v, n) => v === undefined || v === null || (typeof v === 'string' && v.length <= n);
+const counts = (v) => isMap(v) && Object.keys(v).length <= 100 && Object.values(v).every((n) => n === null || (typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1e7));
+/** A map keyed by day ("2026-10-19"), as in a project's weekPlans: every key written by this patch must be a day, null removes one. */
+const byDay = (v, valueOk) => v === undefined || v === null || (isMap(v) && Object.keys(v).length <= 400 && Object.entries(v).every(([k, x]) => x === null || (DAY.test(k) && valueOk(x))));
+const periods = (v) => v === undefined || v === null || (Array.isArray(v) && v.length <= 200 && v.every((w) => isMap(w) && DAY.test(w.start) && DAY.test(w.end) && w.end >= w.start));
+
+/** What a merge patch writes (null removes a field, so it has nothing to judge). Only what a save writes is judged: older data never blocks a later save. */
+const present = (patch) => (isMap(patch) ? Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== null)) : null);
+/** Why the timeline of a day ("plan", "extra", times of sending) or a week is refused, or null. `doc` is the saved document. */
+export function dailyProblem(patch) {
+  const doc = present(patch);
+  if (!doc) return null;
+  const { plan, extra } = doc;
+  if (plan !== undefined && !(Array.isArray(plan) && plan.length <= 100 && plan.every((b) => isMap(b) && HHMM.test(b.start) && HHMM.test(b.end) && b.start < b.end
+    && text(b.id, 60) && text(b.projectId, 200) && (b.actualMinutes === undefined || b.actualMinutes === null || (typeof b.actualMinutes === 'number' && b.actualMinutes >= 0 && b.actualMinutes <= 720))))) return 'A time block is not valid.';
+  if (extra !== undefined && !(Array.isArray(extra) && extra.length <= 50 && extra.every((x) => isMap(x) && typeof x.work === 'string' && x.work.length <= 300 && typeof x.minutes === 'number' && x.minutes > 0 && x.minutes <= 720
+    && (x.start === undefined || HHMM.test(x.start)) && (x.end === undefined || HHMM.test(x.end))))) return 'Extra hours are not valid.';
+  const stamps = ['sodAt', 'eodAt', 'actualsAt', 'entriesAt', 'entriesDoneAt'];
+  if (!stamps.every((k) => when(doc[k]))) return 'A time of sending is not valid.';
+  if (!['sodNote', 'eodNote'].every((k) => text(doc[k], 5000))) return 'A note is too long.';
+  if (!['sodTargets', 'eodActuals', 'eodSnapshot', 'snapshots', 'asg'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A day record is not valid.';
+  return null;
+}
+export function weeklyProblem(patch) {
+  const doc = present(patch);
+  if (!doc) return null;
+  if (!['targetsAt', 'eowAt', 'entriesAt', 'entriesDoneAt'].every((k) => when(doc[k]))) return 'A time of sending is not valid.';
+  if (!['targetsNote', 'eowNote'].every((k) => text(doc[k], 5000))) return 'A note is too long.';
+  if (!['eowSnapshot', 'targetsSnapshot', 'snapshots', 'overrides'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A week record is not valid.';
+  return null;
+}
+/** Why a profile is refused, or null: its own settings must be the kind of value the screens save. Photos are small images. */
+export function profileProblem(patch) {
+  const doc = present(patch);
+  if (!doc) return null;
+  const bool = ['dark', 'cartoon', 'mascot', 'fun', 'funOn', 'alertSound'];
+  if (!bool.every((k) => doc[k] === undefined || typeof doc[k] === 'boolean')) return 'A setting must be on or off.';
+  if (!text(doc.name, 100) || !text(doc.emoji, 40) || !text(doc.theme, 60) || !text(doc.accent, 60)) return 'A profile text is too long.';
+  if (!(doc.photo === undefined || (typeof doc.photo === 'string' && (doc.photo === '' || /^data:image\//.test(doc.photo))))) return 'A photo must be an image.';
+  if (!(doc.qotd === undefined || ['quote', 'joke'].includes(doc.qotd))) return 'The quote setting is not valid.';
+  if (!['myTheme', 'custom', 'prefs', 'water'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A setting is not valid.';
+  return null;
+}
+/**
+ * Why the parts of a project that this patch changes are refused, or null. Only what the patch writes is judged (a project saved
+ * before a rule existed can still be edited elsewhere). Weeks and months are runs of days, plans and texts are keyed by their first day.
+ */
+export function projectProblem(patch) {
+  if (!isMap(patch)) return null;
+  const listOk = (v) => v === undefined || v === null || (Array.isArray(v) && v.length <= 200);
+  if (!periods(patch.customWeeks) || !periods(patch.customMonths)) return 'A week or month needs a first and a last day.';
+  if (!byDay(patch.weekPlans, counts) || !byDay(patch.monthPlans, counts) || !byDay(patch.weekActuals, counts)) return 'Targets must be numbers of zero or more for a week or month that starts on a day.';
+  if (!byDay(patch.weekText, Array.isArray) || !byDay(patch.monthText, Array.isArray) || !byDay(patch.weekOff, (x) => Array.isArray(x) || typeof x === 'boolean')
+    || !byDay(patch.monthOff, (x) => Array.isArray(x) || typeof x === 'boolean') || !byDay(patch.weekDoneAt, (x) => text(x, 40))) return 'A week or month note is not valid.';
+  if (!(patch.periodBin === undefined || patch.periodBin === null || (Array.isArray(patch.periodBin) && patch.periodBin.length <= 200 && patch.periodBin.every((b) => isMap(b) && typeof b.id === 'string' && ['week', 'month'].includes(b.period) && isMap(b.week))))) return 'The bin of weeks and months is not valid.';
+  if (!(patch.typeMinutes === undefined || patch.typeMinutes === null || counts(patch.typeMinutes))) return 'Standard times must be numbers of zero or more.';
+  if (!listOk(patch.typesOff) || !listOk(patch.meetings) || !listOk(patch.updates) || !listOk(patch.teamIds) || !listOk(patch.admins) || !listOk(patch.metrics) || !listOk(patch.customStandards)) return 'A list on the project is not valid.';
+  if (!(patch.status === undefined || ['pending', 'active'].includes(patch.status))) return 'The project status is not valid.';
+  return null;
 }
 
 /** RFC 7386 JSON merge patch: objects merge key by key, arrays and scalars replace, null removes a key. */
@@ -127,6 +198,11 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
     req.on('close', () => { clearInterval(heartbeat); listeners.delete(res); });
   });
+
+  // Writes to documents run one at a time: a change is read, merged and saved without another request (or the sweeps below)
+  // reading the same document in between, so two people saving the same project in the same instant both keep their change.
+  let queue = Promise.resolve();
+  const serial = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
 
   const live = async () => (await store.list('User', { limit: 1000 })).filter((u) => u.status !== 'Inactive');
   const find = async (kind, key) => (await store.list('TrackerDoc', { query: { kind, key }, limit: 1 }))[0];
@@ -213,12 +289,18 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (!prev && data.status !== 'pending' && !approves) return false;
         if (deleting && !approves && !mine(p.pmId)) return false; // only an approver or the project's manager deletes a project
         if (prev?.status === 'pending' && (changed.includes('status') || deleting) && !approves && !(deleting && mine(prev.pmId))) return false;
-        if (leadership(u) || (p.admins || []).includes(u.id) || mine(p.pmId)) return true; // only the project's owner, its admins and the main admins edit it
+        if (leadership(u) || mine(p.pmId)) return true; // the project's owner and the main admins edit everything
+        if (prev && (prev.admins || []).includes(u.id)) {
+          // an admin edits the project but cannot hand it over, pick other admins, or remove anyone but themselves
+          if (changed.includes('pmId') && data.pmId !== prev.pmId) return false;
+          if (changed.includes('admins') && !(Array.isArray(data.admins) && data.admins.every((a) => (prev.admins || []).includes(a)) && (prev.admins || []).filter((a) => !data.admins.includes(a)).every(mine))) return false;
+          return true;
+        }
         // everyone else on the team may only record that a day was finalized (when they send their end of day)
         return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
       }
-      case 'daily': case 'weekly': return key.startsWith(`${u.id}|`) || leadership(u);
-      case 'profile': return mine(key) || leadership(u);
+      case 'daily': case 'weekly': return key.startsWith(`${u.id}|`); // a person's own days and weeks; nobody edits another person's record
+      case 'profile': return mine(key);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
       case 'conv': case 'msg': case 'alias':
         if (trackerRole(u) === 'founder') return false; // founders have no anonymous chat, and nobody can add them to a group
@@ -265,7 +347,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
 
   // Apply a batch of changes: { patches: [{kind, key, patch}], deletes: [{kind, key}] }. `patch` is a JSON merge patch
   // (a whole document for a new one). Each item answers on its own.
-  app.post('/api/tracker/docs/batch', wrap(async (req, res) => {
+  app.post('/api/tracker/docs/batch', wrap((req, res) => serial(async () => {
     const u = req.user;
     const results = [];
     const items = [
@@ -298,11 +380,15 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
-        const why = entriesProblem(data) || asgProblem(data) || lunchProblem(data);
+        const why = entriesProblem(data) || asgProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) : weeklyProblem(patch));
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'profile') {
-        const why = leavesProblem(data) || lunchProblem(data);
+        const why = leavesProblem(data) || taskMenuProblem(data) || lunchProblem(data) || profileProblem(patch);
+        if (why) { results.push({ ...id, ok: false, error: why }); continue; }
+      }
+      if (kind === 'project') {
+        const why = projectProblem(patch);
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (!(await canWrite(u, kind, key, data, prev, changed))) { results.push({ ...id, ok: false, error: 'Not allowed' }); continue; }
@@ -316,14 +402,15 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     }
     if (results.some((r) => r.ok)) announce();
     res.json({ results });
-  }));
+  })));
 
   /**
    * The fun layer (levels, streaks, quests, the weekly boss, the daily wheel) counts finished work in DailyTask records.
    * Every tracker task keeps one such record in step with it: Completed once the reviewer approves.
    */
-  async function mirrorTask(key, doc, deleted) {
-    const existing = (await store.list('DailyTask', { query: { tracker_key: key }, limit: 1 }))[0];
+  const SAME = (a, b) => Object.keys(b).every((k) => a[k] === b[k]);
+  async function mirrorTask(key, doc, deleted, pre = null) {
+    const existing = pre ? pre.mirrors.get(key) : (await store.list('DailyTask', { query: { tracker_key: key }, limit: 1 }))[0];
     if (deleted || !doc?.assigneeId) { if (existing) await store.remove('DailyTask', existing.id); return; }
     const status = { done: 'Completed', in_progress: 'In Progress', in_review: 'In Progress', changes: 'In Progress' }[doc.status] || 'Pending';
     const day = (iso) => String(iso || '').slice(0, 10);
@@ -339,7 +426,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       priority: doc.priority ? 'High' : 'Medium',
       file_source: 'manual',
     };
-    if (existing) await store.update('DailyTask', existing.id, rec);
+    if (existing) { if (!SAME(existing, rec)) await store.update('DailyTask', existing.id, rec); } // nothing is written when it already matches (a restart rechecks everything)
     else await store.insert('DailyTask', rec);
   }
   /**
@@ -347,27 +434,33 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
    * done row keeps one Completed DailyTask in step with it. A row is skipped where a submitted task already covers the same
    * project and kind of work that day, so nothing is counted twice, and rows that are removed or unticked lose their record.
    */
-  async function syncEntryMirrors(personId, date) {
+  async function syncEntryMirrors(personId, date, pre = null) {
     if (!personId || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
-    const doc = await find('daily', `${personId}|${date}`);
+    const doc = pre ? pre.daily.get(`${personId}|${date}`) : await find('daily', `${personId}|${date}`);
     const rows = doc && !doc.deleted && Array.isArray(doc.data?.entries) ? doc.data.entries : [];
-    const covered = new Set((await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 }))
+    const covered = new Set((pre ? pre.tasks : await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 }))
       .filter((d) => !d.deleted && d.data?.assigneeId === personId && d.data?.date === date && ['done', 'in_review'].includes(d.data?.status))
       .map((d) => `${d.data.projectId}|${d.data.typeId}`));
     const want = new Map();
     rows.forEach((e) => { if (e.doneQty > 0 && e.task && !covered.has(`${e.projectId}|${e.task}`)) want.set(`entry:${personId}|${date}:${e.id}`, e); });
-    const have = (await store.list('DailyTask', { query: { user_id: personId, date }, limit: 1000 })).filter((r) => String(r.tracker_key || '').startsWith('entry:'));
+    const have = (pre ? pre.entries.get(`${personId}|${date}`) ?? [] : await store.list('DailyTask', { query: { user_id: personId, date }, limit: 1000 })).filter((r) => String(r.tracker_key || '').startsWith('entry:'));
     for (const r of have) if (!want.has(r.tracker_key)) await store.remove('DailyTask', r.id);
     for (const [key, e] of want) {
       const name = String(e.custom || e.desc || e.task).slice(0, 120);
       const rec = { tracker_key: key, user_id: personId, date, task: `Logged: ${name}`, expected_outcome: `${e.qty || e.doneQty} ${name}`, expected_time: Math.max(0.1, (Number(e.estMin) || 6) / 60), actual_time_taken: Math.max(0, (Number(e.actualMin) || 0) / 60), task_status: 'Completed', priority: 'Medium', file_source: 'manual' };
       const old = have.find((r) => r.tracker_key === key);
-      if (old) await store.update('DailyTask', old.id, rec); else await store.insert('DailyTask', rec);
+      if (old) { if (!SAME(old, rec)) await store.update('DailyTask', old.id, rec); } else await store.insert('DailyTask', rec);
     }
   }
+  /** Brings every fun-layer record in step with the documents (after an update of the server). Reads everything once, so it stays quick with thousands of documents. */
   async function backfillMirrors() {
-    for (const d of await store.list('TrackerDoc', { query: { kind: 'daily' }, limit: 100000 })) { const [who, day] = String(d.key).split('|'); await syncEntryMirrors(who, day); }
-    for (const d of await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 })) await mirrorTask(d.key, d.data, !!d.deleted);
+    const dailies = await store.list('TrackerDoc', { query: { kind: 'daily' }, limit: 100000 });
+    const tasks = await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 });
+    const records = await store.list('DailyTask', { limit: 1000000 });
+    const pre = { daily: new Map(dailies.map((d) => [d.key, d])), tasks, mirrors: new Map(records.map((r) => [r.tracker_key, r])), entries: new Map() };
+    for (const r of records) if (String(r.tracker_key || '').startsWith('entry:')) { const k = `${r.user_id}|${r.date}`; pre.entries.set(k, [...(pre.entries.get(k) ?? []), r]); }
+    for (const d of dailies) { const [who, day] = String(d.key).split('|'); await syncEntryMirrors(who, day, pre); }
+    for (const d of tasks) await mirrorTask(d.key, d.data, !!d.deleted, pre);
   }
   setTimeout(() => backfillMirrors().catch((e) => console.error('mirror backfill failed:', e)), 3000).unref?.();
 
@@ -382,7 +475,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
    * Deadline alerts: an hour before the end of a task's day, 15 minutes before, when it is overdue (the assigner is told too),
    * then once a morning while it stays open. Each alert is a notice (so it shows in the app) and a push (so it reaches the desktop).
    */
-  async function deadlineSweep() {
+  const deadlineSweep = () => serial(deadlineSweepNow);
+  async function deadlineSweepNow() {
     const tasks = (await store.list('TrackerDoc', { query: { kind: 'task' }, limit: 100000 })).filter((d) => !d.deleted && OPEN.includes(d.data?.status)).map((d) => d.data);
     if (!tasks.length) return 0;
     const stateDoc = (await store.list('TrackerDoc', { query: { kind: 'config', key: 'alerts' }, limit: 1 }))[0];
@@ -411,7 +505,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     return alerts.length;
   }
   /** Moves every project's week / month numbers into the history when a new week or month has begun (see rollProject). */
-  async function rollProjects() {
+  const rollProjects = () => serial(rollProjectsNow);
+  async function rollProjectsNow() {
     const today = wallClock(clock(), env.WORK_TZ || 'Asia/Kolkata').date;
     let n = 0;
     for (const d of await store.list('TrackerDoc', { query: { kind: 'project' }, limit: 100000 })) {
@@ -443,7 +538,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
    * Chat is short lived: a message is deleted one day after it was sent, and a conversation (with everybody's aliases in it)
    * one day after its last message. This runs on the server, so it does not matter who has the page open.
    */
-  async function sweepChat() {
+  const sweepChat = () => serial(sweepChatNow);
+  async function sweepChatNow() {
     const now = clock();
     const old = (r) => now - bornAt(r) > CHAT_TTL_MS;
     const gone = (r) => store.update('TrackerDoc', r.id, { deleted: true, data: r.data, owner_id: r.owner_id }); // data stays: it is never served, but tells members it is gone
