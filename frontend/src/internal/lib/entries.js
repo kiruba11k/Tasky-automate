@@ -101,7 +101,10 @@ export function plannedWeekTargets(project, weekly, projectWeekStartKey) {
     if (!(mid >= projectWeekStartKey && mid < end)) return;
     (record.entries ?? []).forEach((row) => {
       if (row.projectId !== project.id || !(row.qty > 0)) return;
-      (KPI_KEYS_BY_TYPE[row.task] ?? []).forEach((k) => { out[k] = (out[k] ?? 0) + row.qty; });
+      (KPI_KEYS_BY_TYPE[row.task] ?? []).forEach((k) => {
+        if (project.template && project.template !== "outbound" && !(project.metrics ?? []).some((m) => m.id === k)) return; // a number this project's template does not track
+        out[k] = (out[k] ?? 0) + row.qty;
+      });
     });
   });
   return out;

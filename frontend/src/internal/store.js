@@ -3,7 +3,6 @@ import { create } from "zustand";
 import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel } from "./lib/dates.js";
 import { PEOPLE, TASK_TYPES, isAdminTier, isLeadership, isApprover, approverNames, roleOf } from "./lib/constants.js";
 import {
-  DEFAULT_METRICS,
   EMPTY_COUNTS,
   canManageProject,
   computeStandardMinutes,
@@ -23,6 +22,7 @@ import {
   dailySnapshot,
   projectWeekStart,
 } from "./lib/domain.js";
+import { DEFAULT_TEMPLATE_ID, PROJECT_TEMPLATES, templateMetrics, validateMetrics } from "./lib/projectTemplates.js";
 
 /** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
 export const emptyState = () => ({
@@ -542,6 +542,9 @@ export const useStore = create()(
           const customStandards = patch.customStandards
             ? validateCustomStandards(patch.customStandards)
             : undefined;
+          if (patch.template !== undefined && !PROJECT_TEMPLATES.some((t) => t.id === patch.template))
+            throw new Error("Pick one of the project templates.");
+          const metrics = patch.metrics ? validateMetrics(patch.metrics) : undefined;
           patchProject(projectId, (p) => {
             const nextHours = hours ?? p.hours;
             const teamIds = hours
@@ -553,6 +556,7 @@ export const useStore = create()(
               hours: nextHours,
               teamIds,
               customStandards: customStandards ?? p.customStandards,
+              metrics: metrics ?? p.metrics,
             };
           });
         },
@@ -763,6 +767,9 @@ export const useStore = create()(
             throw new Error("Standard times must be above zero.");
           const hours = validateHours(draft.hours);
           const customStandards = validateCustomStandards(draft.customStandards ?? []);
+          const template = draft.template ?? DEFAULT_TEMPLATE_ID;
+          if (!PROJECT_TEMPLATES.some((t) => t.id === template)) throw new Error("Pick one of the project templates.");
+          const metrics = draft.metrics ? validateMetrics(draft.metrics) : templateMetrics(template);
           const teamIds = Object.keys(hours).filter((id) => hours[id] > 0);
           if (!teamIds.includes(me)) teamIds.push(me);
           const admins = [
@@ -794,7 +801,8 @@ export const useStore = create()(
                 typeMinutes: draft.typeMinutes,
                 typesOff: draft.typesOff,
                 customStandards,
-                metrics: DEFAULT_METRICS.map((m) => ({ ...m })),
+                template,
+                metrics,
                 weekTarget: draft.weekTarget ? validateTargets(draft.weekTarget) : { ...EMPTY_COUNTS },
                 monthTarget: { ...EMPTY_COUNTS },
                 weekPlans,

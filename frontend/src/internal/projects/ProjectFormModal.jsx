@@ -11,7 +11,6 @@ import {
   $e as dayKey,
   Dw as projectWeeks,
   Rw as DEFAULT_STANDARDS,
-  cf as METRICS,
   lt as attempt,
   Ye as toast,
   be as firstName,
@@ -30,6 +29,7 @@ import {
 import { FormSection } from './FormSection';
 import { ConfirmModal } from '../kit/ConfirmModal';
 import { PersonPicker } from './PersonPicker';
+import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, templateOf, templateMetrics, newMetricId } from '../lib/projectTemplates.js';
 
 const EMPTY_TASK = { name: '', unit: '', minutes: '' };
 // What the standard-time boxes start with: minutes per unit of every task type.
@@ -72,6 +72,10 @@ export function ProjectFormModal({ open, onClose, edit }) {
   const [customTasks, setCustomTasks] = useState([]);
   const [newTask, setNewTask] = useState(EMPTY_TASK);
   const [admins, setAdmins] = useState([]);
+  const [template, setTemplate] = useState(DEFAULT_TEMPLATE_ID);
+  const [metrics, setMetrics] = useState(() => templateMetrics(DEFAULT_TEMPLATE_ID));
+  const [newMetric, setNewMetric] = useState('');
+  const [pendingTemplate, setPendingTemplate] = useState(null);
   const [handoverTo, setHandoverTo] = useState('');
   const [handoverMode, setHandoverMode] = useState(null);
   const [focusId, setFocusId] = useState('');
@@ -86,7 +90,11 @@ export function ProjectFormModal({ open, onClose, edit }) {
       setHandoverTo('');
       setNewTask(EMPTY_TASK);
       setFocusId('');
+      setPendingTemplate(null);
+      setNewMetric('');
       if (edit) {
+        setTemplate(templateOf(edit).id);
+        setMetrics((edit.metrics ?? []).map((m) => ({ ...m })));
         setName(edit.name);
         setClient(edit.client);
         setDescription(edit.description);
@@ -125,7 +133,40 @@ export function ProjectFormModal({ open, onClose, edit }) {
     [startDate, endDate],
   );
 
+  /** Fill the standard times, hidden task types and numbers from a template (the person can still change them after). */
+  const applyTemplate = (id) => {
+    const t = templateOf(id);
+    setTemplate(t.id);
+    setPendingTemplate(null);
+    setStandards(DEFAULT_STANDARD_INPUTS);
+    setTypesOff([...t.typesOff]);
+    setCustomTasks(
+      t.customStandards.map((c) => ({ key: newRowKey(), name: c.name, unit: c.unit, minutes: String(c.minutes) })),
+    );
+    setMetrics(templateMetrics(t.id));
+    setDefaultTargets({});
+    setWeekPlans({});
+    setError('');
+  };
+
+  const pickTemplate = (id) => {
+    if (id === template) return;
+    if (edit) setPendingTemplate(id);
+    else applyTemplate(id);
+  };
+
+  const addMetric = () => {
+    const label = newMetric.trim();
+    if (!label) return;
+    if (metrics.some((m) => m.label.trim().toLowerCase() === label.toLowerCase()))
+      return setError(`"${label}" is already in the list.`);
+    setMetrics((list) => [...list, { id: newMetricId(), label }]);
+    setNewMetric('');
+    setError('');
+  };
+
   const resetForm = () => {
+    applyTemplate(DEFAULT_TEMPLATE_ID);
     setDefaultTargets({});
     setWeekPlans({});
     setName('');
@@ -187,7 +228,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
       unit: t.unit,
       minutes: toNumber(t.minutes),
     }));
-    return { standards: standardsOut, typeMinutes, typesOff: removed, hours, customStandards };
+    return { standards: standardsOut, typeMinutes, typesOff: removed, hours, customStandards, template, metrics };
   };
 
   const submit = () => {
@@ -345,6 +386,54 @@ export function ProjectFormModal({ open, onClose, edit }) {
         </>
       }
     >
+      <FormSection
+        icon={<span>🧭</span>}
+        className="mb-3"
+        title="Project template"
+        hint="What kind of project is this? The template decides which numbers are tracked and which standard tasks are offered. You can still change the numbers and standard times below."
+      >
+        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Project template" data-testid="template-picker">
+          {PROJECT_TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={template === t.id}
+              data-template={t.id}
+              onClick={() => pickTemplate(t.id)}
+              className={clsx(
+                'focus-ring rounded-xl border-2 bg-surface p-3 text-left transition',
+                template === t.id ? 'border-accent bg-accent/5' : 'border-line hover:border-accent/60',
+              )}
+            >
+              <span className="block text-sm font-bold text-ink">
+                <span aria-hidden="true">{t.icon}</span> {t.name}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted">{t.description}</span>
+            </button>
+          ))}
+        </div>
+        {pendingTemplate && (
+          <div
+            role="alertdialog"
+            aria-label="Confirm template change"
+            className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3"
+          >
+            <p className="min-w-0 flex-1 text-sm text-ink">
+              Switch to <b>{templateOf(pendingTemplate).name}</b>? The numbers and standard tasks below are replaced by the
+              template's. Numbers already counted that are not in the new template stay saved, but are hidden. Applies when you
+              save.
+            </p>
+            <Button type="button" tone="ghost" onClick={() => setPendingTemplate(null)}>
+              Keep {templateOf(template).name}
+            </Button>
+            <Button type="button" onClick={() => applyTemplate(pendingTemplate)}>
+              Switch template
+            </Button>
+          </div>
+        )}
+      </FormSection>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-semibold">
           Project name
@@ -393,6 +482,58 @@ export function ProjectFormModal({ open, onClose, edit }) {
           />
         </label>
       </div>
+
+      <FormSection
+        icon={<span>🔢</span>}
+        title="Numbers this project tracks"
+        hint="These are the weekly / monthly numbers shown in the tiles, targets and daily updates. Rename, remove or add your own."
+      >
+        {metrics.length > 0 ? (
+          <ul
+            className="mb-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface"
+            aria-label="Project numbers"
+            data-testid="metrics-list"
+          >
+            {metrics.map((m, index) => (
+              <li key={m.id} className="flex items-center gap-2 px-3 py-1.5">
+                <input
+                  aria-label={`Name of number ${index + 1}`}
+                  className={clsx(INPUT_CLASS, 'flex-1 py-1.5 text-ink')}
+                  value={m.label}
+                  maxLength={60}
+                  onChange={(e) => setMetrics((list) => list.map((x, i) => (i === index ? { ...x, label: e.target.value } : x)))}
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove ${m.label}`}
+                  className="focus-ring rounded-lg p-2 text-muted hover:bg-coral hover:text-coral-ink"
+                  onClick={() => setMetrics((list) => list.filter((_, i) => i !== index))}
+                >
+                  <Trash size={15} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mb-3 text-xs text-muted">No numbers tracked yet.</p>
+        )}
+        <div className="flex gap-2">
+          <input
+            aria-label="New number name"
+            className={clsx(INPUT_CLASS, 'flex-1 text-ink')}
+            placeholder="New number, e.g. Connections accepted"
+            value={newMetric}
+            onChange={(e) => setNewMetric(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMetric())}
+          />
+          <Button type="button" tone="soft" onClick={addMetric}>
+            <Plus size={14} /> Add number
+          </Button>
+        </div>
+        {edit && (
+          <p className="mt-2 text-[11px] text-muted">Removing a number hides it. What was already counted stays saved.</p>
+        )}
+      </FormSection>
 
       <FormSection
         icon={<span>⏱️</span>}

@@ -13,6 +13,7 @@ import {
   nt as fullName,
 } from '@/internal/min';
 import { formatHours } from './projectHelpers';
+import { templateOf, usesMeetings } from '../lib/projectTemplates.js';
 
 /** Coloured header of a project card: name, owner/admins and key facts. */
 export function ProjectHero({ p, color, onEdit }) {
@@ -35,6 +36,7 @@ export function ProjectHero({ p, color, onEdit }) {
           ? 'Management'
           : 'You are on the team';
   const onTeam = p.teamIds.includes(me) || p.hours[me] != null;
+  const outreachStandards = ['prospect', 'l1', 'l2'].some((id) => !p.typesOff?.includes(id));
   const facts = [
     ['⏳', `${daysLeft} days`, 'left on the project'],
     [
@@ -42,12 +44,16 @@ export function ProjectHero({ p, color, onEdit }) {
       `${p.teamIds.length} people`,
       onTeam && p.pmId !== me ? `you: ${formatHours(p.hours[me] ?? 0)} / day` : 'on the team',
     ],
-    ['🤝', `${p.month.meetings ?? 0} meetings`, 'booked this month'],
-    [
-      '⏱️',
-      `${Math.round(standards.prospect * 1000) / 100} / ${standards.l1} / ${standards.l2} min`,
-      `prospects (per 10) · L1 · L2 standard${p.customStandards.length ? ` · +${p.customStandards.length} custom` : ''}`,
-    ],
+    usesMeetings(p)
+      ? ['🤝', `${p.month.meetings ?? 0} meetings`, 'booked this month']
+      : ['🔢', `${p.metrics.length} numbers`, 'tracked on this project'],
+    outreachStandards
+      ? [
+          '⏱️',
+          `${Math.round(standards.prospect * 1000) / 100} / ${standards.l1} / ${standards.l2} min`,
+          `prospects (per 10) · L1 · L2 standard${p.customStandards.length ? ` · +${p.customStandards.length} custom` : ''}`,
+        ]
+      : ['⏱️', `${p.customStandards.length} standard task${p.customStandards.length === 1 ? '' : 's'}`, 'with their own standard time'],
   ];
   return (
     <div
@@ -61,7 +67,15 @@ export function ProjectHero({ p, color, onEdit }) {
           <p className="text-[11px] font-bold uppercase tracking-widest text-white/75">
             {p.client} · {role}
           </p>
-          <h2 className="text-2xl font-extrabold text-white">{p.name}</h2>
+          <h2 className="text-2xl font-extrabold text-white">
+            {p.name}
+            <span
+              className="ml-2 inline-flex translate-y-[-3px] items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 align-middle text-[11px] font-bold uppercase tracking-wide text-white"
+              data-testid="template-badge"
+            >
+              {templateOf(p).icon} {templateOf(p).name}
+            </span>
+          </h2>
           {p.description && <ReadMore text={p.description} className="mt-1 max-w-2xl text-sm text-white/85" buttonClassName="text-white" />}
         </div>
         {canEdit && onEdit && (

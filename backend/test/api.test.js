@@ -1160,6 +1160,30 @@ describe('tracker documents', () => {
     assert.deepEqual(doc.customWeeks, [{ start: '2026-10-12', end: '2026-10-16' }]);
   });
 
+  test('a project stores its template and the numbers it tracks; only the owner and main admins change them', async () => {
+    const proj = (token, patch) => put(token, 'project', 'pt', patch);
+    assert.equal((await proj(fay, { id: 'pt', name: 'PT', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann], finalized: {} })).ok, true);
+    const metrics = [{ id: 'workflows', label: 'Workflows built' }, { id: 'n-1', label: 'Bugs fixed', unit: 'bugs', periods: ['week'] }];
+    assert.equal((await proj(pm, { template: 'automation', metrics })).ok, true);
+    const doc = () => call('GET', '/api/tracker/docs', ann).then((r) => r.body.docs.find((d) => d.key === 'pt').data);
+    assert.equal((await doc()).template, 'automation');
+    assert.deepEqual((await doc()).metrics, metrics);
+    assert.equal((await proj(pm, { metrics: [] })).ok, true, 'a blank project tracks nothing');
+    assert.equal((await proj(pm, { template: 'x'.repeat(41) })).ok, false);
+    assert.equal((await proj(pm, { template: { id: 'automation' } })).ok, false);
+    assert.equal((await proj(pm, { metrics: 'messages' })).ok, false);
+    assert.equal((await proj(pm, { metrics: [{ id: 'a', label: '' }] })).ok, false, 'every number needs a name');
+    assert.equal((await proj(pm, { metrics: [{ label: 'No id' }] })).ok, false);
+    assert.equal((await proj(pm, { metrics: [{ id: 'a', label: 'A' }, { id: 'a', label: 'B' }] })).ok, false, 'ids are unique');
+    assert.equal((await proj(pm, { metrics: [{ id: 'a', label: 'A'.repeat(61) }] })).ok, false);
+    assert.equal((await proj(pm, { metrics: [{ id: 'a', label: 'A', periods: ['year'] }] })).ok, false);
+    assert.equal((await proj(pm, { metrics: Array.from({ length: 31 }, (_, i) => ({ id: `m${i}`, label: `M${i}` })) })).ok, false, 'at most 30 numbers');
+    assert.equal((await proj(ann, { template: 'agents' })).ok, false, 'a team member cannot change the template');
+    assert.equal((await proj(ann, { metrics: [] })).ok, false);
+    assert.equal((await proj(fay, { template: 'agents' })).ok, true, 'a main admin can');
+    assert.equal((await doc()).template, 'agents');
+  });
+
   test('anonymous chat: members read the thread, outsiders do not, and aliases stay private', async () => {
     assert.equal((await put(ann, 'conv', 'c1', { id: 'c1', name: 'Ann & Bo', memberIds: [ids.ann, ids.bo] })).ok, true);
     assert.equal((await put(ann, 'alias', `${ids.ann}:c1`, { alias: 'Sneaky Otter' })).ok, true);

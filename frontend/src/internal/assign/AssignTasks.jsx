@@ -67,12 +67,21 @@ export function AssignTasks() {
   const [title, setTitle] = useState('');
   const [cart, setCart] = useState([]);
   const customStandards = project?.customStandards ?? [];
+  // a task type this project switched off (its template hides the outreach ones) is never the selected one
+  const availableTypes = projectTaskTypes(project);
   const typeId =
     typeIdState === 'custom' ||
-    STANDARD_TASK_TYPES.some((G) => G.id === typeIdState) ||
+    availableTypes.some((G) => G.id === typeIdState) ||
     customStandards.some((G) => G.id === typeIdState)
       ? typeIdState
-      : 'l1';
+      : (availableTypes[0]?.id ?? customStandards[0]?.id ?? 'custom');
+  useEffect(() => {
+    if (typeId === typeIdState) return;
+    setTypeId(typeId);
+    setManualTarget(typeId === 'custom');
+    const std = customStandards.find((G) => G.id === typeId);
+    setQty(std ? Math.max(1, Math.round(30 / std.minutes)) : typeId === 'deck' ? 1 : typeId === 'model' ? 10 : 30);
+  }, [typeId, typeIdState]);
   const stdType = STANDARD_TASK_TYPES.find((G) => G.id === typeId);
   const projectStd = customStandards.find((G) => G.id === typeId);
   const draft = {

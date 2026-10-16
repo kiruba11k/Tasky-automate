@@ -169,6 +169,11 @@ export function projectProblem(patch) {
   if (!(patch.typeMinutes === undefined || patch.typeMinutes === null || counts(patch.typeMinutes))) return 'Standard times must be numbers of zero or more.';
   if (!listOk(patch.typesOff) || !listOk(patch.meetings) || !listOk(patch.updates) || !listOk(patch.teamIds) || !listOk(patch.admins) || !listOk(patch.metrics) || !listOk(patch.customStandards)) return 'A list on the project is not valid.';
   if (!(patch.status === undefined || ['pending', 'active'].includes(patch.status))) return 'The project status is not valid.';
+  if (!(patch.template === undefined || patch.template === null || (typeof patch.template === 'string' && /^[a-z0-9_-]{1,40}$/.test(patch.template)))) return 'The project template is not valid.';
+  if (!(patch.metrics === undefined || patch.metrics === null || (Array.isArray(patch.metrics) && patch.metrics.length <= 30
+    && patch.metrics.every((m) => isMap(m) && text(m.id, 60) && m.id && text(m.label, 60) && typeof m.label === 'string' && m.label.trim()
+      && (m.unit === undefined || text(m.unit, 40)) && (m.periods === undefined || (Array.isArray(m.periods) && m.periods.every((p) => p === 'week' || p === 'month'))))
+    && new Set(patch.metrics.map((m) => m.id)).size === patch.metrics.length))) return 'The numbers a project tracks are not valid (a name and a unique id each, at most 30).';
   return null;
 }
 

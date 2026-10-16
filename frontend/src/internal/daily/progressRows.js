@@ -1,4 +1,5 @@
 import { entryAsTask } from '../lib/entries.js';
+import { AUTO_COUNTED_METRIC_IDS } from '../lib/projectTemplates.js';
 import {
   Fw as taskTypeOf,
   qV as dayProgress,
@@ -9,7 +10,7 @@ import {
 } from '@/internal/min';
 
 /** Project metric ids that are counted automatically from submitted tasks. */
-export const AUTO_COUNTED_METRICS = new Set(['messages', 'l2', 'decks']);
+export const AUTO_COUNTED_METRICS = new Set(AUTO_COUNTED_METRIC_IDS);
 
 /** Sort order of the different row kinds. */
 export const ROW_KIND_ORDER = { task: 0, block: 1, custom: 2, number: 3 };

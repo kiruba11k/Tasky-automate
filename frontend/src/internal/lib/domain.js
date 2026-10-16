@@ -24,6 +24,8 @@ import {
   roleOf,
 } from "./constants.js";
 
+import { OUTBOUND_METRICS } from "./projectTemplates.js";
+
 export { isLeadership, isAdminTier, roleOf };
 
 /** `Tn` - short random id. */
@@ -32,15 +34,7 @@ export const newId = () => Math.random().toString(36).slice(2, 10);
 // ---------------------------------------------------------------- metrics
 
 /** `cf` / `wV` - the default tracked numbers of a project. */
-export const DEFAULT_METRICS = [
-  { id: "messages", label: "Messages sent" },
-  { id: "responses", label: "Responses received" },
-  { id: "l2", label: "2nd level sent" },
-  { id: "calls", label: "Tele calls made" },
-  { id: "interest", label: "Meeting interest" },
-  { id: "meetings", label: "Meetings scheduled" },
-  { id: "decks", label: "Decks" },
-];
+export const DEFAULT_METRICS = OUTBOUND_METRICS;
 
 /** `Cd` - empty counts object (always spread, never mutated). */
 export const EMPTY_COUNTS = {};

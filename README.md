@@ -173,6 +173,21 @@ Manual setup without the Blueprint: Web Service · Node · Build `npm run render
 
 `DATABASE_URL`, `JWT_SECRET` (required in production), `ADMIN_EMAIL`, `PORT` (default 4000), `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` (optional AI allocation; otherwise a round-robin fallback is used), `DATA_DIR` (JSON fallback only).
 
+## Project templates
+
+Not every project is outreach. When you propose, onboard or edit a project, pick a **Project template** at the top of the form:
+
+| Template | Numbers it tracks | Standard tasks |
+| --- | --- | --- |
+| Outbound / Lead generation (default) | Messages sent, Responses received, 2nd level sent, Tele calls made, Meeting interest, Meetings scheduled, Decks | all built-in task types |
+| Automation | Workflows built, Bugs fixed, Deployments / releases, Automations tested, Demos / reviews | Build workflow, Fix bug, Test / QA, Deploy / release, Review / demo |
+| Agent building | Agents built, Prompts / tools tested, Evals passed, Bugs fixed, Deployments, Demos | Build agent, Write / tune prompt, Test tool / eval, Fix bug, Deploy, Review / demo |
+| Custom / blank | none (add your own) | none |
+
+Choosing a template pre-fills the numbers, the hidden task types (`typesOff`) and the preset custom standards (`customStandards`); all of them can still be edited in the form. The id is saved on the project as `template`, and the tracked numbers as `project.metrics` (`[{id, label, unit?, periods?}]`), so every screen (tiles, targets, week and month planners, Today's targets, Dashboard cards, the Assign task-type picker, the day and week tables' task dropdown) reads the project's own list. Projects saved before templates have no `template` and behave as Outbound. Editing a project and switching template asks first: numbers already counted that are not in the new template stay saved, but hidden. Only the Outbound numbers (`messages`, `l2`, `decks`) are counted automatically from submitted tasks; every other number is counted by hand.
+
+The registry is `frontend/src/internal/lib/projectTemplates.js` (add a template there, plus a test case is automatic). The backend validates `template` (short id) and `metrics` (at most 30, each with a name and a unique id) in `projectProblem` (`backend/src/tracker.js`); only the project's owner, its admins and main admins can change them. The demo seed includes an Automation and an Agent building project.
+
 ## Notes
 
 - Google Sheets integration only stores the sheet ID/status; there is no live Google sync.

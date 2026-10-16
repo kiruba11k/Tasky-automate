@@ -55,7 +55,8 @@ export function Spotlight() {
     [tasks, daily],
   );
   const winners = useMemo(() => {
-    const project = [...projects.filter((p) => p.status === 'active')].sort(
+    // ranked by meetings booked, so only projects whose template books meetings compete
+    const project = [...projects.filter((p) => p.status === 'active' && (p.template ?? 'outbound') === 'outbound')].sort(
       (a, b) =>
         (b.month.meetings ?? 0) / Math.max(1, b.monthTarget.meetings ?? 0) -
         (a.month.meetings ?? 0) / Math.max(1, a.monthTarget.meetings ?? 0),

@@ -12,6 +12,7 @@ import { TargetsTabs } from './TargetsTabs';
 import { WeekNumbers } from './WeekNumbers';
 import { MeetingsPanel } from './MeetingsPanel';
 import { ProjectFormModal } from './ProjectFormModal';
+import { usesMeetings } from '../lib/projectTemplates.js';
 
 /** One project: hero header, tabs (progress / targets / numbers / meetings) and the edit modal. */
 export function ProjectCard({ p, color }) {
@@ -23,7 +24,7 @@ export function ProjectCard({ p, color }) {
     ['progress', '📈 Progress'],
     ...(canEdit ? [['targets', '🎯 Targets']] : []),
     ['numbers', "✍️ This week's numbers"],
-    ['meetings', `🤝 Meetings (${p.meetings.length})`],
+    ...(usesMeetings(p) || p.meetings.length ? [['meetings', `🤝 Meetings (${p.meetings.length})`]] : []),
   ];
   const active = tabs.some(([id]) => id === tab) ? tab : 'progress';
   return (

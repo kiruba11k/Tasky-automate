@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { Se as useStore, ea as canEditProject, vt as Avatar, nt as fullName, $e as dayKey, lt as attempt, Ye as toast, Ge as INPUT_CLASS } from '@/internal/min';
 import { formatHours } from './projectHelpers';
+import { usesMeetings } from '../lib/projectTemplates.js';
 
 const shortDate = (value) =>
   new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -33,7 +34,7 @@ export function ProjectSidebar({ p }) {
           ))}
         </ul>
       </div>
-      <div className="rounded-2xl border border-line p-3">
+      {(usesMeetings(p) || p.meetings.length > 0) && <div className="rounded-2xl border border-line p-3">
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Upcoming meetings</p>
         {upcoming.length === 0 ? (
           <p className="text-muted">None scheduled.</p>
@@ -47,7 +48,7 @@ export function ProjectSidebar({ p }) {
             </p>
           ))
         )}
-      </div>
+      </div>}
       {p.updates.length > 0 && (
         <div className="rounded-2xl border border-line p-3" data-testid="project-updates">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Latest updates</p>

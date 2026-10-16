@@ -29,6 +29,7 @@ import {
   standardMinutes,
   weeklySnapshot,
 } from "./domain.js";
+import { templateMetrics, templateOf, templateStandards } from "./projectTemplates.js";
 
 export { PEOPLE, TASK_TYPES };
 
@@ -195,6 +196,56 @@ export function buildDemoProjects() {
       standards: { prospect: 1.5, l1: 1.5, l2: 1.2 },
       customStandards: [],
     },
+    {
+      id: "automation",
+      template: "automation",
+      name: "LeadStrategus Automation",
+      client: "Lead Strategus",
+      pmId: "prajwal",
+      admins: [],
+      status: "active",
+      description: "Internal workflow automation: build, fix and ship the automations the outreach team runs on.",
+      teamIds: ["udhaya", "bharath", "prajwal"],
+      startDate: todayKey(-30),
+      endDate: todayKey(60),
+      hours: { udhaya: 2, bharath: 3, prajwal: 2 },
+      metrics: templateMetrics("automation"),
+      weekTarget: { workflows: 3, bugs: 8, releases: 2, tested: 6, demos: 1 },
+      monthTarget: { workflows: 12, bugs: 30, releases: 8, tested: 24, demos: 4 },
+      weekLocked: true,
+      monthLocked: true,
+      week: { workflows: 2, bugs: 5, releases: 1, tested: 3, demos: 0 },
+      month: { workflows: 7, bugs: 19, releases: 4, tested: 12, demos: 2 },
+      meetings: [],
+      updates: [],
+      typesOff: templateOf("automation").typesOff,
+      customStandards: templateStandards("automation").map((c, i) => ({ ...c, id: `cs-auto${i}` })),
+    },
+    {
+      id: "agents",
+      template: "agents",
+      name: "Support Agents Build",
+      client: "Helios",
+      pmId: "alok",
+      admins: [],
+      status: "active",
+      description: "Build and evaluate the AI support agents for the Helios help desk.",
+      teamIds: ["sachi", "udhaya", "alok"],
+      startDate: todayKey(-15),
+      endDate: todayKey(75),
+      hours: { sachi: 4, udhaya: 2, alok: 2 },
+      metrics: templateMetrics("agents"),
+      weekTarget: { agents: 1, prompts: 12, evals: 6, bugs: 5, deploys: 1, demos: 1 },
+      monthTarget: { agents: 4, prompts: 48, evals: 24, bugs: 20, deploys: 4, demos: 4 },
+      weekLocked: true,
+      monthLocked: true,
+      week: { agents: 1, prompts: 7, evals: 3, bugs: 2, deploys: 0, demos: 0 },
+      month: { agents: 2, prompts: 21, evals: 9, bugs: 8, deploys: 1, demos: 1 },
+      meetings: [],
+      updates: [],
+      typesOff: templateOf("agents").typesOff,
+      customStandards: templateStandards("agents").map((c, i) => ({ ...c, id: `cs-agent${i}` })),
+    },
   ].map((project, i) => seedProject(project, 101 + i * 37));
 }
 
@@ -312,7 +363,7 @@ export const PERSON_PROJECTS = {
 };
 
 /** `PV` - project owner per project id. */
-export const PROJECT_PM = { northwind: "bheeshma", helios: "alok", bd: "abisho" };
+export const PROJECT_PM = { northwind: "bheeshma", helios: "alok", bd: "abisho", automation: "prajwal", agents: "alok" };
 
 /**
  * `AV` - per-person performance curves; the argument `p` is progress through
@@ -585,6 +636,26 @@ export function buildTodayTasks(projects) {
     make("t10", "whatsapp", 60, "bharath", "northwind", "bheeshma", "done",
       { doneQty: 60, minutes: 66 },
       { reviewer: "bheeshma", submits: [a(5.3)], approvedAt: a(5) }),
+    make("t28", "custom", 3, "udhaya", "automation", "prajwal", "in_progress",
+      {
+        unit: "workflows",
+        title: "3 Build workflow",
+        customName: "Build workflow",
+        customStandardId: "cs-auto0",
+        standardMinutes: 270,
+        targetMinutes: 270,
+      },
+      { assignedAt: a(1.2), reviewer: "prajwal" }),
+    make("t29", "custom", 6, "sachi", "agents", "alok", "todo",
+      {
+        unit: "prompts",
+        title: "6 Write / tune prompt",
+        customName: "Write / tune prompt",
+        customStandardId: "cs-agent1",
+        standardMinutes: 150,
+        targetMinutes: 150,
+      },
+      { assignedAt: a(0.5), reviewer: "alok" }),
     make("t26", "custom", 40, "bharath", "northwind", "prajwal", "done",
       {
         unit: "requests",
@@ -1153,14 +1224,19 @@ export function seedEntries(projects, daily, weekly) {
   const rowId = (person) => `se-${person}-${Math.floor(rand() * 1e9).toString(36)}`;
   /** The rows of one project on one day: 1 to 3 pieces of work that fill the planned minutes. */
   const rowsFor = (projectId, minutes, person, finished) => {
-    const count = minutes >= 240 ? 3 : minutes >= 120 ? 2 : 1;
+    // a project whose template hides the outreach task types works from its own standard tasks instead
+    const own = projects.find((p) => p.id === projectId);
+    const choices = own?.typesOff?.includes("l1")
+      ? own.customStandards.map((c) => ({ task: `std:${c.id}`, qty: [1, 4], per: c.minutes, desc: c.name }))
+      : pool;
+    const count = Math.min(choices.length, minutes >= 240 ? 3 : minutes >= 120 ? 2 : 1);
     const used = new Set();
     const rows = [];
     while (rows.length < count) {
-      const at = Math.floor(rand() * pool.length);
+      const at = Math.floor(rand() * choices.length);
       if (used.has(at)) continue;
       used.add(at);
-      const t = pool[at];
+      const t = choices[at];
       const qty = Math.round(t.qty[0] + rand() * (t.qty[1] - t.qty[0]));
       const estMin = Math.max(15, Math.round((qty * t.per) / 5) * 5);
       const ratio = 0.7 + rand() * 0.4;
