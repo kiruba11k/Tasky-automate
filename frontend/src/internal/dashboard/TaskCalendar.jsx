@@ -22,7 +22,7 @@ const clockMinutes = (hhmm) => {
 };
 
 /** What a person did on a day besides assigned tasks: plan blocks, day-table rows and extra hours (read from the day record). */
-function dayWork(record, projects) {
+export function dayWork(record, projects) {
   if (!record) return { blocks: [], rows: [], extra: [] };
   const blocks = (record.plan ?? [])
     .filter((b) => !b.lunch)
@@ -201,7 +201,7 @@ export function TaskCalendar({ tasks, who, personId }) {
 }
 
 /** The person's own day under the task list: tasks they gave out, plan blocks, day-table rows and extra hours. */
-function DayLog({ work, given }) {
+export function DayLog({ work, given }) {
   const { blocks, rows, extra } = work;
   if (!given.length && !blocks.length && !rows.length && !extra.length) return null;
   const heading = 'mb-1 mt-3 text-xs font-bold uppercase tracking-wide text-muted';

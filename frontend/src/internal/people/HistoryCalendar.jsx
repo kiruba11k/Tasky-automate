@@ -4,6 +4,7 @@ import { Se as useStore, oe as cn, $e as dayKey } from '@/internal/min';
 import { isSubmitted, workDate } from '../lib/domain';
 import { LeaveBadge } from '../ui/LeaveBadge';
 import { TaskLine } from './TaskLine';
+import { DayLog, dayWork } from '../dashboard/TaskCalendar';
 import { MONTH_SHORT, isWeekday, parseDateKey, previousWeekday } from '../lib/dates';
 
 const WEEK_STARTS_MONDAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -12,6 +13,14 @@ const dateKey = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d)
 /** Task history as a month calendar (dots for assigned / submitted tasks, lavender for leave) plus the tasks of the picked day. (Jue) */
 export function HistoryCalendar({ tasks, personId }) {
   const leaves = useStore((s) => s.profiles[personId]?.leaves) ?? [];
+  const daily = useStore((s) => s.daily);
+  const projects = useStore((s) => s.projects);
+  // work logged in the person's day record (plan blocks, Daily update rows, extra hours): it counts in Day by day, so it shows here too
+  const workOf = (day) => dayWork(daily[`${personId}|${day}`], projects);
+  const workCount = (day) => {
+    const w = workOf(day);
+    return w.blocks.length + w.rows.length + w.extra.length;
+  };
   const leaveOn = (date) => leaves.find((l) => l.date === date);
   const [month, setMonth] = useState(() => {
     const now = new Date();
@@ -79,7 +88,8 @@ export function HistoryCalendar({ tasks, personId }) {
           {cells.map((day, i) => {
             if (!day) return <span key={`e${i}`} />;
             const assignedCount = assignedByDay.get(day)?.length ?? 0;
-            const submittedCount = submittedByDay.get(day)?.length ?? 0;
+            const submittedCount = (submittedByDay.get(day)?.length ?? 0) + workOf(day).rows.filter((r) => r.done > 0).length;
+            const loggedCount = workCount(day);
             return (
               <button
                 key={day}
@@ -92,16 +102,16 @@ export function HistoryCalendar({ tasks, personId }) {
                     ? 'bg-accent text-accent-on'
                     : leaveOn(day)
                       ? 'bg-lavender text-lavender-ink hover:bg-lavender/80'
-                      : assignedCount || submittedCount
+                      : assignedCount || submittedCount || loggedCount
                         ? 'bg-surface-2 hover:bg-accent-soft'
                         : 'text-faint hover:bg-surface-2',
                   day === dayKey(0) && picked !== day && 'ring-1 ring-accent/60',
                 )}
               >
                 {parseDateKey(day).getDate()}
-                {(assignedCount > 0 || submittedCount > 0) && (
+                {(assignedCount > 0 || submittedCount > 0 || loggedCount > 0) && (
                   <span className="mt-0.5 flex gap-0.5">
-                    {assignedCount > 0 && (
+                    {(assignedCount > 0 || (loggedCount > 0 && submittedCount === 0)) && (
                       <span className={cn('h-1.5 w-1.5 rounded-full', picked === day ? 'bg-white' : 'bg-sky-strong')} />
                     )}
                     {submittedCount > 0 && (
@@ -169,6 +179,7 @@ export function HistoryCalendar({ tasks, personId }) {
             <p className="text-sm text-muted">Nothing submitted on this day.</p>
           )}
         </div>
+        <DayLog work={workOf(picked)} given={[]} />
       </div>
     </div>
   );
