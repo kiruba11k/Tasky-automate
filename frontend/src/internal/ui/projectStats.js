@@ -1,5 +1,6 @@
 import { addDays, currentWeekStart as weekStart, todayKey as dayKey } from '../lib/dates.js';
 import { loggedKpiExtras, loggedMetricExtras } from '../lib/entries.js';
+import { withinTarget } from '../lib/domain.js';
 
 /** On-time stats over finished tasks, or null (original: `PR`). */
 export const onTimeStats = (tasks) => {
@@ -7,7 +8,7 @@ export const onTimeStats = (tasks) => {
     (t) => (t.status === 'done' || t.status === 'in_review') && t.minutes && t.doneQty && t.qty,
   );
   if (!done.length) return null;
-  const onTime = done.filter((t) => t.minutes <= t.targetMinutes * (t.doneQty / t.qty)).length;
+  const onTime = done.filter((t) => withinTarget(t.minutes, t.targetMinutes * (t.doneQty / t.qty))).length;
   return { onTime, total: done.length, pct: Math.round((onTime / done.length) * 100) };
 };
 

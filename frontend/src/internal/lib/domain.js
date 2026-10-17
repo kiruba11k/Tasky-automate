@@ -316,11 +316,15 @@ export function workDate(task) {
   return day > task.date ? day : task.date;
 }
 
+/** Work counts as on time when it took no more than the target plus 10% (a few minutes over a long task is not late). */
+export const ON_TIME_GRACE = 1.1;
+export const withinTarget = (actual, target) => actual <= target * ON_TIME_GRACE;
+
 /** `LV` - true/false when within target time, null when not measurable. */
 export function wasOnTime(task) {
   return !isSubmitted(task) || !task.minutes || !task.doneQty || !task.qty
     ? null
-    : task.minutes <= task.targetMinutes * (task.doneQty / task.qty);
+    : withinTarget(task.minutes, task.targetMinutes * (task.doneQty / task.qty));
 }
 
 /** `PR` - on-time summary {onTime,total,pct} for a list of tasks (null if none measurable). */
@@ -329,7 +333,7 @@ export const onTimeSummary = (tasks) => {
     (t) => (t.status === "done" || t.status === "in_review") && t.minutes && t.doneQty && t.qty,
   );
   if (!measurable.length) return null;
-  const onTime = measurable.filter((t) => t.minutes <= t.targetMinutes * (t.doneQty / t.qty)).length;
+  const onTime = measurable.filter((t) => withinTarget(t.minutes, t.targetMinutes * (t.doneQty / t.qty))).length;
   return {
     onTime,
     total: measurable.length,
@@ -850,7 +854,7 @@ export function personMetrics(tasks, daily, personId, from, to) {
       submitted++;
       if (e.estMin > 0 && e.actualMin > 0) {
         timed++;
-        if (e.actualMin <= e.estMin) onTimeCount++;
+        if (withinTarget(e.actualMin, e.estMin)) onTimeCount++;
       }
     });
   }
@@ -869,7 +873,7 @@ export function personMetrics(tasks, daily, personId, from, to) {
       submitted++;
       if (b.plannedMin > 0) {
         timed++;
-        if (b.actualMin <= b.plannedMin) onTimeCount++;
+        if (withinTarget(b.actualMin, b.plannedMin)) onTimeCount++;
       }
     });
   }

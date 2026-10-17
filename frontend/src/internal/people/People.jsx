@@ -296,8 +296,8 @@ export function People() {
           day tables and submitted tasks, the larger per project, Saturdays and Sundays included, as in each person's Weekly hours); extra
           hours come from end-of-day updates. Tasks done counts submitted tasks, work ticked off in the day tables and, for a day and project
           that has neither, each plan block with time worked as one item. On time compares the time taken with the target: a task's target
-          minutes, a table row's estimate, or a plan block's planned length (a plan block is on time when its actual time is no more than
-          planned). While a {noun} is still running, vs previous sets it against the same number of days of the previous {noun}; an on-time
+          minutes, a table row's estimate, or a plan block's planned length (on time means no more than 10% over the target, so a few
+          minutes over a long task is not late). While a {noun} is still running, vs previous sets it against the same number of days of the previous {noun}; an on-time
           change is only shown when both {noun}s have at least {MIN_TIMED} timed items.
         </p>
       </Card>

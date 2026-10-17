@@ -1,4 +1,5 @@
 import { We as formatMinutes } from '@/internal/min';
+import { withinTarget } from '../lib/domain';
 
 /** One-line summary of assigned or submitted tasks. */
 export function TaskSummary({ tasks, mode }) {
@@ -20,7 +21,7 @@ export function TaskSummary({ tasks, mode }) {
   }
   const logged = tasks.reduce((sum, t) => sum + (t.minutes ?? 0), 0);
   const measurable = tasks.filter((t) => t.minutes && t.doneQty && t.qty);
-  const onTime = measurable.filter((t) => t.minutes <= t.targetMinutes * (t.doneQty / t.qty)).length;
+  const onTime = measurable.filter((t) => withinTarget(t.minutes, t.targetMinutes * (t.doneQty / t.qty))).length;
   return (
     <p className="text-xs text-muted">
       {tasks.length}

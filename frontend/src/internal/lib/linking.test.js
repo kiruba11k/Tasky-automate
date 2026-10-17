@@ -342,3 +342,13 @@ test('time and notes typed on an assigned row are kept with the row and counted 
   const rows = dayRowsWithAssigned([sent], daily, ME, day, OPTS);
   assert.equal(rows.reduce((s, r) => s + (r.actualMin ?? 0), 0), 80);
 });
+
+test('a few minutes over a long task is still on time (10% grace)', async () => {
+  const { withinTarget, wasOnTime } = await import('./domain.js');
+  assert.equal(withinTarget(365, 360), true); // 6h 5m against 6h
+  assert.equal(withinTarget(396, 360), true); // exactly 10% over
+  assert.equal(withinTarget(397, 360), false);
+  assert.equal(withinTarget(115, 120), true);
+  assert.equal(wasOnTime({ status: 'done', qty: 1, doneQty: 1, minutes: 365, targetMinutes: 360 }), true);
+  assert.equal(wasOnTime({ status: 'done', qty: 1, doneQty: 1, minutes: 400, targetMinutes: 360 }), false);
+});
