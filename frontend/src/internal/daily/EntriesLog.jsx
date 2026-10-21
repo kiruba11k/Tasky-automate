@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Copy, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
+import { ClipboardList, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -13,7 +13,6 @@ import {
   nt as personName,
   Mn as toMinutes,
 } from '@/internal/min';
-import { previousWeekday } from '../lib/dates.js';
 import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
 import { splitEstimates } from '../lib/estimateSplit.js';
 import { assignedDay } from '../lib/assigned.js';
@@ -22,7 +21,8 @@ import { EntryKindSelect } from './EntryKindSelect';
 import { TaskMenuSettings, useTaskMenu } from './TaskMenuSettings';
 import { ProjectChanger, PROJECT_CHANGED } from './ProjectChanger';
 import { moveEntries } from '../lib/changeProject.js';
-import { formatClock, formatDayClock } from './dateHelpers';
+import { formatClock, formatDayClock, formatShortDate } from './dateHelpers';
+import { FillFromPicker } from './FillFromPicker';
 import { blockMinutes } from './planHelpers';
 import {
   CUSTOM_TASK,
@@ -121,7 +121,6 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const taskMenu = useTaskMenu(personId);
   const key = date;
   const record = daily[`${personId}|${key}`] ?? emptyDaily();
-  const previous = daily[`${personId}|${previousWeekday(date)}`]?.entries ?? [];
   const save = (patch) => saveDaily(personId, key, patch);
   const stored = record.entries ?? [];
   const blocks = plan ?? record.plan;
@@ -303,10 +302,10 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     const std = standardFor(next, next.qty);
     return std ? { ...patch, estMin: std, estAuto: true } : patch;
   };
-  const fillFromPrevious = (pid) => {
-    const source = previous.filter((r) => r.projectId === pid);
+  const fillFromPrevious = (pid, from) => {
+    const source = (daily[`${personId}|${from}`]?.entries ?? []).filter((r) => r.projectId === pid);
     if (!source.length) {
-      toast({ title: 'Nothing saved for this project on the previous day', tone: 'info' });
+      toast({ title: `Nothing saved for this project on ${formatShortDate(from)}`, tone: 'info' });
       return;
     }
     setRows((list) => [
@@ -322,7 +321,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
         remarks: '',
       })),
     ]);
-    toast({ title: `Copied ${source.length} task${source.length > 1 ? 's' : ''} from the previous day`, tone: 'success' });
+    toast({ title: `Copied ${source.length} task${source.length > 1 ? 's' : ''} from ${formatShortDate(from)}`, tone: 'success' });
   };
   const lock = (which) =>
     guarded(() => {
@@ -505,12 +504,15 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                     </span>
                   )}
                   {targetsEditable && (
-                    <button
+                    <FillFromPicker
+                      personId={personId}
+                      date={date}
+                      kind="rows"
+                      projectId={pid}
+                      testId={`fill-rows-${pid}`}
                       className="focus-ring flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs font-semibold text-accent-ink hover:bg-surface-2"
-                      onClick={() => fillFromPrevious(pid)}
-                    >
-                      <Copy size={11} /> Fill from previous day
-                    </button>
+                      onPick={(from) => fillFromPrevious(pid, from)}
+                    />
                   )}
                 </span>
               </div>

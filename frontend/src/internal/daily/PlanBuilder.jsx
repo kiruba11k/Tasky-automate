@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, Reorder, motion, useReducedMotion } from 'framer-motion';
-import { CalendarClock, Copy, GripVertical, Lock, Pencil, Plus, Trash, WandSparkles } from 'lucide-react';
+import { CalendarClock, GripVertical, Lock, Pencil, Plus, Trash, WandSparkles } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -10,7 +10,9 @@ import {
   Mn as toMinutes,
   NR as planFromProjectHours,
 } from '@/internal/min';
-import { lunchFor, previousWeekday } from '../lib/dates';
+import { lunchFor } from '../lib/dates';
+import { formatShortDate } from './dateHelpers';
+import { FillFromPicker } from './FillFromPicker';
 import { DurationInput } from './DurationInput';
 import { LunchRow } from './LunchRow';
 import { ReorderRow } from './ReorderRow';
@@ -181,14 +183,14 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
   };
   const removeItem = (id, name = 'plan') =>
     name === 'plan' ? commitPlan(groups.filter((g) => g.id !== id)) : commitExtra(extras.filter((x) => x.id !== id));
-  const fillFromYesterday = () => {
-    const before = daily[`${personId}|${previousWeekday(date)}`]?.plan ?? [];
+  const fillFromDay = (from) => {
+    const before = daily[`${personId}|${from}`]?.plan ?? [];
     if (!before.length) {
-      toast({ title: 'No plan saved on the previous working day', tone: 'info' });
+      toast({ title: `No plan saved on ${formatShortDate(from)}`, tone: 'info' });
       return;
     }
     commitPlan(groupBlocks(before).map((g) => ({ ...g, id: `pb${Date.now().toString(36)}${++idCounter}`, actual: undefined })));
-    toast({ title: "Copied the previous day's blocks. Save to keep them.", tone: 'success' });
+    toast({ title: `Copied the blocks from ${formatShortDate(from)}. Save to keep them.`, tone: 'success' });
   };
 
   // dragging a block along the line
@@ -331,9 +333,15 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
           <Plus size={14} /> {lane === 'plan' ? 'Add block' : 'Add extra hours'}
         </Button>
         <span className="ml-auto flex flex-wrap gap-2">
-          <Button tone="ghost" className="border border-line bg-surface" onClick={fillFromYesterday}>
-            <Copy size={13} /> Fill from yesterday
-          </Button>
+          <FillFromPicker
+            personId={personId}
+            date={date}
+            kind="plan"
+            label="Fill from previous day"
+            testId="fill-plan"
+            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2"
+            onPick={fillFromDay}
+          />
           <Button
             tone="ghost"
             className="border border-line bg-surface"
