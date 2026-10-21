@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { completionPct, personStat, pickStar, pickStars, projectProgress, pickProject } from './spotlightPick.js';
+import { completionPct, personStat, pickStar, pickStars, effortCompletion, scoreStars, projectProgress, pickProject } from './spotlightPick.js';
 
 test('completion comes from all counted work and is not shown when nothing was assigned', () => {
   assert.equal(completionPct({ tasks: 5, assigned: 10 }), 50);
@@ -19,6 +19,17 @@ test('star needs enough timed work', () => {
   assert.equal(pickStar([rows[0]], 3), undefined);
 });
 
+test('size counts: four big tasks beat nine small ones when the effort is larger, and tie when equal', () => {
+  const big = { personId: 'a', onTime: 100, tasks: 4, assigned: 4, timed: 4, hours: 30, assignedMin: 1800, doneMin: 1800 };
+  const small = { personId: 'b', onTime: 100, tasks: 9, assigned: 9, timed: 9, hours: 20, assignedMin: 1200, doneMin: 1200 };
+  assert.equal(pickStar([big, small], 3).personId, 'a');
+  const even = { ...small, doneMin: 1800, assignedMin: 1800 };
+  assert.equal(scoreStars([big, even], 3)[0].score, scoreStars([big, even], 3)[1].score); // same effort, same score
+  assert.equal(pickStar([big, even], 3).personId, 'a'); // the hours settle it
+  assert.equal(effortCompletion({ assignedMin: 100, doneMin: 25, tasks: 9, assigned: 10 }), 25);
+  assert.equal(effortCompletion({ tasks: 9, assigned: 10 }), 90);
+});
+
 test('project of the month is picked by progress to targets, never by default', () => {
   const m = [{ id: 'x' }, { id: 'y' }];
   const zero = { id: 'z', status: 'active', metrics: m, month: {}, monthTarget: { x: 10 } };
@@ -30,11 +41,9 @@ test('project of the month is picked by progress to targets, never by default', 
   assert.equal(pickProject([zero], () => true), undefined);
 });
 
-test('equal scores go to more hours worked (big tasks vs many small ones), then to more tasks', () => {
-  const big = { personId: 'a', onTime: 100, tasks: 4, assigned: 4, timed: 4, hours: 30 };
-  const small = { personId: 'b', onTime: 100, tasks: 9, assigned: 9, timed: 9, hours: 20 };
-  assert.equal(pickStar([big, small], 3).personId, 'a');
-  assert.equal(pickStar([small, { ...small, personId: 'c', tasks: 12 }], 3).personId, 'c');
+test('equal scores go to more hours worked, then to more tasks', () => {
+  const r = (id, over = {}) => ({ personId: id, onTime: 100, tasks: 5, assigned: 5, timed: 5, hours: 10, assignedMin: 300, doneMin: 300, ...over });
+  assert.equal(pickStars([r('a'), r('b', { hours: 12 })], 3).rows[0].personId, 'b');
 });
 
 test('a full tie shares the title; when everyone or too many tie, no one stands out', () => {

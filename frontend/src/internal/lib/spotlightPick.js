@@ -5,7 +5,7 @@ export function completionPct(row) {
 
 /** "88% on time · 51% of assigned work done", leaving out a part that cannot be measured yet. */
 export function personStat(row) {
-  const done = completionPct(row);
+  const done = effortCompletion(row);
   return [row.onTime != null && `${row.onTime}% on time`, done != null && `${done}% of assigned work done`]
     .filter(Boolean)
     .join(' · ');
@@ -13,17 +13,38 @@ export function personStat(row) {
 
 const SHARED_MAX = 3;
 
+/** Share (%) of the assigned work done, weighted by estimated minutes (a big task counts for more than a small one); by count without estimates. */
+export function effortCompletion(row) {
+  return row?.assignedMin > 0 ? Math.min(100, Math.round((row.doneMin / row.assignedMin) * 100)) : completionPct(row);
+}
+
 /**
- * Star(s) of `rows`: ranked by the average of on-time % and completion %, equal scores by hours worked, then tasks done; only people
- * with enough timed items compete. People still equal after that share the title: { rows } (1..SHARED_MAX people). When too many tie,
- * or everyone does, nobody stands out: { rows: [], team: true }. No one eligible gives undefined.
+ * Score of every eligible person, from three things in the data, each 0-100:
+ *  - quality: on time % (finished within the estimate),
+ *  - follow-through: share of the assigned work done, weighted by estimated minutes,
+ *  - output: estimated minutes of work finished relative to the best in the group (by tasks done when no estimates exist),
+ * so four big tasks and nine small ones that add up to the same effort score the same. The score is their average.
+ */
+export function scoreStars(rows, minTimed) {
+  const eligible = rows.filter((r) => r.onTime != null && r.tasks > 0 && r.timed >= minTimed);
+  const useMinutes = eligible.some((r) => r.doneMin > 0);
+  const volume = (r) => (useMinutes ? (r.doneMin ?? 0) : r.tasks);
+  const top = Math.max(0, ...eligible.map(volume));
+  return eligible.map((row) => {
+    const output = top ? (volume(row) / top) * 100 : 0;
+    return { row, output: Math.round(output), score: (row.onTime + (effortCompletion(row) ?? 0) + output) / 3 };
+  });
+}
+
+/**
+ * Star(s) of `rows`: highest score, equal scores by hours worked, then tasks done. People still equal after that share the title:
+ * { rows } (1..SHARED_MAX people). When too many tie, or everyone does, nobody stands out: { rows: [], team: true }. No one eligible
+ * gives undefined.
  */
 export function pickStars(rows, minTimed) {
-  const ranked = rows
-    .filter((r) => r.onTime != null && r.tasks > 0 && r.timed >= minTimed)
-    .map((row) => ({ row, score: (row.onTime + (completionPct(row) ?? 0)) / 2 }));
+  const ranked = scoreStars(rows, minTimed);
   if (!ranked.length) return undefined;
-  const key = (x) => [x.score, x.row.hours ?? 0, x.row.tasks].join('|');
+  const key = (x) => [Math.round(x.score * 10), x.row.hours ?? 0, x.row.tasks].join('|');
   const sorted = ranked.sort((a, b) => b.score - a.score || (b.row.hours ?? 0) - (a.row.hours ?? 0) || b.row.tasks - a.row.tasks);
   const tied = sorted.filter((x) => key(x) === key(sorted[0]));
   if (tied.length > SHARED_MAX || (tied.length === ranked.length && ranked.length >= 3)) return { rows: [], team: true };

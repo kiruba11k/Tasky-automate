@@ -1,6 +1,6 @@
 import { ReadMore } from '@/internal/ui/ReadMore';
 import { MIN_TIMED } from '@/internal/lib/domain';
-import { personStat, completionPct, pickStars, pickProject } from '@/internal/lib/spotlightPick';
+import { personStat, effortCompletion, pickStars, pickProject } from '@/internal/lib/spotlightPick';
 import { useMemo, useState } from 'react';
 import { Sparkles, Trophy, Crown } from 'lucide-react';
 import {
@@ -47,7 +47,7 @@ function PersonDetail({ person, series: weeklySeries }) {
           {[
             ['On time this month', person.row.onTime == null ? 'n/a' : `${person.row.onTime}%`],
             ['Work done this month', `${person.row.tasks} of ${person.row.assigned}`],
-            ['Assigned work done', completionPct(person.row) == null ? 'n/a' : `${completionPct(person.row)}%`],
+            ['Assigned work done (by size)', effortCompletion(person.row) == null ? 'n/a' : `${effortCompletion(person.row)}%`],
           ].map(([label, value]) => (
             <div key={label} className="rounded-xl bg-surface-2 p-3">
               <p className="text-xl font-bold">{value}</p>

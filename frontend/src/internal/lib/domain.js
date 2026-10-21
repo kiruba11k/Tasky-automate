@@ -824,6 +824,8 @@ export function personMetrics(tasks, daily, personId, from, to) {
   let timed = 0;
   let onTimeCount = 0;
   let resubmits = 0;
+  let assignedMin = 0; // estimated minutes of everything assigned, so a few big tasks weigh like many small ones
+  let doneMin = 0; // estimated minutes of the part that is done
   const coveredWork = new Set(); // day, project and kind of work that submitted tasks already count
   const coveredDays = new Set(); // day and project that a done task or a ticked-off table row already counts (plan blocks then add nothing)
   const assignedDays = new Set(); // day and project that already has an assigned task (a worked plan block there is not a new assignment)
@@ -831,13 +833,18 @@ export function personMetrics(tasks, daily, personId, from, to) {
     if (t.date >= from && t.date <= to) {
       assignedDays.add(`${t.date}|${t.projectId}`);
       assigned++;
+      assignedMin += t.targetMinutes ?? 0;
       resubmits += t.resubmits ?? 0;
     }
     if (!isSubmitted(t)) return;
     const done = workDate(t); // finished work counts on the day it was sent in
     if (done < from || done > to) return;
-    if (t.date < from || t.date > to) assigned++; // assigned on an earlier day, finished in this period
+    if (t.date < from || t.date > to) {
+      assigned++; // assigned on an earlier day, finished in this period
+      assignedMin += t.targetMinutes ?? 0;
+    }
     submitted++;
+    doneMin += (t.targetMinutes ?? 0) * Math.min(1, (t.doneQty ?? t.qty) / (t.qty || 1));
     coveredWork.add(`${done}|${t.projectId}|${t.typeId}`);
     coveredDays.add(`${done}|${t.projectId}`);
     const ok = wasOnTime(t);
@@ -852,8 +859,10 @@ export function personMetrics(tasks, daily, personId, from, to) {
       if (e.task === CUSTOM_TASK ? !e.custom?.trim() : !e.task) return;
       if (coveredWork.has(`${d}|${e.projectId}|${e.task}`)) return;
       assigned++;
+      assignedMin += e.estMin ?? 0;
       if (!(rowDoneCount(e) > 0)) return;
       submitted++;
+      doneMin += e.estMin ?? 0;
       if (e.estMin > 0 && e.actualMin > 0) {
         timed++;
         if (withinTarget(e.actualMin, e.estMin)) onTimeCount++;
@@ -871,8 +880,12 @@ export function personMetrics(tasks, daily, personId, from, to) {
     workedPlanBlocks(record).forEach((b) => {
       const day = `${d}|${b.projectId}`;
       if (coveredDays.has(day)) return;
-      if (!assignedDays.has(day)) assigned++;
+      if (!assignedDays.has(day)) {
+        assigned++;
+        assignedMin += b.plannedMin;
+      }
       submitted++;
+      doneMin += b.plannedMin;
       if (b.plannedMin > 0) {
         timed++;
         if (withinTarget(b.actualMin, b.plannedMin)) onTimeCount++;
@@ -893,6 +906,8 @@ export function personMetrics(tasks, daily, personId, from, to) {
     extra: roundOneDecimal(extraMinutes / 60),
     resubmits,
     assigned,
+    assignedMin,
+    doneMin,
     timed,
     onTimeCount,
   };
