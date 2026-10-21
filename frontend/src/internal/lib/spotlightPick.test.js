@@ -30,9 +30,9 @@ test('project of the month is picked by progress to targets, never by default', 
   assert.equal(pickProject([zero], () => true), undefined);
 });
 
-test('equal scores go to the person who finished more work, then to more hours', () => {
-  const four = { personId: 'a', onTime: 100, tasks: 4, assigned: 4, timed: 4, hours: 30 };
-  const nine = { personId: 'b', onTime: 100, tasks: 9, assigned: 9, timed: 9, hours: 20 };
-  assert.equal(pickStar([four, nine], 3).personId, 'b');
-  assert.equal(pickStar([nine, { ...nine, personId: 'c', hours: 25 }], 3).personId, 'c');
+test('equal scores go to more hours worked (big tasks vs many small ones), then to more tasks', () => {
+  const big = { personId: 'a', onTime: 100, tasks: 4, assigned: 4, timed: 4, hours: 30 };
+  const small = { personId: 'b', onTime: 100, tasks: 9, assigned: 9, timed: 9, hours: 20 };
+  assert.equal(pickStar([big, small], 3).personId, 'a');
+  assert.equal(pickStar([small, { ...small, personId: 'c', tasks: 12 }], 3).personId, 'c');
 });
