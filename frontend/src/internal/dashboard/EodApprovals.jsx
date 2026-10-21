@@ -14,8 +14,8 @@ import {
   lt as runAction,
   Ye as showToast,
 } from '@/internal/min';
-import { isLeadership, roleOf } from '../lib/constants.js';
-import { assignedContext, groupByProject, pendingForReviewer, sendSummary, taskReviewLabel } from '../lib/eodReview.js';
+import { PEOPLE, isLeadership, roleOf } from '../lib/constants.js';
+import { assignedContext, eodReviewerOf, groupByProject, pendingForReviewer, sendSummary, taskReviewLabel } from '../lib/eodReview.js';
 import { todayKey } from '../lib/dates.js';
 import { entryName, rowDone, rowTarget } from '../daily/entryHelpers';
 import { formatClock } from '../daily/dateHelpers';
@@ -182,9 +182,10 @@ function EodItem({ item, project }) {
 export function EodApprovals() {
   const { me, daily, projects } = useStore();
   const seesAll = isLeadership(roleOf(me));
-  const manages = projects.some((p) => p.pmId === me);
+  const ownerId = PEOPLE.find((p) => p.owner)?.id;
+  const manages = projects.some((p) => eodReviewerOf(p, ownerId) === me);
   if (!seesAll && !manages) return null;
-  const items = pendingForReviewer({ daily, projects, me, seesAll });
+  const items = pendingForReviewer({ daily, projects, me, seesAll, ownerId });
   const groups = groupByProject(items);
   return (
     <div data-testid="eod-approvals">

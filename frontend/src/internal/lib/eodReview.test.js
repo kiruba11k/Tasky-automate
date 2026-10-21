@@ -124,3 +124,14 @@ test('assigned tasks are shown as context with their own review status', () => {
   assert.deepEqual(assignedContext(tasks, 'u1', '2026-10-21', 'a', '2026-10-22').map((t) => t.id), ['t1']);
   assert.deepEqual(['done', 'in_review', 'changes', 'in_progress', 'todo'].map((status) => taskReviewLabel({ status })), ['approved', 'awaiting approval', 'changes asked', 'in progress', 'to do']);
 });
+
+test('a project without a manager goes to the main admin; the admin\'s own work approves at once', () => {
+  const record = { entries: [row('d'), row('d')] };
+  const sent = buildEodRequests({ record, projects, personId: 'u1', at: AT, ownerId: 'root' });
+  assert.deepEqual(sent.reviews.d, { status: 'pending', reviewerId: 'root', sentAt: AT });
+  assert.deepEqual(sent.sends.map((s) => [s.projectId, s.reviewerId]), [['d', 'root']]);
+  assert.equal(buildEodRequests({ record, projects, personId: 'root', at: AT, ownerId: 'root' }).reviews.d.auto, true);
+  const daily = { 'u1|2026-10-14': { eodReviews: sent.reviews } };
+  assert.equal(pendingForReviewer({ daily, projects, me: 'root', ownerId: 'root' }).length, 1);
+  assert.equal(pendingForReviewer({ daily, projects, me: 'pmA', ownerId: 'root' }).length, 0);
+});

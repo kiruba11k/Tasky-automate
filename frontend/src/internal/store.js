@@ -23,7 +23,7 @@ import {
   dailySnapshot,
   projectWeekStart,
 } from "./lib/domain.js";
-import { buildEodRequests, decisionFor, eodProjectWork, reviewsAfterMove, sendSummary } from "./lib/eodReview.js";
+import { buildEodRequests, eodReviewerOf, decisionFor, eodProjectWork, reviewsAfterMove, sendSummary } from "./lib/eodReview.js";
 import { DEFAULT_TEMPLATE_ID, PROJECT_TEMPLATES, templateMetrics, validateMetrics } from "./lib/projectTemplates.js";
 
 /** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
@@ -120,6 +120,7 @@ export const useStore = create()(
         return project;
       };
       /** Ids of the other approvers: project proposals are sent only to them. */
+      const ownerId = () => PEOPLE.find((p) => p.owner)?.id;
       const approverIds = () => PEOPLE.filter((p) => p.approver && p.id !== get().me).map((p) => p.id);
       /** `p` - ids of the other admins: managers, founders and project managers (they approve projects). */
       const leadershipIds = () => PEOPLE.filter((p) => isAdminTier(p.role) && p.id !== get().me).map((p) => p.id);
@@ -720,7 +721,7 @@ export const useStore = create()(
           // only re-saves the same sending time does not ask again. Reviews never change any number.
           let sends = [];
           if (next.eodAt && next.eodAt !== get().daily[key]?.eodAt && personId === get().me) {
-            const built = buildEodRequests({ record, projects: get().projects, personId, at: next.eodAt });
+            const built = buildEodRequests({ record, projects: get().projects, personId, at: next.eodAt, ownerId: ownerId() });
             const worked = new Set(eodProjectWork(record).map((w) => w.projectId));
             const kept = Object.fromEntries(Object.entries(record.eodReviews ?? {}).filter(([pid]) => worked.has(pid))); // a request for work that is gone is dropped
             const merged = { ...kept, ...built.reviews };
@@ -729,7 +730,7 @@ export const useStore = create()(
             sends = built.sends;
           } else if (next.eodAt && next.eodAt === get().daily[key]?.eodAt && personId === get().me) {
             // Change project on a sent day: the review moves with the rows and plan time.
-            const moved = reviewsAfterMove({ prev: get().daily[key], record, projects: get().projects, personId, at: nowIso() });
+            const moved = reviewsAfterMove({ prev: get().daily[key], record, projects: get().projects, personId, at: nowIso(), ownerId: ownerId() });
             if (moved.changed) {
               if (Object.keys(moved.reviews).length) record.eodReviews = moved.reviews;
               else delete record.eodReviews;
@@ -757,8 +758,8 @@ export const useStore = create()(
           const review = record?.eodReviews?.[projectId];
           const project = requireProject(projectId);
           const me = get().me;
-          if (project.pmId !== me && !isLeadership(roleOf(me)))
-            throw new Error(`Only ${displayName(project.pmId)}, who manages this project, can do that.`);
+          if (eodReviewerOf(project, ownerId()) !== me && !isLeadership(roleOf(me)))
+            throw new Error(`Only ${displayName(eodReviewerOf(project, ownerId()))}, who approves this project, can do that.`);
           if (!review) throw new Error("That end of day is no longer waiting for approval.");
           if (review.status !== "pending") throw new Error("This end of day was already handled.");
           const decision = decisionFor(review, verdict, me, nowIso(), note);

@@ -84,7 +84,7 @@ export function Shell() {
   ]; // Profile lives in the top bar (your name), not in the side rail
   // projects waiting for an approver: shown on the page where they are decided
   // end of day approvals this person can decide (a project manager: their projects; managers and founders: all) wait on the Dashboard
-  const eodPending = pendingForReviewer({ daily, projects, me, seesAll: isManager }).length;
+  const eodPending = pendingForReviewer({ daily, projects, me, seesAll: isManager, ownerId: PEOPLE.find((p) => p.owner)?.id }).length;
   const badgeFor = (item) => ((isManager ? (alsoWorks ? item === TEAM_NAV : item === DASHBOARD_NAV) : item === PROJECTS_NAV) ? pending : 0) + (item === DASHBOARD_NAV ? eodPending : 0);
   const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: badgeFor(item) }))];
   const iconButton = 'focus-ring rounded-xl p-2 text-muted hover:bg-surface-2';

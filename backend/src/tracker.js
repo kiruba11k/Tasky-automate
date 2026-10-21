@@ -317,9 +317,11 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       const v = data.eodReviews?.[pid];
       if (v === undefined) continue; // a request taken back
       const project = (await find('project', pid))?.data;
-      if (!project || !project.pmId) return false;
-      if (project.pmId === u.id) { if (!(v.status === 'approved' && v.reviewerId === u.id && v.by === u.id && v.auto === true && v.for === v.sentAt)) return false; continue; }
-      if (!(v.status === 'pending' && v.reviewerId === project.pmId)) return false;
+      if (!project) return false;
+      const reviewer = project.pmId || (await live()).find(isOwner)?.id; // a project without a manager goes to the main admin (ADMIN_EMAIL)
+      if (!reviewer) return false;
+      if (reviewer === u.id) { if (!(v.status === 'approved' && v.reviewerId === u.id && v.by === u.id && v.auto === true && v.for === v.sentAt)) return false; continue; }
+      if (!(v.status === 'pending' && v.reviewerId === reviewer)) return false;
     }
     return true;
   }
@@ -334,7 +336,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       const was = prev.eodReviews?.[pid];
       if (!v || !was) return false;
       const project = (await find('project', pid))?.data;
-      if (!project || !(leadership(u) || project.pmId === u.id)) return false;
+      if (!project || !(leadership(u) || (project.pmId ? project.pmId === u.id : isOwner(u)))) return false;
       if (!['approved', 'changes'].includes(v.status) || v.by !== u.id || v.reviewerId !== was.reviewerId || v.sentAt !== was.sentAt || v.for !== was.sentAt || v.auto) return false; // the answer to the request as it stands
     }
     return true;
