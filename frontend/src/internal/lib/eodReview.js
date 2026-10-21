@@ -119,3 +119,49 @@ export function decisionFor(review, verdict, by, at, note = "") {
   const { note: _old, ...rest } = review; // eslint-disable-line no-unused-vars
   return { ...rest, status: verdict, by, decidedAt: at, for: review.sentAt, ...(verdict === "changes" ? { note: note.trim() } : {}) };
 }
+
+/** Projects whose end of day was sent back: their tables are open for editing again until the day is sent again. */
+export const reopenedProjects = (record) => new Set(Object.entries(record?.eodReviews ?? {}).filter(([, r]) => r?.status === "changes").map(([pid]) => pid));
+
+const workSignature = (record) => new Map(eodProjectWork(record).map((w) => [w.projectId, JSON.stringify([w.rows.map((r) => r.id).sort(), w.minutes])]));
+
+/**
+ * A day that is already sent had rows or plan time moved to another project (Change project). The review moves with the work:
+ * a project with no work left loses its request; a project that got work gets a pending request for its manager (approved at once
+ * when that is the sender, skipped without a manager). A pending or sent-back request stays as it is; an approved one becomes
+ * pending again because there is new work to look at. Returns { reviews, sends, changed }.
+ */
+export function reviewsAfterMove({ prev, record, projects, personId, at }) {
+  const before = workSignature(prev);
+  const after = workSignature(record);
+  const reviews = { ...(record?.eodReviews ?? {}) };
+  const sends = [];
+  let changed = false;
+  for (const pid of Object.keys(reviews)) if (!after.has(pid)) { delete reviews[pid]; changed = true; }
+  for (const [pid, sig] of after) {
+    if (before.get(pid) === sig) continue;
+    const project = projects.find((p) => p.id === pid);
+    if (!project?.pmId) continue;
+    const cur = reviews[pid];
+    if (cur && cur.status !== "approved") continue;
+    if (project.pmId === personId) {
+      if (cur?.auto) continue;
+      reviews[pid] = { status: "approved", reviewerId: personId, sentAt: at, decidedAt: at, by: personId, for: at, auto: true };
+    } else {
+      reviews[pid] = { status: "pending", reviewerId: project.pmId, sentAt: at };
+      const work = eodProjectWork(record).find((w) => w.projectId === pid);
+      sends.push({ projectId: pid, reviewerId: project.pmId, rows: work?.rows.length ?? 0, minutes: work?.minutes ?? 0 });
+    }
+    changed = true;
+  }
+  return { reviews, sends, changed };
+}
+
+/** What a task is doing, as the project manager sees it next to an end of day. */
+export const taskReviewLabel = (t) =>
+  t.status === "done" ? "approved" : t.status === "in_review" ? "awaiting approval" : t.status === "changes" ? "changes asked" : t.status === "in_progress" ? "in progress" : "to do";
+
+/** The person's assigned tasks for a project on a day (and the unfinished ones carried over to today), as context for the approver. */
+export function assignedContext(tasks, personId, day, projectId, today) {
+  return tasks.filter((t) => t.assigneeId === personId && t.projectId === projectId && (t.date === day || (day === today && t.date < today && t.status !== "done")));
+}

@@ -38,6 +38,7 @@ import HubPage from '@/hub/HubPage';
 import CastPage from '@/fun/CastPage';
 import PageHero from '@/fun/PageHero';
 import { isAdminTier, isApprover } from '@/internal/lib/constants';
+import { pendingForReviewer } from '@/internal/lib/eodReview';
 
 const ROLE_GROUPS = [
   ['pm', 'Project managers'],
@@ -48,7 +49,7 @@ const ROLE_GROUPS = [
 
 /** Whole authenticated layout: side nav, top bar, routes, chat, mascot, toaster (original: `aue`). */
 export function Shell() {
-  const { me, notices, projects } = useStore();
+  const { me, notices, projects, daily } = useStore();
   const { logout } = useAuth();
   // The people list is replaced whenever someone is added or edited (and the store is briefly emptied when the session restarts);
   // keep the last known person so the layout never has to render without one.
@@ -82,7 +83,9 @@ export function Shell() {
     ...(hasFun ? [HUB_NAV] : []),
   ]; // Profile lives in the top bar (your name), not in the side rail
   // projects waiting for an approver: shown on the page where they are decided
-  const badgeFor = (item) => ((isManager ? (alsoWorks ? item === TEAM_NAV : item === DASHBOARD_NAV) : item === PROJECTS_NAV) ? pending : 0);
+  // end of day approvals this person can decide (a project manager: their projects; managers and founders: all) wait on the Dashboard
+  const eodPending = pendingForReviewer({ daily, projects, me, seesAll: isManager }).length;
+  const badgeFor = (item) => ((isManager ? (alsoWorks ? item === TEAM_NAV : item === DASHBOARD_NAV) : item === PROJECTS_NAV) ? pending : 0) + (item === DASHBOARD_NAV ? eodPending : 0);
   const navItems = [DAILY_NAV, ...baseItems.map((item) => ({ ...item, badge: badgeFor(item) }))];
   const iconButton = 'focus-ring rounded-xl p-2 text-muted hover:bg-surface-2';
 

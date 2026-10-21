@@ -105,6 +105,33 @@ describe('end of day approval goes to the project manager', () => {
     assert.equal((await read(tok.pm, day('res2'))).eodReviews, undefined);
   });
 
+  test('moving work to another project after sending moves the request to that manager', async () => {
+    const k = day('res2');
+    assert.equal((await put(tok.res2, 'daily', k, { eodAt: T0, eodReviews: { p1: pending(ids.pm) } })).ok, true);
+    // the old project's request goes, the new project's goes to ITS manager (not the old one)
+    assert.equal((await put(tok.res2, 'daily', k, { eodReviews: { p1: null, p2: pending(ids.pm, T1) } })).ok, false, 'p2 belongs to another manager');
+    assert.equal((await put(tok.res2, 'daily', k, { eodReviews: { p1: null, p2: pending(ids.other, T1) } })).ok, true);
+    const d = await read(tok.res2, k);
+    assert.equal(d.eodReviews.p1, undefined);
+    assert.equal(d.eodReviews.p2.reviewerId, ids.other);
+    // the old manager can no longer decide on the moved work; the new one can
+    assert.equal((await put(tok.pm, 'daily', k, { eodReviews: { p2: { status: 'approved', by: ids.pm, decidedAt: T1, for: T1 } } })).ok, false);
+    assert.equal((await put(tok.other, 'daily', k, { eodReviews: { p2: { status: 'approved', by: ids.other, decidedAt: T1, for: T1 } } })).ok, true);
+    // a decided request goes back to pending when new work arrives (decision fields cleared)
+    assert.equal((await put(tok.res2, 'daily', k, { eodReviews: { p2: { ...pending(ids.other, '2026-10-21T19:00:00.000Z'), by: null, decidedAt: null, for: null } } })).ok, true);
+    assert.equal((await read(tok.res2, k)).eodReviews.p2.status, 'pending');
+    await put(tok.res2, 'daily', k, { eodReviews: null });
+  });
+
+  test('a manager whose project was handed over: the new manager decides, the old one cannot', async () => {
+    const k = day('res');
+    const cur = (await read(tok.res, k)).eodReviews.p1;
+    assert.equal((await put(admin, 'project', 'p1', { pmId: ids.other })).ok, true);
+    assert.equal((await put(tok.pm, 'daily', k, { eodReviews: { p1: { status: 'approved', by: ids.pm, decidedAt: T1, for: cur.sentAt } } })).ok, false);
+    assert.equal((await put(tok.other, 'daily', k, { eodReviews: { p1: { status: 'approved', by: ids.other, decidedAt: T1, for: cur.sentAt } } })).ok, true);
+    assert.equal((await put(admin, 'project', 'p1', { pmId: ids.pm })).ok, true);
+  });
+
   test('leadership may decide on any project', async () => {
     const me = (await call('GET', '/api/tracker/people', admin)).body.find((p) => p.role === 'manager');
     assert.equal((await put(admin, 'daily', day('res'), { eodReviews: { p2: { status: 'approved', reviewerId: ids.other, sentAt: T0, decidedAt: T1, by: me.id, for: T0, note: null } } })).ok, true);

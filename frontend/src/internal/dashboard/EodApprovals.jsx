@@ -15,15 +15,74 @@ import {
   Ye as showToast,
 } from '@/internal/min';
 import { isLeadership, roleOf } from '../lib/constants.js';
-import { groupByProject, pendingForReviewer, sendSummary } from '../lib/eodReview.js';
+import { assignedContext, groupByProject, pendingForReviewer, sendSummary, taskReviewLabel } from '../lib/eodReview.js';
+import { todayKey } from '../lib/dates.js';
 import { entryName, rowDone, rowTarget } from '../daily/entryHelpers';
 import { formatClock } from '../daily/dateHelpers';
 
 const KIND_LABEL = { number: 'Number', milestone: 'Milestone', text: 'Text' };
 
+const TASK_TONE = { approved: 'mint', 'awaiting approval': 'butter', 'changes asked': 'coral', 'in progress': 'sky', 'to do': 'grey' };
+
+/**
+ * A task assigned to the person, shown beside their end of day as context. Tasks stay approved the normal way: only the task's
+ * reviewer can approve or send one back here, which is the same action as in "Waiting for your review". The end of day decision
+ * below covers the person's logged rows only.
+ */
+function TaskContext({ task }) {
+  const { me, approve, sendBack } = useStore();
+  const [panel, setPanel] = useState(false);
+  const [note, setNote] = useState('');
+  const label = taskReviewLabel(task);
+  const mine = task.status === 'in_review' && task.reviewerId === me;
+  return (
+    <li className="py-1" data-eod-task={task.id}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-w-[160px] flex-1 font-medium first-letter:uppercase">{task.title}</span>
+        <Badge tone={TASK_TONE[label]}>{label}</Badge>
+        {mine && (
+          <>
+            <Button
+              onClick={() =>
+                runAction(() => {
+                  approve(task.id);
+                  showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
+                })
+              }
+            >
+              <Check size={13} /> Approve
+            </Button>
+            <Button tone="ghost" className="border border-line" onClick={() => setPanel((v) => !v)}>
+              <MessageSquare size={13} /> Send back
+            </Button>
+          </>
+        )}
+      </div>
+      {panel && (
+        <form
+          className="mt-1 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (runAction(() => sendBack(task.id, note))) {
+              showToast({ title: `Feedback sent to ${firstName(task.assigneeId)}`, tone: 'info' });
+              setNote('');
+              setPanel(false);
+            }
+          }}
+        >
+          <input className={inputClass} autoFocus aria-label="Task feedback" placeholder="What should they change?" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Button type="submit">Send</Button>
+        </form>
+      )}
+    </li>
+  );
+}
+
 /** One person's day for one project: the rows they reported, with Approve and Send back (feedback is required). */
 function EodItem({ item, project }) {
   const decideEod = useStore((s) => s.decideEod);
+  const tasks = useStore((s) => s.tasks);
+  const context = assignedContext(tasks, item.personId, item.day, item.projectId, todayKey(0));
   const [panel, setPanel] = useState(false);
   const [note, setNote] = useState('');
   const minutes = item.rows.reduce((s, r) => s + (r.actualMin ?? r.estMin ?? 0), 0);
@@ -84,6 +143,16 @@ function EodItem({ item, project }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {context.length > 0 && (
+        <div className="mt-2 text-xs sm:ml-10" data-testid="eod-assigned">
+          <p className="font-semibold uppercase tracking-wide text-muted">Assigned tasks (approved on their own)</p>
+          <ul className="divide-y divide-line">
+            {context.map((t) => (
+              <TaskContext key={t.id} task={t} />
+            ))}
+          </ul>
         </div>
       )}
       {panel && (

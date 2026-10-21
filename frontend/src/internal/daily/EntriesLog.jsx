@@ -17,7 +17,7 @@ import {
 import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
 import { splitEstimates } from '../lib/estimateSplit.js';
 import { assignedDay } from '../lib/assigned.js';
-import { eodStatusText } from '../lib/eodReview.js';
+import { eodStatusText, reopenedProjects } from '../lib/eodReview.js';
 import { DurationInput } from './DurationInput';
 import { EntryKindSelect } from './EntryKindSelect';
 import { TaskMenuSettings, useTaskMenu } from './TaskMenuSettings';
@@ -272,12 +272,13 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     return () => window.removeEventListener(PROJECT_CHANGED, follow);
   }, [readOnly]);
 
+  const reopenedPids = useMemo(() => reopenedProjects(record), [record.eodReviews]); // eslint-disable-line react-hooks/exhaustive-deps
   const targetsLocked = !!record.entriesAt && !unlocked;
   const actualsAt = record.actualsAt ?? record.entriesDoneAt;
   const actualsLocked = !!actualsAt && !unlocked;
   const actualsReadOnly = readOnly || actualsLocked;
   const canSend =
-    !!record.entriesAt && !!actualsAt && !unlocked && (!record.entriesDoneAt || (record.actualsAt ?? '') > record.entriesDoneAt);
+    !!record.entriesAt && !!actualsAt && !unlocked && (!record.entriesDoneAt || (record.actualsAt ?? '') > record.entriesDoneAt || reopenedPids.size > 0);
   const shown = readOnly ? stored : rows;
   const targetsEditable = !readOnly && !targetsLocked;
   // Tasks assigned to this person for the day (and unfinished ones carried over to today): read-only rows next to the logged ones.
@@ -534,6 +535,10 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       )}
       <div className="space-y-4 p-4">
         {groups.map(({ project, pid, planned, name, added: isAdded }) => {
+          // a project whose end of day was sent back opens again by itself; the other tables stay as they are
+          const reopened = !readOnly && reopenedPids.has(pid);
+          const tableEditable = targetsEditable || reopened;
+          const tableReadOnly = actualsReadOnly && !reopened;
           const choices = taskChoices(project, taskMenu);
           const mine = shown.filter((r) => r.projectId === pid);
           const assignedMine = assignedNow.rows.filter((r) => r.projectId === pid);
@@ -610,9 +615,9 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                 <span className="flex flex-wrap items-center gap-2">
                   {(() => {
                     const review = record.eodReviews?.[pid];
-                    const st = review && eodStatusText(review, firstName(review.reviewerId), firstName(review.by ?? review.reviewerId));
+                    const st = review && eodStatusText(review, firstName(project?.pmId ?? review.reviewerId), firstName(review.by ?? review.reviewerId));
                     return st ? (
-                      <span data-testid="eod-status" data-status={review.status} title={review.status === 'changes' ? 'Press Update, make the changes, lock and send your end of day again.' : undefined}>
+                      <span data-testid="eod-status" data-status={review.status} title={review.status === 'changes' ? 'Edit the rows and send your end of day again.' : undefined}>
                         <Badge tone={st.tone}>{st.text}</Badge>
                       </span>
                     ) : null;
@@ -622,7 +627,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       Planned <b className="text-ink">{formatMinutes(planned)}</b>
                     </span>
                   )}
-                  {targetsEditable && (
+                  {tableEditable && (
                     <FillFromPicker
                       personId={personId}
                       date={date}
@@ -652,7 +657,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       <th className="min-w-[11rem] px-2 py-2">
                         Notes <span className="font-normal normal-case">(optional)</span>
                       </th>
-                      {targetsEditable && <th className="w-20" />}
+                      {tableEditable && <th className="w-20" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -668,7 +673,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       return (
                         <tr key={r.id} data-entry={r.id} className="border-t border-line align-middle">
                           <td className="px-3 py-2">
-                            {targetsEditable ? (
+                            {tableEditable ? (
                               <>
                                 <select
                                   aria-label="Task"
@@ -708,11 +713,11 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            <EntryKindSelect value={kind} disabled={!targetsEditable} onChange={(k) => update(r.id, { kind: k })} />
+                            <EntryKindSelect value={kind} disabled={!tableEditable} onChange={(k) => update(r.id, { kind: k })} />
                           </td>
                           <td className="px-2 py-2">
                             {kind === 'number' ? (
-                              targetsEditable ? (
+                              tableEditable ? (
                                 <input
                                   aria-label="Target"
                                   type="number"
@@ -725,7 +730,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                               ) : (
                                 <span className="tabular-nums">{r.qty ?? '·'}</span>
                               )
-                            ) : targetsEditable ? (
+                            ) : tableEditable ? (
                               <input
                                 aria-label="Target"
                                 className={FIELD}
@@ -739,7 +744,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                           </td>
                           <td className="px-2 py-2">
                             {kind === 'number' ? (
-                              actualsReadOnly ? (
+                              tableReadOnly ? (
                                 <span className="tabular-nums">{r.doneQty ?? '·'}</span>
                               ) : (
                                 <input
@@ -755,7 +760,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             ) : kind === 'milestone' ? (
                               <select
                                 aria-label="Actual"
-                                disabled={actualsReadOnly}
+                                disabled={tableReadOnly}
                                 className={cx(FIELD, 'font-medium', STATUS_CLASS[r.status ?? 'Not started'])}
                                 value={r.status ?? 'Not started'}
                                 onChange={(e) => update(r.id, { status: e.target.value })}
@@ -766,7 +771,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                                   </option>
                                 ))}
                               </select>
-                            ) : actualsReadOnly ? (
+                            ) : tableReadOnly ? (
                               <span>{r.actualText || '·'}</span>
                             ) : (
                               <input
@@ -779,7 +784,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            {targetsEditable ? (
+                            {tableEditable ? (
                               <DurationInput
                                 label="Estimated time"
                                 placeholder="1h"
@@ -791,7 +796,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            {actualsReadOnly ? (
+                            {tableReadOnly ? (
                               <span className="tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</span>
                             ) : (
                               <DurationInput
@@ -803,7 +808,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            {actualsReadOnly ? (
+                            {tableReadOnly ? (
                               <span>{r.remarks || '·'}</span>
                             ) : (
                               <input
@@ -815,7 +820,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                               />
                             )}
                           </td>
-                          {targetsEditable && (
+                          {tableEditable && (
                             <td className="py-2">
                               <button
                                 aria-label="Remove task"
@@ -832,8 +837,8 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                     {assignedMine.map((r) => (
                       <AssignedRow
                         key={r.id}
-                        r={r} project={project} showRemoveCell={targetsEditable} locked={actualsReadOnly} onType={(patch) => typeOnAssigned(r, patch)}
-                        canChange={targetsEditable}
+                        r={r} project={project} showRemoveCell={tableEditable} locked={tableReadOnly} onType={(patch) => typeOnAssigned(r, patch)}
+                        canChange={tableEditable}
                         onChange={(patch) => changeCarried(r.id, patch)}
                         onRemove={() => {
                           changeCarried(r.id, { hidden: true });
@@ -845,7 +850,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                   <tfoot>
                     <tr className="border-t border-line bg-surface-2/40 text-xs font-semibold">
                       <td className="px-2 py-2">
-                        {targetsEditable && (
+                        {tableEditable && (
                           <button
                             className="focus-ring flex items-center gap-1 rounded-full border border-line px-3 py-1 text-accent-ink hover:bg-surface-2"
                             onClick={() => setRows((list) => [...list, blankEntry(pid)])}

@@ -22,7 +22,7 @@ import {
   dailySnapshot,
   projectWeekStart,
 } from "./lib/domain.js";
-import { buildEodRequests, decisionFor, sendSummary } from "./lib/eodReview.js";
+import { buildEodRequests, decisionFor, eodProjectWork, reviewsAfterMove, sendSummary } from "./lib/eodReview.js";
 import { DEFAULT_TEMPLATE_ID, PROJECT_TEMPLATES, templateMetrics, validateMetrics } from "./lib/projectTemplates.js";
 
 /** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
@@ -648,8 +648,20 @@ export const useStore = create()(
           let sends = [];
           if (next.eodAt && next.eodAt !== get().daily[key]?.eodAt && personId === get().me) {
             const built = buildEodRequests({ record, projects: get().projects, personId, at: next.eodAt });
-            if (Object.keys(built.reviews).length) record.eodReviews = { ...record.eodReviews, ...built.reviews };
+            const worked = new Set(eodProjectWork(record).map((w) => w.projectId));
+            const kept = Object.fromEntries(Object.entries(record.eodReviews ?? {}).filter(([pid]) => worked.has(pid))); // a request for work that is gone is dropped
+            const merged = { ...kept, ...built.reviews };
+            if (Object.keys(merged).length) record.eodReviews = merged;
+            else delete record.eodReviews;
             sends = built.sends;
+          } else if (next.eodAt && next.eodAt === get().daily[key]?.eodAt && personId === get().me) {
+            // Change project on a sent day: the review moves with the rows and plan time.
+            const moved = reviewsAfterMove({ prev: get().daily[key], record, projects: get().projects, personId, at: nowIso() });
+            if (moved.changed) {
+              if (Object.keys(moved.reviews).length) record.eodReviews = moved.reviews;
+              else delete record.eodReviews;
+            }
+            sends = moved.sends;
           }
           set((s) => ({
             daily: { ...s.daily, [key]: record },

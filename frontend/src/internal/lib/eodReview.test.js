@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { eodProjectWork, buildEodRequests, eodStatusText, pendingForReviewer, groupByProject, decisionFor, sendSummary } from './eodReview.js';
+import { eodProjectWork, buildEodRequests, eodStatusText, pendingForReviewer, groupByProject, decisionFor, sendSummary, reviewsAfterMove, reopenedProjects, taskReviewLabel, assignedContext } from './eodReview.js';
 
 const projects = [
   { id: 'a', name: 'A', pmId: 'pmA' },
@@ -76,4 +76,51 @@ test('a decision answers the current send and a send-back needs feedback', () =>
   assert.equal(back.note, 'Redo the deck');
   assert.equal(back.status, 'changes');
   assert.equal('note' in decisionFor({ ...back }, 'approved', 'pmA', AT), false);
+});
+
+test('sent-back projects are the ones that reopen', () => {
+  const r = { eodReviews: { a: { status: 'changes' }, b: { status: 'pending' }, c: { status: 'approved' } } };
+  assert.deepEqual([...reopenedProjects(r)], ['a']);
+  assert.equal(reopenedProjects({}).size, 0);
+});
+
+test('changing a table project on a sent day moves the review with the rows', () => {
+  const r1 = row('a', { id: 'r1' });
+  const r2 = row('b', { id: 'r2' });
+  const prev = { entries: [r1, r2], eodReviews: { a: { status: 'approved', reviewerId: 'pmA', sentAt: AT, decidedAt: AT, by: 'pmA', for: AT }, b: { status: 'pending', reviewerId: 'pmB', sentAt: AT } } };
+  const LATER = '2026-10-21T19:00:00.000Z';
+  // all rows of a move to c (the sender's own project): a loses its request, c is approved at once
+  let m = reviewsAfterMove({ prev, record: { ...prev, entries: [{ ...r1, projectId: 'c' }, r2] }, projects, personId: 'u1', at: LATER });
+  assert.equal(m.reviews.a, undefined);
+  assert.equal(m.reviews.c.status, 'approved');
+  assert.equal(m.reviews.c.auto, true);
+  assert.equal(m.reviews.b.status, 'pending');
+  assert.deepEqual(m.sends, []);
+  // a row of a moves to b: a is empty (removed), b's pending request stays, one pending request for the new manager is not duplicated
+  m = reviewsAfterMove({ prev, record: { ...prev, entries: [{ ...r1, projectId: 'b' }, r2] }, projects, personId: 'u1', at: LATER });
+  assert.equal(m.reviews.a, undefined);
+  assert.deepEqual(m.reviews.b, { status: 'pending', reviewerId: 'pmB', sentAt: AT });
+  // rows of b move into a, which was approved: new work makes it pending again, to a's manager, and the manager is told
+  const prev2 = { ...prev, entries: [r1, r2, row('b', { id: 'r3' })] };
+  m = reviewsAfterMove({ prev: prev2, record: { ...prev2, entries: [r1, { ...r2, projectId: 'a' }, row('b', { id: 'r3' })] }, projects, personId: 'u2', at: LATER });
+  assert.deepEqual(m.reviews.a, { status: 'pending', reviewerId: 'pmA', sentAt: LATER });
+  assert.equal(m.sends[0].reviewerId, 'pmA');
+  // a project without a manager gets nothing; unchanged work changes nothing
+  m = reviewsAfterMove({ prev, record: { ...prev, entries: [{ ...r1, projectId: 'd' }, r2] }, projects, personId: 'u2', at: LATER });
+  assert.equal(m.reviews.d, undefined);
+  m = reviewsAfterMove({ prev, record: { ...prev }, projects, personId: 'u2', at: LATER });
+  assert.equal(m.changed, false);
+});
+
+test('assigned tasks are shown as context with their own review status', () => {
+  const tasks = [
+    { id: 't1', assigneeId: 'u1', projectId: 'a', date: '2026-10-21', status: 'in_review' },
+    { id: 't2', assigneeId: 'u1', projectId: 'a', date: '2026-10-20', status: 'todo' },
+    { id: 't3', assigneeId: 'u1', projectId: 'a', date: '2026-10-20', status: 'done' },
+    { id: 't4', assigneeId: 'u2', projectId: 'a', date: '2026-10-21', status: 'todo' },
+    { id: 't5', assigneeId: 'u1', projectId: 'b', date: '2026-10-21', status: 'todo' },
+  ];
+  assert.deepEqual(assignedContext(tasks, 'u1', '2026-10-21', 'a', '2026-10-21').map((t) => t.id), ['t1', 't2']);
+  assert.deepEqual(assignedContext(tasks, 'u1', '2026-10-21', 'a', '2026-10-22').map((t) => t.id), ['t1']);
+  assert.deepEqual(['done', 'in_review', 'changes', 'in_progress', 'todo'].map((status) => taskReviewLabel({ status })), ['approved', 'awaiting approval', 'changes asked', 'in progress', 'to do']);
 });
