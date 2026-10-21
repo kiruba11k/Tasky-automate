@@ -1092,6 +1092,17 @@ describe('tracker documents', () => {
     assert.equal((await put(bo, 'profile', ids.ann, { name: 'Ann', taskMenu: menu })).ok, false, 'a colleague cannot change it');
   });
 
+  test('table header colours on a profile are hex colours, written only to the viewer\'s own profile', async () => {
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColors: { day: '#7B1A48', week: '#00aa33' } })).ok, true);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColor: '#112233' })).ok, true);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColors: { day: 'red' } })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColors: { day: 'url(javascript:1)' } })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColors: ['#112233'] })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColors: { [`k${'x'.repeat(90)}`]: '#112233' } })).ok, false);
+    assert.equal((await put(ann, 'profile', ids.ann, { name: 'Ann', sheetColor: 5 })).ok, false);
+    assert.equal((await put(bo, 'profile', ids.ann, { name: 'Ann', sheetColors: { day: '#112233' } })).ok, false, 'a colleague cannot change it');
+  });
+
   test('a project admin edits the project but cannot hand it over, pick other admins, or remove anyone but themselves', async () => {
     const patch = (token, p) => put(token, 'project', 'pa', p);
     assert.equal((await patch(fay, { id: 'pa', name: 'PA', status: 'active', pmId: ids.pm, admins: [ids.ann, ids.bo], teamIds: [ids.ann, ids.bo], finalized: {} })).ok, true);

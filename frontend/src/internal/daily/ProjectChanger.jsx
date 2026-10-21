@@ -26,7 +26,7 @@ export function ProjectChanger({ current, projects, onSave, onCancel, label = 'P
     onSave(value === CUSTOM_PROJECT ? `${OTHER_PREFIX}${typed}` : value);
   };
   return (
-    <span className="flex flex-wrap items-center gap-1.5" data-testid="project-changer">
+    <span className="pointer-events-auto flex flex-wrap items-center gap-1.5" data-testid="project-changer">
       <select aria-label={`${label} to change to`} className={cx(FIELD, 'w-48')} value={value} onChange={(e) => setValue(e.target.value)}>
         {active.map((p) => (
           <option key={p.id} value={p.id}>

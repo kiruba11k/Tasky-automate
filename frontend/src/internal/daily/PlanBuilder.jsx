@@ -576,7 +576,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                       aria-label="Edit block project"
                       title={lockNote ? `Change project. ${lockNote}` : 'Change project'}
                       data-testid="edit-block"
-                      className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink"
+                      className="focus-ring pointer-events-auto rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink"
                       onClick={() => setEditing({ id: group.id, lane: 'plan' })}
                     >
                       <Pencil size={14} />
@@ -646,7 +646,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                       <button
                         aria-label="Edit extra hours project"
                         title={lockNote ? `Change project. ${lockNote}` : 'Change project'}
-                        className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink"
+                        className="focus-ring pointer-events-auto rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink"
                         onClick={() => setEditing({ id: item.id, lane: 'extra' })}
                       >
                         <Pencil size={14} />

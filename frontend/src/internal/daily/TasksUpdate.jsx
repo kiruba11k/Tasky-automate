@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Sunrise, Moon, Lock } from 'lucide-react';
+import { Sunrise, Moon, Lock, Pencil } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
   rt as Card,
   Te as Button,
+  qe as Badge,
   Ge as textareaClass,
   lt as guarded,
   Ye as toast,
@@ -70,9 +71,10 @@ export function TasksUpdate() {
 
   // The plan follows the assigned work: top it up with the minutes assigned per project that it does not hold yet. Only on the
   // owner's own editable day, and never over unsaved edits in the builder.
+  const planLocked = !!record.planAt; // 'Save plan and times' locks the plan until Update is pressed
   const editable = date >= todayKey(0) && isWeekday(date) && !record.eodAt && !(leave && leave.kind !== 'half');
   useEffect(() => {
-    if (!editable) return;
+    if (!editable || planLocked) return; // a locked plan is never rewritten behind the person's back; the top-up runs again after Update
     const st = useStore.getState();
     const r = st.daily[`${me}|${date}`] ?? emptyDaily();
     const sameExtra = (a, b) => (a ?? []).map((x) => `${x.id}|${x.minutes}`).join() === (b ?? []).map((x) => `${x.id}|${x.minutes}`).join();
@@ -98,7 +100,7 @@ export function TasksUpdate() {
     const total = Object.values(res.added).reduce((a, b) => a + b, 0);
     const first = Object.keys(res.added).length === 1 ? ` ${names[Object.keys(res.added)[0]] ?? ''}` : '';
     toast({ title: `Added ${formatMinutes(total)}${first} from tasks assigned to you`, tone: 'success' });
-  }, [tasks, me, date, projects, profiles, editable, record.plan, record.extra, record.autoPlanned, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tasks, me, date, projects, profiles, editable, planLocked, record.plan, record.extra, record.autoPlanned, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Change the project of one block / extra row (or, with no id, of every block of `from`), also when the day is locked or sent.
@@ -174,28 +176,41 @@ export function TasksUpdate() {
               Blocks marked Auto come from your assigned tasks. Change or delete them freely, they will not come back.
             </p>
           )}
-          <PlanBuilder
-            plan={plan}
-            setPlan={setPlan}
-            extra={extra}
-            setExtra={setExtra}
-            personId={me}
-            date={date}
-            onChangeProject={changeBlockProject}
-            lockNote={lockNote}
-          />
+          <div className={cx('relative', planLocked && 'pointer-events-none select-none opacity-70')} aria-disabled={planLocked}>
+            <PlanBuilder
+              plan={plan}
+              setPlan={setPlan}
+              extra={extra}
+              setExtra={setExtra}
+              personId={me}
+              date={date}
+              onChangeProject={changeBlockProject}
+              lockNote={planLocked && !lockNote ? 'Works even though the plan is locked.' : lockNote}
+            />
+          </div>
           <div className="mt-4 flex justify-end">
-            <Button
-              onClick={() =>
-                guarded(() => {
-                  saveDaily(me, date, { plan, extra: nonEmptyExtras(extra) });
-                  syncPlanFromStore();
-                  toast({ title: 'Plan and times saved', tone: 'success' });
-                })
-              }
-            >
-              Save plan and times
-            </Button>
+            {planLocked ? (
+              <span className="flex items-center gap-2" data-testid="plan-locked">
+                <Badge tone="mint">
+                  <Lock size={11} /> Locked {new Date(record.planAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Badge>
+                <Button tone="ghost" className="border border-line" onClick={() => guarded(() => saveDaily(me, date, { planAt: undefined }))}>
+                  <Pencil size={13} /> Update
+                </Button>
+              </span>
+            ) : (
+              <Button
+                onClick={() =>
+                  guarded(() => {
+                    saveDaily(me, date, { plan, extra: nonEmptyExtras(extra), planAt: new Date().toISOString() });
+                    syncPlanFromStore();
+                    toast({ title: 'Plan and times saved and locked 🔒', tone: 'success' });
+                  })
+                }
+              >
+                <Lock size={13} /> Save plan and times
+              </Button>
+            )}
           </div>
         </Card>
       </section>

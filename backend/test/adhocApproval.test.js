@@ -2,7 +2,7 @@ import test, { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, bootstrapAdmin } from '../src/app.js';
 import { MemoryStore } from '../src/store.js';
-import { entriesProblem, asgProblem, taskLinksProblem, lunchProblem } from '../src/tracker.js';
+import { entriesProblem, asgProblem, taskLinksProblem, lunchProblem, dailyProblem } from '../src/tracker.js';
 
 test('links and task rows are checked', () => {
   assert.equal(taskLinksProblem({}), null);
@@ -17,6 +17,16 @@ test('links and task rows are checked', () => {
   assert.ok(entriesProblem({ entries: [{ ...row, qty: -1 }] }));
   assert.ok(entriesProblem({ entries: [{ ...row, task: 5 }] }));
   assert.ok(entriesProblem({ entries: Array(301).fill(row) }));
+  assert.equal(entriesProblem({ entries: [{ ...row, estManual: true }] }), null);
+  assert.ok(entriesProblem({ entries: [{ ...row, estManual: 'yes' }] }));
+});
+
+test('the time a plan was locked (planAt) is an ISO time or absent', () => {
+  assert.equal(dailyProblem({}), null);
+  assert.equal(dailyProblem({ planAt: '2026-10-21T09:30:00.000Z' }), null);
+  assert.equal(dailyProblem({ planAt: null }), null);
+  assert.ok(dailyProblem({ planAt: 'yesterday' }));
+  assert.ok(dailyProblem({ planAt: 5 }));
 });
 
 test('a day\'s lunch break is a valid time range', () => {

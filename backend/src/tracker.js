@@ -71,7 +71,7 @@ export function entriesProblem(doc) {
   if (!Array.isArray(rows) || rows.length > 300) return 'Too many task rows.';
   const ok = rows.every((r) => r && typeof r === 'object' && typeof r.id === 'string' && r.id.length <= 60 && typeof r.projectId === 'string' && r.projectId.length <= 200
     && typeof r.task === 'string' && r.task.length <= 200 && short(r.custom, 200) && short(r.desc, 500) && short(r.remarks, 1000) && count(r.qty) && count(r.estMin) && count(r.actualMin) && count(r.doneQty)
-    && (r.kind === undefined || ENTRY_KINDS.includes(r.kind)) && short(r.targetText, 1000) && short(r.actualText, 1000) && short(r.status, 40) && short(r.achieved, 1000));
+    && (r.kind === undefined || ENTRY_KINDS.includes(r.kind)) && short(r.targetText, 1000) && short(r.actualText, 1000) && short(r.status, 40) && short(r.achieved, 1000) && (r.estManual === undefined || typeof r.estManual === 'boolean'));
   return ok ? null : 'A task row is not valid.';
 }
 
@@ -130,6 +130,7 @@ export function dailyProblem(patch) {
     && (x.start === undefined || HHMM.test(x.start)) && (x.end === undefined || HHMM.test(x.end))))) return 'Extra hours are not valid.';
   const stamps = ['sodAt', 'eodAt', 'actualsAt', 'entriesAt', 'entriesDoneAt'];
   if (!stamps.every((k) => when(doc[k]))) return 'A time of sending is not valid.';
+  if (doc.planAt !== undefined && !(typeof doc.planAt === 'string' && doc.planAt.length <= 40 && !Number.isNaN(Date.parse(doc.planAt)))) return 'The time the plan was locked is not valid.'; // ISO text, or absent when unlocked
   if (!['sodNote', 'eodNote'].every((k) => text(doc[k], 5000))) return 'A note is too long.';
   if (!['sodTargets', 'eodActuals', 'eodSnapshot', 'snapshots', 'asg'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A day record is not valid.';
   return null;
@@ -152,6 +153,10 @@ export function profileProblem(patch) {
   if (!(doc.photo === undefined || (typeof doc.photo === 'string' && (doc.photo === '' || /^data:image\//.test(doc.photo))))) return 'A photo must be an image.';
   if (!(doc.qotd === undefined || ['quote', 'joke'].includes(doc.qotd))) return 'The quote setting is not valid.';
   if (!['myTheme', 'custom', 'prefs', 'water'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A setting is not valid.';
+  const hex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+  if (!(doc.sheetColor === undefined || hex(doc.sheetColor))) return 'A table header colour must be a hex colour like #7B1A48.';
+  if (!(doc.sheetColors === undefined || (isMap(doc.sheetColors) && Object.keys(doc.sheetColors).length <= 50
+    && Object.entries(doc.sheetColors).every(([k, v]) => k.length > 0 && k.length <= 80 && hex(v))))) return 'Table header colours must be hex colours like #7B1A48.';
   return null;
 }
 /**
