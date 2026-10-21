@@ -27,6 +27,7 @@ import {
   Kw as ProjectPanel,
 } from '@/internal/min';
 import { WeekGlance } from './WeekGlance';
+import { EodApprovals } from '../dashboard/EodApprovals';
 import { AssignmentDifficulty } from './AssignmentDifficulty';
 import { isApprover, approverNames, isTrackedPerson } from '../lib/constants';
 
@@ -50,6 +51,7 @@ export function ManagerDashboard() {
       <ManagerWidgetA />
       <ManagerWidgetB />
       <WeekGlance />
+      <EodApprovals />
       {pending.length > 0 && (
         <Card>
           <CardTitle>Projects waiting for approval</CardTitle>

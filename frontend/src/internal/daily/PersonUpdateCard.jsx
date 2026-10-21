@@ -1,5 +1,6 @@
 import { MessageSquareText } from 'lucide-react';
-import { qe as Badge, vt as Avatar } from '@/internal/min';
+import { qe as Badge, vt as Avatar, be as firstName, Se as useStore } from '@/internal/min';
+import { eodStatusText } from '../lib/eodReview.js';
 import { TargetsTable } from './TargetsTable';
 import { PendingHint } from './PendingHint';
 import { HoursLine } from './HoursLine';
@@ -9,6 +10,8 @@ import { formatClock, formatDayClock } from './dateHelpers';
 /** Manager-facing card summarising one person's day/week update. */
 export function PersonUpdateCard({ r, view }) {
   const met = countTargetsMet(r.rows);
+  const projects = useStore((s) => s.projects);
+  const projectName = (pid) => projects.find((p) => p.id === pid)?.name ?? 'Project';
   const status = r.leave && !r.sentAt ? (
     <Badge tone="lavender">{r.leave}</Badge>
   ) : r.sentAt ? (
@@ -37,6 +40,18 @@ export function PersonUpdateCard({ r, view }) {
         <span data-testid="status">{status}</span>
       </div>
       <div className="flex-1 space-y-2 px-4 py-3">
+        {view === 'daily' && r.sentAt && Object.keys(r.eodReviews ?? {}).length > 0 && (
+          <p className="flex flex-wrap gap-1.5" data-testid="eod-reviews">
+            {Object.entries(r.eodReviews).map(([pid, rv]) => {
+              const st = eodStatusText(rv, firstName(rv.reviewerId), firstName(rv.by ?? rv.reviewerId));
+              return (
+                <Badge key={pid} tone={st.tone}>
+                  {projectName(pid)}: {st.text}
+                </Badge>
+              );
+            })}
+          </p>
+        )}
         <TargetsTable
           rows={r.rows}
           showActual

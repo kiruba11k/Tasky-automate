@@ -146,6 +146,31 @@ export function dailyProblem(patch) {
   if (!['sodTargets', 'eodActuals', 'eodSnapshot', 'snapshots', 'asg', 'carryEdits'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A day record is not valid.';
   return null;
 }
+const EOD_STATUSES = ['pending', 'approved', 'changes'];
+const EOD_KEYS = ['status', 'reviewerId', 'sentAt', 'decidedAt', 'by', 'note', 'for', 'auto'];
+const isStamp = (v) => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
+/**
+ * Why a day's end-of-day reviews ("eodReviews": { projectId: { status, reviewerId, sentAt, decidedAt, by, note, for } }) are refused, or null.
+ * A request is `pending` with only who reviews it and when it was sent; a decision (`approved`, `changes`) names who decided, when,
+ * and which send it answers (`for` = that send's `sentAt`). A send-back needs a note.
+ */
+export function eodReviewsProblem(doc) {
+  const r = doc?.eodReviews;
+  if (r === undefined || r === null) return null;
+  const bad = 'An end of day approval is not valid.';
+  if (!isMap(r) || Object.keys(r).length > 100) return bad;
+  for (const [pid, v] of Object.entries(r)) {
+    if (!pid || pid.length > 200 || !isMap(v) || !Object.keys(v).every((k) => EOD_KEYS.includes(k))) return bad;
+    if (!EOD_STATUSES.includes(v.status) || typeof v.reviewerId !== 'string' || !v.reviewerId || v.reviewerId.length > 200 || !isStamp(v.sentAt)) return bad;
+    if (!text(v.note, 1000) || (v.by !== undefined && !(typeof v.by === 'string' && v.by.length <= 200)) || (v.auto !== undefined && typeof v.auto !== 'boolean')) return bad;
+    if (v.decidedAt !== undefined && !isStamp(v.decidedAt)) return bad;
+    if (v.for !== undefined && !isStamp(v.for)) return bad;
+    if (v.status === 'pending') { if (['decidedAt', 'by', 'note', 'for', 'auto'].some((k) => v[k] !== undefined)) return bad; continue; }
+    if (!v.decidedAt || !v.by) return bad;
+    if (v.status === 'changes' && !(typeof v.note === 'string' && v.note.trim())) return 'Feedback cannot be empty.';
+  }
+  return null;
+}
 export function weeklyProblem(patch) {
   const doc = present(patch);
   if (!doc) return null;
@@ -275,6 +300,41 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     return !!project && project.status === 'active' && (project.pmId === u.id || (project.teamIds || []).includes(u.id) || (project.admins || []).includes(u.id));
   }
 
+  const eodChanged = (data, prev) => {
+    const a = data?.eodReviews || {};
+    const b = prev?.eodReviews || {};
+    return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((pid) => JSON.stringify(a[pid]) !== JSON.stringify(b[pid]));
+  };
+
+  /** The owner of a day sends its end of day to each project's manager: a pending request for that manager (or, on their own project, approved at once). */
+  async function eodOwnerOk(u, data, prev) {
+    for (const pid of eodChanged(data, prev)) {
+      const v = data.eodReviews?.[pid];
+      if (v === undefined) continue; // a request taken back
+      const project = (await find('project', pid))?.data;
+      if (!project || !project.pmId) return false;
+      if (project.pmId === u.id) { if (!(v.status === 'approved' && v.reviewerId === u.id && v.by === u.id && v.auto === true && v.for === v.sentAt)) return false; continue; }
+      if (!(v.status === 'pending' && v.reviewerId === project.pmId)) return false;
+    }
+    return true;
+  }
+
+  /** Someone else's day: only the end of day decision on a project, by that project's manager or the main admins, and nothing else on the record. */
+  async function eodDecisionOk(u, data, prev, changed) {
+    if (!prev || changed.length !== 1 || changed[0] !== 'eodReviews') return false;
+    const pids = eodChanged(data, prev);
+    if (!pids.length) return false;
+    for (const pid of pids) {
+      const v = data.eodReviews?.[pid];
+      const was = prev.eodReviews?.[pid];
+      if (!v || !was) return false;
+      const project = (await find('project', pid))?.data;
+      if (!project || !(leadership(u) || project.pmId === u.id)) return false;
+      if (!['approved', 'changes'].includes(v.status) || v.by !== u.id || v.reviewerId !== was.reviewerId || v.sentAt !== was.sentAt || v.for !== was.sentAt || v.auto) return false; // the answer to the request as it stands
+    }
+    return true;
+  }
+
   /** May `u` write `data` to this document? `prev` is the stored data (undefined for a new document). */
   async function canWrite(u, kind, key, data, prev, changed = [], deleting = false, existing = null) {
     const mine = (id) => id === u.id;
@@ -321,7 +381,8 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         // everyone else on the team may only record that a day was finalized (when they send their end of day)
         return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
       }
-      case 'daily': case 'weekly': return key.startsWith(`${u.id}|`); // a person's own days and weeks; nobody edits another person's record
+      case 'daily': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev) : eodDecisionOk(u, data, prev, changed); // a person's own days; another person's day only gets end of day decisions
+      case 'weekly': return key.startsWith(`${u.id}|`); // a person's own weeks; nobody edits another person's record
       case 'profile': return mine(key);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
       case 'conv': case 'msg': case 'alias':
@@ -402,7 +463,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
-        const why = entriesProblem(data) || asgProblem(data) || carryEditsProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) : weeklyProblem(patch));
+        const why = entriesProblem(data) || asgProblem(data) || carryEditsProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) || eodReviewsProblem(data) : weeklyProblem(patch));
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'profile') {

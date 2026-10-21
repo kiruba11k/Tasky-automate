@@ -25,6 +25,7 @@ import {
   $e as dayKey,
 } from '@/internal/min';
 import { LeaveBadge } from '../ui/LeaveBadge';
+import { eodStatusText } from '../lib/eodReview';
 import { HistoryCalendar } from './HistoryCalendar';
 import { TaskLine } from './TaskLine';
 import { dayHours, dayHasTime, personMetrics, isSubmitted, workDate, NOT_ENOUGH_DATA } from '../lib/domain';
@@ -221,10 +222,22 @@ export function PersonPage() {
                       {!entry?.eodAt && leaveOn(profiles, id, day) ? (
                         <span className="text-xs font-semibold text-lavender-ink">On leave</span>
                       ) : entry?.eodAt ? (
-                        <Badge tone="mint">
-                          Sent{' '}
-                          {new Date(entry.eodAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Badge>
+                        <span
+                          className="inline-flex flex-wrap items-center gap-1.5"
+                          title={Object.entries(entry.eodReviews ?? {})
+                            .map(([pid, r]) => `${projects.find((p) => p.id === pid)?.name ?? 'Project'}: ${eodStatusText(r, displayName(r.reviewerId).split(' ')[0], displayName(r.by ?? r.reviewerId).split(' ')[0])?.text}`)
+                            .join('\n') || undefined}
+                        >
+                          <Badge tone="mint">
+                            Sent{' '}
+                            {new Date(entry.eodAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Badge>
+                          {Object.values(entry.eodReviews ?? {}).some((r) => r.status === 'changes') ? (
+                            <Badge tone="coral">Changes asked</Badge>
+                          ) : Object.values(entry.eodReviews ?? {}).some((r) => r.status === 'pending') ? (
+                            <Badge tone="butter">Awaiting approval</Badge>
+                          ) : null}
+                        </span>
                       ) : (
                         <span className="text-xs text-muted">Not sent</span>
                       )}

@@ -22,6 +22,7 @@ import {
   dailySnapshot,
   projectWeekStart,
 } from "./lib/domain.js";
+import { buildEodRequests, decisionFor, sendSummary } from "./lib/eodReview.js";
 import { DEFAULT_TEMPLATE_ID, PROJECT_TEMPLATES, templateMetrics, validateMetrics } from "./lib/projectTemplates.js";
 
 /** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
@@ -642,6 +643,14 @@ export const useStore = create()(
               record.eodSnapshot = dailySnapshot(get().tasks, personId, day, record, next.eodAt, { projects: get().projects });
             else delete record.eodSnapshot;
           }
+          // Sending the end of day (again) asks each project's manager to approve the work reported for it. A project change that
+          // only re-saves the same sending time does not ask again. Reviews never change any number.
+          let sends = [];
+          if (next.eodAt && next.eodAt !== get().daily[key]?.eodAt && personId === get().me) {
+            const built = buildEodRequests({ record, projects: get().projects, personId, at: next.eodAt });
+            if (Object.keys(built.reviews).length) record.eodReviews = { ...record.eodReviews, ...built.reviews };
+            sends = built.sends;
+          }
           set((s) => ({
             daily: { ...s.daily, [key]: record },
             projects: next.eodAt
@@ -651,6 +660,31 @@ export const useStore = create()(
                 })
               : s.projects,
           }));
+          for (const send of sends) {
+            const name = get().projects.find((p) => p.id === send.projectId)?.name ?? "a project";
+            notify(send.reviewerId, `${firstName(personId)} sent end of day for ${name} (${sendSummary(send.rows, send.minutes)}), waiting for your approval`, "eod");
+          }
+        },
+        /** The project's manager (or leadership) approves, or sends back with feedback, the work a person reported for a project on a day. */
+        decideEod: (personId, day, projectId, verdict, note = "") => {
+          const key = `${personId}|${day}`;
+          const record = get().daily[key];
+          const review = record?.eodReviews?.[projectId];
+          const project = requireProject(projectId);
+          const me = get().me;
+          if (project.pmId !== me && !isLeadership(roleOf(me)))
+            throw new Error(`Only ${displayName(project.pmId)}, who manages this project, can do that.`);
+          if (!review) throw new Error("That end of day is no longer waiting for approval.");
+          if (review.status !== "pending") throw new Error("This end of day was already handled.");
+          const decision = decisionFor(review, verdict, me, nowIso(), note);
+          set((s) => ({ daily: { ...s.daily, [key]: { ...s.daily[key], eodReviews: { ...s.daily[key].eodReviews, [projectId]: decision } } } }));
+          notify(
+            personId,
+            verdict === "approved"
+              ? `${firstName(me)} approved your end of day for ${project.name} ✓`
+              : `${firstName(me)} asked for changes on your end of day for ${project.name}: ${decision.note}`,
+            "eod",
+          );
         },
         finalizeDay: (projectId, day = todayKey(0)) => {
           const at = nowIso();

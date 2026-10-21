@@ -50,6 +50,7 @@ export function ManagerDaily() {
             sent,
             targetsAt: entry?.sodAt,
             sentAt: entry?.eodAt,
+            eodReviews: entry?.eodReviews,
             hours: dailyHours(dayRecordWithTaskTime(tasks, daily, id, date)),
             note: (sent ? entry?.eodNote : entry?.sodNote) || entry?.sodNote,
             leave: leaveLabel(leaveOn(profiles, id, date)),

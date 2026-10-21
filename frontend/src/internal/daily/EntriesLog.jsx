@@ -11,11 +11,13 @@ import {
   We as formatMinutes,
   pu as projectColor,
   nt as personName,
+  be as firstName,
   Mn as toMinutes,
 } from '@/internal/min';
 import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
 import { splitEstimates } from '../lib/estimateSplit.js';
 import { assignedDay } from '../lib/assigned.js';
+import { eodStatusText } from '../lib/eodReview.js';
 import { DurationInput } from './DurationInput';
 import { EntryKindSelect } from './EntryKindSelect';
 import { TaskMenuSettings, useTaskMenu } from './TaskMenuSettings';
@@ -606,6 +608,15 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                   </p>
                 )}
                 <span className="flex flex-wrap items-center gap-2">
+                  {(() => {
+                    const review = record.eodReviews?.[pid];
+                    const st = review && eodStatusText(review, firstName(review.reviewerId), firstName(review.by ?? review.reviewerId));
+                    return st ? (
+                      <span data-testid="eod-status" data-status={review.status} title={review.status === 'changes' ? 'Press Update, make the changes, lock and send your end of day again.' : undefined}>
+                        <Badge tone={st.tone}>{st.text}</Badge>
+                      </span>
+                    ) : null;
+                  })()}
                   {planned > 0 && (
                     <span className="text-xs text-muted">
                       Planned <b className="text-ink">{formatMinutes(planned)}</b>

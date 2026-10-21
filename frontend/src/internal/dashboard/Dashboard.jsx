@@ -18,6 +18,7 @@ import { Spotlight } from './Spotlight';
 import { dayLoggedMinutes } from '../lib/domain';
 import { DayPlanStrip } from './DayPlanStrip';
 import { ReviewQueue } from './ReviewQueue';
+import { EodApprovals } from './EodApprovals';
 import { ReviewedByYou } from './ReviewedByYou';
 import { ProjectCard } from './ProjectCard';
 import { TaskRow } from './TaskRow';
@@ -83,6 +84,7 @@ export function Dashboard() {
         </Link>
       </Card>
       <ReviewQueue />
+      <EodApprovals />
       <div className="space-y-5">
         {myProjects.length === 0 && (
           <Card>
