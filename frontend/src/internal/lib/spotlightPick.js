@@ -11,7 +11,10 @@ export function personStat(row) {
     .join(' · ');
 }
 
-/** Best of `rows` ranked by the average of on-time % and completion %; only people with enough timed items compete. */
+/**
+ * Best of `rows` ranked by the average of on-time % and completion %; only people with enough timed items compete.
+ * Equal scores go to whoever finished more work, then to whoever put in more hours (4 of 4 and 9 of 9 on time: the 9 wins).
+ */
 export function pickStar(rows, minTimed) {
   return rows
     .filter((r) => r.onTime != null && r.tasks > 0 && r.timed >= minTimed)
@@ -19,7 +22,7 @@ export function pickStar(rows, minTimed) {
       const done = completionPct(row) ?? 0;
       return { row, score: (row.onTime + done) / 2 };
     })
-    .sort((a, b) => b.score - a.score || b.row.tasks - a.row.tasks)[0]?.row;
+    .sort((a, b) => b.score - a.score || b.row.tasks - a.row.tasks || (b.row.hours ?? 0) - (a.row.hours ?? 0))[0]?.row;
 }
 
 /** How far a project is through this month's targets (0-100, mean over the metrics that have a target), or null with no progress. */
