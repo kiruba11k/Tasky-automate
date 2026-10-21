@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Pencil } from 'lucide-react';
-import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes } from '@/internal/min';
+import { useEffect, useRef, useState } from 'react';
+import { Image as ImageIcon, Pencil } from 'lucide-react';
+import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes, Ye as toast } from '@/internal/min';
 import { addDays, formatDayMonth, weekStart } from '../lib/dates.js';
 import { rowKey, weekRows } from '../lib/entries.js';
 import { dayRowsWithAssigned, weekAssignedRows } from '../lib/assigned.js';
 import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
+import { copyElementAsImage } from '../lib/copyTableImage';
 import { sheetAchievedText, sheetColorOf, sheetTargetText } from './sheetText';
 
 /** Window event: "open the week's table for editing" (sent by the Edit button on the week's progress card). */
@@ -68,6 +69,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
   // The table's header colour is the viewer's own choice (kept in their profile), per table kind (day or week).
   const headerColor = sheetColorOf(profiles[me], kind);
   const monday = weekStart(date);
+  const sheetRef = useRef(null);
+  const [copying, setCopying] = useState(false);
   const record = weekly[`${personId}|${monday}`];
   const rows =
     kind === 'day'
@@ -132,10 +135,33 @@ export function EntriesProgress({ personId, date, kind, editable }) {
             />
           </label>
         )}
+        {!editable && (
+          <button
+            type="button"
+            data-testid="copy-sheet-image"
+            title="Copy the whole table as one picture (every row and column)"
+            disabled={copying}
+            className="focus-ring flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs font-semibold text-muted hover:bg-surface-2 disabled:opacity-60"
+            onClick={async () => {
+              if (!sheetRef.current) return;
+              setCopying(true);
+              try {
+                const how = await copyElementAsImage(sheetRef.current, `${kind === 'day' ? 'day' : 'week'}-update.png`);
+                toast({ title: how === 'copied' ? 'Table copied as an image' : 'Table saved as an image', tone: 'success' });
+              } catch (err) {
+                toast({ title: err.message || 'Could not copy the table', tone: 'info' });
+              } finally {
+                setCopying(false);
+              }
+            }}
+          >
+            <ImageIcon size={12} /> {copying ? 'Copying...' : 'Copy as image'}
+          </button>
+        )}
         {editButton}
       </div>
       {!editable && (
-        <div className="overflow-x-auto" data-testid={`sheet-${kind}`}>
+        <div className="overflow-x-auto" data-testid={`sheet-${kind}`} ref={sheetRef}>
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="text-white" style={{ background: headerColor }}>

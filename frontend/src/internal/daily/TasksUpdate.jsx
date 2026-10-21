@@ -224,7 +224,7 @@ export function TasksUpdate() {
           Built from the daily and weekly tasks above and your assigned tasks. Targets against what got achieved, updated as you go.
         </p>
       </div>
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6">
         <UpdateCard
           id="todays-targets"
           icon={<Sunrise size={18} className="text-butter-ink" />}
