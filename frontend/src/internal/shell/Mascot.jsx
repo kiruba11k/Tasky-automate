@@ -12,6 +12,7 @@ export function Mascot() {
   const me = useStore((s) => s.me);
   const tasks = useStore((s) => s.tasks);
   const daily = useStore((s) => s.daily);
+  const profiles = useStore((s) => s.profiles);
   const [line, setLine] = useState(null);
   const [tick, setTick] = useState(0);
   const counters = useRef({ said: 0, quip: 0, boost: 0 });
@@ -22,7 +23,7 @@ export function Mascot() {
   const today = dayKey(0);
   const myDay = daily[`${me}|${today}`];
   const missingTargets = isManager
-    ? PEOPLE.filter((p) => isTrackedPerson(p) && !daily[`${p.id}|${today}`]?.sodAt).length
+    ? PEOPLE.filter((p) => isTrackedPerson(p) && !daily[`${p.id}|${today}`]?.sodAt && !profiles?.[p.id]?.leaves?.some((l) => l.date === today && l.kind !== 'half')).length
     : 0;
   const now = new Date();
   const hour = now.getHours();

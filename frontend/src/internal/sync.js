@@ -105,7 +105,7 @@ export async function startSync(user) {
    * of each other, and neither knows about the other's, so after every load the signed-in person finishes the job.
    */
   const finalizeCompleteDays = () => {
-    const { projects, daily, me } = useStore.getState();
+    const { projects, daily, me, profiles } = useStore.getState();
     const limit = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
     const days = [...new Set(Object.keys(daily).map((k) => k.split("|")[1]))].filter((d) => d >= limit);
     let changed = false;
@@ -114,8 +114,9 @@ export async function startSync(user) {
       const finalized = { ...p.finalized };
       for (const d of days) {
         if (finalized[d]) continue;
+        const off = (id) => profiles?.[id]?.leaves?.some((l) => l.date === d && (l.kind === "full" || l.kind === "holiday")); // a holiday / full-day leave is not waited for
         const sent = p.teamIds.map((id) => daily[`${id}|${d}`]?.eodAt);
-        if (sent.every(Boolean)) { finalized[d] = [...sent].sort().pop(); changed = true; }
+        if (sent.some(Boolean) && p.teamIds.every((id, i) => sent[i] || off(id))) { finalized[d] = [...sent].filter(Boolean).sort().pop(); changed = true; }
       }
       return changed && finalized !== p.finalized ? { ...p, finalized } : p;
     });

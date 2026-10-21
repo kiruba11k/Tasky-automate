@@ -1,6 +1,7 @@
 // The tracker store. Its data lives on the server and is kept in step by sync.js.
 import { create } from "zustand";
-import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel } from "./lib/dates.js";
+import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel, formatDayMonth } from "./lib/dates.js";
+import { moveRows as moveRowsBetween, moveTargetProblem, rescheduleNote } from "./lib/moveRows.js";
 import { PEOPLE, TASK_TYPES, isAdminTier, isLeadership, isApprover, approverNames, roleOf } from "./lib/constants.js";
 import {
   EMPTY_COUNTS,
@@ -449,6 +450,78 @@ export const useStore = create()(
           });
           notify(task.assigneeId, `${firstName(get().me)} updated your task: ${edit.title.trim()}`);
         },
+        /**
+         * Change the day of a task (the assignee or whoever assigned it): rows, the Dashboard and the weekly views follow because
+         * they are built from `task.date`. Status and numbers stay. The other party is told.
+         */
+        rescheduleTask: (id, date) => {
+          const task = requireTask(id);
+          const me = get().me;
+          if (task.assigneeId !== me && task.assignedById !== me) throw new Error("Only the person it was given to, or who gave it, can change its day.");
+          if (["done", "in_review"].includes(task.status)) throw new Error("This task is already sent in, so its day cannot change.");
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) throw new Error("Pick a date.");
+          if (date === task.date) return;
+          const note = rescheduleNote(formatDayMonth(task.date), formatDayMonth(date), firstName(me));
+          patchTask(id, { date, history: withHistory(task, "rescheduled", { note: note.note }) });
+          const other = me === task.assigneeId ? task.assignedById : task.assigneeId;
+          if (other && other !== me) notify(other, `${firstName(me)} moved ${task.title} from ${formatDayMonth(task.date)} to ${formatDayMonth(date)}`);
+        },
+        /**
+         * Move logged rows of one of my days to another day (`ids` picks rows, all when omitted; `fromRows` are the rows as the screen
+         * holds them). The target day is saved first and the source second; when the second save is refused the first is undone.
+         * Returns the number of rows moved.
+         */
+        moveDayRows: (personId, from, to, { ids, fromRows } = {}) => {
+          if (personId !== get().me) throw new Error("You can only move your own rows.");
+          if (from === to) return 0;
+          const fromKey = `${personId}|${from}`;
+          const toKey = `${personId}|${to}`;
+          const toRecord = get().daily[toKey];
+          const why = moveTargetProblem(to, toRecord);
+          if (why) throw new Error(why);
+          const res = moveRowsBetween({
+            fromEntries: fromRows ?? get().daily[fromKey]?.entries ?? [],
+            toEntries: toRecord?.entries ?? [],
+            ids,
+            targetDate: to,
+            newId,
+          });
+          if (!res) return 0;
+          const before = toRecord?.entries;
+          get().saveDaily(personId, to, { entries: res.to });
+          try {
+            const sentAt = get().daily[fromKey]?.eodAt;
+            get().saveDaily(personId, from, { entries: res.from, ...(sentAt ? { eodAt: sentAt } : {}) }); // a sent day (opened with Update) refreshes its snapshot
+          } catch (e) {
+            get().saveDaily(personId, to, { entries: before ?? [] });
+            throw e;
+          }
+          return res.moved;
+        },
+        /**
+         * Move the rows added to a week ("Add to the week", all those that count as `rowKeyText`) to the week of another day. Same order
+         * as moveDayRows: the target week first, then this one, undone when the second save fails. Returns the number of rows moved.
+         */
+        moveWeekRows: (personId, fromWeek, toDate, match) => {
+          if (personId !== get().me) throw new Error("You can only move your own rows.");
+          const fromMon = weekStart(fromWeek);
+          const toMon = weekStart(toDate);
+          if (fromMon === toMon) throw new Error("Pick a day in another week.");
+          const fromRec = get().weekly[`${personId}|${fromMon}`];
+          const toRec = get().weekly[`${personId}|${toMon}`];
+          if (toRec?.eowAt) throw new Error("That week was already submitted, so rows cannot be added to it.");
+          const moving = (fromRec?.entries ?? []).filter(match);
+          if (!moving.length) return 0;
+          const before = toRec?.entries;
+          get().saveWeekly(personId, toMon, { entries: [...(before ?? []), ...moving.map((r) => ({ ...r, id: newId() }))] });
+          try {
+            get().saveWeekly(personId, fromMon, { entries: (fromRec?.entries ?? []).filter((r) => !match(r)) });
+          } catch (e) {
+            get().saveWeekly(personId, toMon, { entries: before ?? [] });
+            throw e;
+          }
+          return moving.length;
+        },
         remind: (id) => {
           const task = requireTask(id);
           patchTask(id, {
@@ -669,7 +742,7 @@ export const useStore = create()(
               ? finalizeProjectsForDay(s.projects, personId, day, next.eodAt, {
                   ...s.daily,
                   [key]: record,
-                })
+                }, s.profiles)
               : s.projects,
           }));
           for (const send of sends) {

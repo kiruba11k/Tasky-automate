@@ -164,7 +164,7 @@ export function TaskCalendar({ tasks, who, personId }) {
         </p>
         {leave && (
           <p className="mb-2 rounded-xl bg-lavender/40 px-3 py-2 text-sm">
-            🌴 {leave.kind === 'half' ? 'On half day leave' : 'On leave'}
+            🌴 {leave.kind === 'half' ? 'On half day leave' : leave.kind === 'holiday' ? 'Holiday' : 'On leave'}
             {leave.note ? `: ${leave.note}` : ''}
           </p>
         )}

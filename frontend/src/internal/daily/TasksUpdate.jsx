@@ -20,6 +20,7 @@ import { changeProject } from '../lib/changeProject.js';
 import { PROJECT_CHANGED } from './ProjectChanger';
 import { isWeekday, lunchFor, todayKey } from '../lib/dates.js';
 import { DatePicker } from './DatePicker';
+import { MarkLeave } from './MarkLeave';
 import { HoursStats } from './HoursStats';
 import { UpdateCard } from './UpdateCard';
 import { TaskSummary } from './TaskSummary';
@@ -154,7 +155,10 @@ export function TasksUpdate() {
             Plan your day and record the real time it took. Targets and actuals fill in from your tasks. Working hours 10am to 7pm, lunch 1pm to 2pm.
           </p>
         </div>
-        <DatePicker date={date} onChange={setDate} />
+        <div className="flex flex-wrap items-center gap-2">
+          <DatePicker date={date} onChange={setDate} personId={me} />
+          <MarkLeave personId={me} date={date} />
+        </div>
       </div>
       {leave && (
         <div
@@ -218,7 +222,7 @@ export function TasksUpdate() {
       <div className="border-t-2 border-dashed border-line pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Auto-filled updates</h2>
-          <DatePicker date={date} onChange={setDate} />
+          <DatePicker date={date} onChange={setDate} personId={me} />
         </div>
         <p className="text-sm text-muted">
           Built from the daily and weekly tasks above and your assigned tasks. Targets against what got achieved, updated as you go.

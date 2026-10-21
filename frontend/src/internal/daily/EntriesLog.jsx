@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
+import { CalendarDays, ClipboardList, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -25,6 +25,9 @@ import { ProjectChanger, PROJECT_CHANGED } from './ProjectChanger';
 import { moveEntries } from '../lib/changeProject.js';
 import { formatClock, formatDayClock, formatShortDate } from './dateHelpers';
 import { FillFromPicker } from './FillFromPicker';
+import { DateMenu } from './DateMenu';
+import { moveWork } from './moveActions';
+import { canReschedule } from '../lib/moveRows.js';
 import { blockMinutes } from './planHelpers';
 import {
   CUSTOM_TASK,
@@ -54,7 +57,7 @@ const STATUS_LABEL = { todo: 'To do', in_progress: 'In progress', in_review: 'In
  * A task assigned to the person, in the project's day table. The row comes from the task itself (never saved with the day's rows);
  * what the person types on it, the time taken and a note, is kept in the day record's `asg`.
  */
-function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, onChange, onRemove }) {
+function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, onChange, onRemove, personId, date, canMove, onReschedule }) {
   const [editing, setEditing] = useState(false);
   const [asking, setAsking] = useState(false);
   const [draft, setDraft] = useState({});
@@ -150,6 +153,22 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
       </td>
       {showRemoveCell && (
         <td className="whitespace-nowrap py-2 pr-2">
+          {canMove && !editing && (
+            <DateMenu
+              personId={personId}
+              from={date}
+              title="Reschedule task"
+              confirmLabel="Reschedule"
+              hint="Changes the day of the task itself, so it moves on the Dashboard and everywhere else."
+              testId="reschedule-popover"
+              onPick={onReschedule}
+              trigger={({ onClick }) => (
+                <button aria-label="Reschedule" title="Reschedule: change the task's date" data-testid="reschedule-task" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={onClick}>
+                  <CalendarDays size={14} />
+                </button>
+              )}
+            />
+          )}
           {carried && canChange && editing && (
             <>
               <button aria-label="Save task" title="Save (today only)" className="focus-ring rounded-lg p-1.5 text-accent-ink hover:bg-surface-2" onClick={saveEdit}>
@@ -393,6 +412,16 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   };
 
   const update = (id, patch) => setRows((list) => list.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  // Moving work to another date: the target day is saved first, then this day; the tasks behind assigned rows change their own day.
+  const validRow = (r) => r.task && (r.task !== CUSTOM_TASK || r.custom?.trim());
+  const moveRowsTo = (ids, to, taskIds = []) =>
+    guarded(() => {
+      const picked = rows.filter((r) => ids.includes(r.id));
+      if (picked.some((r) => !validRow(r))) throw new Error('Pick a task for the row first.');
+      moveWork({ personId, from: key, to, ids: picked.length ? picked.map((r) => r.id) : [], taskIds, fromRows: rows.filter(validRow) });
+      setRows((list) => list.filter((r) => !ids.includes(r.id)));
+    });
+  const canMoveTask = (taskId) => canReschedule(tasks.find((t) => t.id === taskId), useStore.getState().me);
   const typeOnAssigned = (row, patch) =>
     setAsg((all) => {
       const next = { ...(all[row.id] ?? { projectId: row.projectId, task: row.task, custom: row.custom }), ...patch };
@@ -590,6 +619,27 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                         <Pencil size={11} /> Change project
                       </button>
                     )}
+                    {!readOnly && tableEditable && (mine.some(validRow) || assignedMine.some((r) => r.taskIds.some(canMoveTask))) && (
+                      <DateMenu
+                        personId={personId}
+                        from={key}
+                        title="Move whole table"
+                        hint={`Moves this table's rows (and reschedules its assigned tasks) to another day.`}
+                        testId="move-table-popover"
+                        onPick={(to) => moveRowsTo(mine.filter(validRow).map((r) => r.id), to, assignedMine.flatMap((r) => r.taskIds))}
+                        trigger={({ onClick }) => (
+                          <button
+                            aria-label={`Move ${name} to another date`}
+                            title="Move this table to another date"
+                            data-testid="move-table-date"
+                            className="focus-ring flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] font-semibold text-accent-ink hover:bg-surface-2"
+                            onClick={onClick}
+                          >
+                            <CalendarDays size={11} /> Move table
+                          </button>
+                        )}
+                      />
+                    )}
                     {!readOnly && isAdded && !project && (
                       <button
                         aria-label={`Rename ${name}`}
@@ -657,7 +707,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       <th className="min-w-[11rem] px-2 py-2">
                         Notes <span className="font-normal normal-case">(optional)</span>
                       </th>
-                      {tableEditable && <th className="w-20" />}
+                      {tableEditable && <th className="w-28" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -821,7 +871,22 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             )}
                           </td>
                           {tableEditable && (
-                            <td className="py-2">
+                            <td className="whitespace-nowrap py-2">
+                              {!readOnly && (
+                                <DateMenu
+                                  personId={personId}
+                                  from={key}
+                                  title="Move to another date"
+                                  hint="Moves this row. Its target stays; the results are cleared unless the day has passed."
+                                  testId="move-row-popover"
+                                  onPick={(to) => moveRowsTo([r.id], to)}
+                                  trigger={({ onClick }) => (
+                                    <button aria-label="Change date" title="Move to another date" data-testid="change-row-date" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={onClick}>
+                                      <CalendarDays size={14} />
+                                    </button>
+                                  )}
+                                />
+                              )}
                               <button
                                 aria-label="Remove task"
                                 className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink"
@@ -839,6 +904,10 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                         key={r.id}
                         r={r} project={project} showRemoveCell={tableEditable} locked={tableReadOnly} onType={(patch) => typeOnAssigned(r, patch)}
                         canChange={tableEditable}
+                        personId={personId}
+                        date={date}
+                        canMove={!readOnly && r.taskIds.some(canMoveTask)}
+                        onReschedule={(to) => guarded(() => moveWork({ personId, from: key, to, ids: [], taskIds: r.taskIds }))}
                         onChange={(patch) => changeCarried(r.id, patch)}
                         onRemove={() => {
                           changeCarried(r.id, { hidden: true });

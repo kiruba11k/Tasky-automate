@@ -1,4 +1,4 @@
-import { UserPlus, Send, Repeat, MessageSquare, Forward, CheckCheck, Pencil, BellRing } from 'lucide-react';
+import { UserPlus, Send, Repeat, MessageSquare, Forward, CheckCheck, Pencil, BellRing, CalendarDays } from 'lucide-react';
 import { be as firstName } from '@/internal/min';
 import { formatTimeOrDateTime, durationBetween } from './taskFormat';
 
@@ -11,6 +11,7 @@ export const HISTORY_ACTIONS = {
   approved: { title: 'Approved', tone: 'mint', icon: CheckCheck },
   edited: { title: 'Edited', tone: 'grey', icon: Pencil },
   reminded: { title: 'Reminder sent', tone: 'grey', icon: BellRing },
+  rescheduled: { title: 'Moved to another day', tone: 'lavender', icon: CalendarDays },
 };
 
 export const HISTORY_TONE_CLASSES = {

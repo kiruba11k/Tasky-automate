@@ -99,12 +99,17 @@ export function carryEditsProblem(doc) {
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Why a day's lunch break is refused, or null. It is a start and an end time within the working day. */
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-/** Why a profile's leave list is refused, or null. Each leave is a day, "full" or "half", and a short note. */
+/** Why a profile's leave list is refused, or null. Each leave is a day, "full", "half" or "holiday", and a short note. */
 export function leavesProblem(doc) {
   if (doc?.leaves === undefined) return null;
   const l = doc.leaves;
-  const ok = Array.isArray(l) && l.length <= 400 && l.every((x) => x && typeof x === 'object' && DAY.test(x.date) && ['full', 'half'].includes(x.kind) && short(x.note, 300));
-  return ok ? null : 'A leave needs a day, full or half, and a short note.';
+  const ok = Array.isArray(l) && l.length <= 400 && l.every((x) => x && typeof x === 'object' && DAY.test(x.date) && ['full', 'half', 'holiday'].includes(x.kind) && short(x.note, 300));
+  return ok ? null : 'A leave needs a day, full, half or holiday, and a short note.';
+}
+/** Why a task's day is refused, or null. Rescheduling a task changes only this field, to a real YYYY-MM-DD day. */
+export function taskDateProblem(task) {
+  if (task?.date === undefined) return null;
+  return typeof task.date === 'string' && DAY.test(task.date) && !Number.isNaN(Date.parse(`${task.date}T00:00:00Z`)) ? null : 'A task needs a real day (YYYY-MM-DD).';
 }
 /** Why a profile's task-dropdown settings are refused, or null: lists of short names, nothing else. */
 export function taskMenuProblem(doc) {
@@ -459,7 +464,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       if (JSON.stringify(data).length > MAX_DOC) { results.push({ ...id, ok: false, error: 'Document too large' }); continue; }
       const changed = Object.keys(patch);
       if (kind === 'task') {
-        const why = taskTransitionProblem(prev, data, u.id) || taskLinksProblem(data);
+        const why = taskTransitionProblem(prev, data, u.id) || taskLinksProblem(data) || taskDateProblem(data);
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
@@ -478,7 +483,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       // a conversation keeps its creator as owner, whoever edits it later (renaming, leaving)
       if (existing) await store.update('TrackerDoc', existing.id, { data, deleted: false, owner_id: kind === 'conv' && !existing.deleted ? existing.owner_id : u.id });
       else await store.insert('TrackerDoc', { kind, key, data, owner_id: u.id, deleted: false, born: clock() }, u.email);
-      if (kind === 'task') { await mirrorTask(key, data, false); await syncEntryMirrors(data.assigneeId, data.date); }
+      if (kind === 'task') { await mirrorTask(key, data, false); await syncEntryMirrors(data.assigneeId, data.date); if (prev?.date && prev.date !== data.date) await syncEntryMirrors(prev.assigneeId, prev.date); }
       if (kind === 'daily') { const [who, day] = key.split('|'); await syncEntryMirrors(who, day); }
       if (kind === 'notice' && !existing && data.to && data.to !== u.id && !data.read) pushNotice(data);
       results.push({ ...id, ok: true });

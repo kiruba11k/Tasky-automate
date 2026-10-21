@@ -30,7 +30,7 @@ import { HistoryCalendar } from './HistoryCalendar';
 import { TaskLine } from './TaskLine';
 import { dayHours, dayHasTime, personMetrics, isSubmitted, workDate, NOT_ENOUGH_DATA } from '../lib/domain';
 import { recordWithAssigned } from '../lib/assigned';
-import { leaveOn } from '../lib/leave';
+import { leaveLabel, leaveOn } from '../lib/leave';
 import { WEEKDAY_SHORT, addDays, formatDayMonth, isWeekday, parseDateKey } from '../lib/dates';
 
 
@@ -220,7 +220,7 @@ export function PersonPage() {
                     <td className="px-2 py-1.5 text-right">{hours.extraMin ? formatMinutes(hours.extraMin) : '·'}</td>
                     <td className="px-2 py-1.5">
                       {!entry?.eodAt && leaveOn(profiles, id, day) ? (
-                        <span className="text-xs font-semibold text-lavender-ink">On leave</span>
+                        <span className="text-xs font-semibold text-lavender-ink">{leaveLabel(leaveOn(profiles, id, day))}</span>
                       ) : entry?.eodAt ? (
                         <span
                           className="inline-flex flex-wrap items-center gap-1.5"

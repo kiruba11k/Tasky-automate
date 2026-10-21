@@ -55,7 +55,7 @@ export function LeaveSection({ personId }) {
       <span className="w-28 font-medium">
         {WEEKDAY_SHORT[parseDateKey(leave.date).getDay()]} {formatDayMonth(leave.date)}
       </span>
-      <Badge tone={leave.kind === 'full' ? 'lavender' : 'sky'}>{leave.kind === 'full' ? 'Full day' : 'Half day'}</Badge>
+      <Badge tone={leave.kind === 'half' ? 'sky' : 'lavender'}>{leave.kind === 'holiday' ? 'Holiday' : leave.kind === 'full' ? 'Full day' : 'Half day'}</Badge>
       <span className="min-w-0 flex-1 truncate text-xs text-muted">{leave.note}</span>
       <button
         aria-label={`Remove leave on ${leave.date}`}
@@ -108,6 +108,7 @@ export function LeaveSection({ personId }) {
           >
             <option value="full">Full day</option>
             <option value="half">Half day</option>
+            <option value="holiday">Holiday</option>
           </select>
         </label>
         <label className="min-w-[10rem] flex-1 text-xs font-semibold text-muted">

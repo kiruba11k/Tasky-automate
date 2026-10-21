@@ -1,9 +1,11 @@
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
-import { Xt as weekStart, Wr as isWorkday, ia as snapToWorkday, ft as addDays } from '@/internal/min';
-import { latestWorkday, stepWorkdays, formatWeekRange } from './dateHelpers';
+import { Xt as weekStart, ft as addDays } from '@/internal/min';
+import { latestWorkday, stepWorkdays, formatWeekRange, furthestDate } from './dateHelpers';
+import { DayMarker } from './DateMenu';
 
-export function DatePicker({ date, onChange, mode = 'day' }) {
-  const max = latestWorkday();
+/** Day picker: the calendar input accepts any date (weekends, holidays, past, up to 60 days ahead); the arrows step workdays. */
+export function DatePicker({ date, onChange, mode = 'day', personId }) {
+  const max = mode === 'day' ? furthestDate() : latestWorkday();
   const monday = weekStart(date);
   const nextDisabled = mode === 'day' ? date >= max : monday >= weekStart(max);
   const step = (dir) =>
@@ -33,10 +35,10 @@ export function DatePicker({ date, onChange, mode = 'day' }) {
             onChange={(e) => {
               const v = e.target.value;
               if (!v) return;
-              const clamped = v > max ? max : v;
-              onChange(isWorkday(clamped) ? clamped : snapToWorkday(clamped));
+              onChange(v > max ? max : v);
             }}
           />
+          {personId && <DayMarker personId={personId} date={date} />}
         </label>
       ) : (
         <span className="flex items-center gap-2 px-2 text-sm font-semibold" data-testid="week-label">

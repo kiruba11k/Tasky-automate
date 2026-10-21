@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image as ImageIcon, Pencil } from 'lucide-react';
-import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes, Ye as toast } from '@/internal/min';
-import { addDays, formatDayMonth, weekStart } from '../lib/dates.js';
+import { CalendarDays, Image as ImageIcon, Pencil } from 'lucide-react';
+import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes, Ye as toast, lt as guarded } from '@/internal/min';
+import { addDays, formatDayMonth, parseDateKey, weekStart, WEEKDAY_SHORT } from '../lib/dates.js';
 import { rowKey, weekRows } from '../lib/entries.js';
 import { dayRowsWithAssigned, weekAssignedRows } from '../lib/assigned.js';
 import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
 import { copyElementAsImage } from '../lib/copyTableImage';
+import { DateMenu, DayMarker } from './DateMenu';
+import { DayMover } from './DayMover';
 import { sheetAchievedText, sheetColorOf, sheetTargetText } from './sheetText';
 
 /** Window event: "open the week's table for editing" (sent by the Edit button on the week's progress card). */
@@ -57,6 +59,30 @@ function TextBox({ value, onSave, label }) {
       placeholder="What got done"
       className="focus-ring w-full rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs"
     />
+  );
+}
+
+/** Each day of the week as a chip: date, Holiday / Leave marker and how much work it holds. The owner can move a day's work from here. */
+function WeekDays({ personId, monday }) {
+  const { tasks, daily, projects, me } = useStore();
+  const days = [0, 1, 2, 3, 4, 5, 6]
+    .map((i) => addDays(monday, i))
+    .map((d) => ({ d, count: dayRowsWithAssigned(tasks, daily, personId, d, { projects, carry: false }).length }))
+    .filter(({ d, count }) => count > 0 || parseDateKey(d).getDay() % 6 !== 0);
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-testid="week-days">
+      <span className="text-[10px] font-bold uppercase tracking-wide text-muted">Days</span>
+      {days.map(({ d, count }) => (
+        <span key={d} data-week-day={d} className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2 py-1 text-xs">
+          <DayMover personId={personId} date={d} testId={`week-day-${d}`} className="font-semibold">
+            {WEEKDAY_SHORT[parseDateKey(d).getDay()]} {formatDayMonth(d)}
+          </DayMover>
+          <DayMarker personId={personId} date={d} />
+          <span className="tabular-nums text-muted">{count ? `${count} row${count === 1 ? '' : 's'}` : '·'}</span>
+        </span>
+      ))}
+      {personId === me && <span className="text-[11px] text-muted">Click a date to move its work to another day.</span>}
+    </div>
   );
 }
 
@@ -160,6 +186,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
         )}
         {editButton}
       </div>
+      {kind === 'week' && <WeekDays personId={personId} monday={monday} />}
       {!editable && (
         <div className="overflow-x-auto" data-testid={`sheet-${kind}`} ref={sheetRef}>
           <table className="w-full min-w-[860px] border-collapse text-sm">
@@ -198,7 +225,14 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                           rowSpan={rows.length}
                           className="whitespace-nowrap border border-line bg-surface px-3 py-2 text-center align-middle font-medium"
                         >
-                          {dateLabel}
+                          {kind === 'day' ? (
+                            <DayMover personId={personId} date={date} testId="sheet-date-move">
+                              {dateLabel}
+                            </DayMover>
+                          ) : (
+                            dateLabel
+                          )}
+                          {kind === 'day' && <DayMarker personId={personId} date={date} className="ml-1" />}
                         </td>
                       )}
                       {first && (
@@ -255,6 +289,26 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                     <li key={r.id} className="py-2 text-sm" data-progress-row={r.id}>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="min-w-[10rem] flex-1 font-medium">{name}</span>
+                        {kind === 'week' && personId === me && (record?.entries ?? []).some((e) => rowKey(e) === rowKey(r)) && (
+                          <DateMenu
+                            personId={personId}
+                            from={monday}
+                            title="Move to another week"
+                            hint="Moves the rows you added to this week to the week of the day you pick."
+                            testId="move-week-row-popover"
+                            onPick={(to) =>
+                              guarded(() => {
+                                const n = useStore.getState().moveWeekRows(personId, monday, to, (e) => rowKey(e) === rowKey(r));
+                                if (n) toast({ title: `Moved to the week of ${formatDayMonth(weekStart(to))}`, tone: 'success' });
+                              })
+                            }
+                            trigger={({ onClick }) => (
+                              <button aria-label="Change date" title="Move the rows added to this week to another week" data-testid="move-week-row" className="focus-ring rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={onClick}>
+                                <CalendarDays size={13} />
+                              </button>
+                            )}
+                          />
+                        )}
                         {editable && kindOf === 'milestone' ? (
                           <select
                             aria-label={`${name} status`}

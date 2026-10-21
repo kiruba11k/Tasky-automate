@@ -93,11 +93,12 @@ export const activeProjectsFor = (projects, personId) =>
  * `personId` for `day`, but only once all other team members sent their EOD
  * (when `daily` is supplied).
  */
-export function finalizeProjectsForDay(projects, personId, day, at, daily) {
+export function finalizeProjectsForDay(projects, personId, day, at, daily, profiles) {
   const mine = new Set(activeProjectsFor(projects, personId).map((p) => p.id));
+  const offToday = (id) => profiles?.[id]?.leaves?.some((l) => l.date === day && (l.kind === "full" || l.kind === "holiday")); // a holiday / full-day leave is not waited for
   const everyoneSent = (project) =>
     !daily ||
-    project.teamIds.every((id) => id === personId || !!daily[`${id}|${day}`]?.eodAt);
+    project.teamIds.every((id) => id === personId || !!daily[`${id}|${day}`]?.eodAt || offToday(id));
   return projects.map((p) =>
     mine.has(p.id) && !p.finalized?.[day] && everyoneSent(p)
       ? { ...p, finalized: { ...p.finalized, [day]: at } }
@@ -646,7 +647,8 @@ export function weeklyCompletion(state, week, people = TRACKED_PEOPLE_IDS) {
 /** `HV` - which team members of a project have / have not sent EOD. */
 export function projectEodStatus(project, state, day = todayKey(0)) {
   const sent = project.teamIds.filter((id) => state.daily[`${id}|${day}`]?.eodAt);
-  return { sent, pending: project.teamIds.filter((id) => !sent.includes(id)) };
+  const off = (id) => state.profiles?.[id]?.leaves?.some((l) => l.date === day && (l.kind === "full" || l.kind === "holiday")); // not waited for
+  return { sent, pending: project.teamIds.filter((id) => !sent.includes(id) && !off(id)) };
 }
 
 /**

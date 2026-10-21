@@ -24,6 +24,7 @@ import {
 import { EntriesLog } from '../daily/EntriesLog';
 import { WeeklyUpdate } from '../daily/WeeklyUpdate';
 import { leaveLabel, leaveOn } from '../lib/leave';
+import { isOffLeave } from '../lib/moveRows';
 import { dayHours as dailyHours, dayRecordWithTaskTime } from '../lib/domain';
 
 /** Manager view of "/daily": team tasks update (daily or weekly). */
@@ -54,6 +55,7 @@ export function ManagerDaily() {
             hours: dailyHours(dayRecordWithTaskTime(tasks, daily, id, date)),
             note: (sent ? entry?.eodNote : entry?.sodNote) || entry?.sodNote,
             leave: leaveLabel(leaveOn(profiles, id, date)),
+            leaveOff: isOffLeave(leaveOn(profiles, id, date)),
           };
         }
         const entry = weekly[`${id}|${weekKey}`];
@@ -75,12 +77,15 @@ export function ManagerDaily() {
   );
   const dayStats = dailyStats({ daily }, date, ids);
   const weekStats = weeklyStats({ weekly }, weekKey, ids);
+  // a holiday or full-day leave is not a missing update: those people are left out of the "still to do" lists and totals
+  const excusedTargets = view === 'daily' ? results.filter((r) => r.leaveOff && !r.targetsAt).length : 0;
+  const excusedSent = view === 'daily' ? results.filter((r) => r.leaveOff && !r.sentAt).length : 0;
   const counts =
     view === 'daily'
-      ? { targets: dayStats.targetsSet, sent: dayStats.eodSent, total: dayStats.total }
+      ? { targets: dayStats.targetsSet, sent: dayStats.eodSent, total: dayStats.total, totalTargets: dayStats.total - excusedTargets, totalSent: dayStats.total - excusedSent }
       : { targets: weekStats.targetsSet, sent: weekStats.eowSent, total: weekStats.total };
   const visible = results.filter((r) =>
-    filter === 'targets' ? !r.targetsAt : filter === 'sent' ? !r.sentAt : true,
+    filter === 'targets' ? !r.targetsAt && !r.leaveOff : filter === 'sent' ? !r.sentAt && !r.leaveOff : true,
   );
   const toggleFilter = (key) => setFilter((cur) => (cur === key ? 'all' : key));
   const switchView = (next) => {
@@ -142,7 +147,7 @@ export function ManagerDaily() {
           }
           label={labels.targets}
           done={counts.targets}
-          total={counts.total}
+          total={counts.totalTargets ?? counts.total}
           active={filter === 'targets'}
           onClick={() => toggleFilter('targets')}
         />
@@ -156,7 +161,7 @@ export function ManagerDaily() {
           }
           label={labels.sent}
           done={counts.sent}
-          total={counts.total}
+          total={counts.totalSent ?? counts.total}
           active={filter === 'sent'}
           onClick={() => toggleFilter('sent')}
         />

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Se as useStore, oe as cn, $e as dayKey } from '@/internal/min';
 import { isSubmitted, workDate } from '../lib/domain';
 import { LeaveBadge } from '../ui/LeaveBadge';
+import { leaveLabel } from '../lib/leave';
 import { TaskLine } from './TaskLine';
 import { DayLog, dayWork } from '../dashboard/TaskCalendar';
 import { MONTH_SHORT, isWeekday, parseDateKey, previousWeekday } from '../lib/dates';
@@ -95,7 +96,7 @@ export function HistoryCalendar({ tasks, personId }) {
                 key={day}
                 data-day={day}
                 onClick={() => setPicked(day)}
-                title={leaveOn(day) ? (leaveOn(day).kind === 'half' ? 'Half day leave' : 'On leave') : undefined}
+                title={leaveLabel(leaveOn(day))}
                 className={cn(
                   'focus-ring flex h-11 flex-col items-center justify-center rounded-lg text-xs font-semibold transition-colors',
                   picked === day
@@ -151,7 +152,7 @@ export function HistoryCalendar({ tasks, personId }) {
         </p>
         {pickedLeave && (
           <p className="rounded-xl bg-lavender/40 px-3 py-2 text-sm" data-testid="leave-note">
-            🌴 {pickedLeave.kind === 'half' ? 'On half day leave' : 'On leave'} this day
+            🌴 {pickedLeave.kind === 'half' ? 'On half day leave' : pickedLeave.kind === 'holiday' ? 'Holiday' : 'On leave'} this day
             {pickedLeave.note ? `: ${pickedLeave.note}` : ''}.
           </p>
         )}

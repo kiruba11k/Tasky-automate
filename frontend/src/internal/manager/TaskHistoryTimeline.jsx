@@ -36,6 +36,7 @@ export const HISTORY_ACTIONS = {
     text: (e) => `Reminder from ${firstName(e.by)}`,
     dot: 'bg-grey-strong',
   },
+  rescheduled: { text: (e) => `Moved to another day by ${firstName(e.by)}`, dot: 'bg-lavender-strong' },
 };
 
 /** Vertical timeline of a task's history. (bundle: jle) */

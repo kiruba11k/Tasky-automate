@@ -9,14 +9,17 @@ import {
 /** Today's date key if it is a workday, otherwise the snapped workday (the latest selectable date). */
 export const latestWorkday = () => (isWorkday(dayKey(0)) ? dayKey(0) : snapToWorkday(dayKey(0)));
 
-/** Move `date` by `steps` workdays (negative = back), never past the latest workday. */
+/** Furthest day that can be picked: 60 days ahead, to plan around holidays and leave. */
+export const furthestDate = () => addDays(dayKey(0), 60);
+
+/** Move `date` by `steps` workdays (negative = back), never past the furthest pickable day. The picker itself accepts any date. */
 export function stepWorkdays(date, steps) {
   let n = date;
   for (let i = 0; i < Math.abs(steps); i++) {
     do n = addDays(n, Math.sign(steps));
     while (!isWorkday(n));
   }
-  const max = latestWorkday();
+  const max = furthestDate();
   return n > max ? max : n;
 }
 
