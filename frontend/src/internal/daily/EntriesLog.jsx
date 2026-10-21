@@ -305,9 +305,14 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown, asg: shownAsg, carryEdits: record.carryEdits }), [tasks, personId, date, projects, shown, shownAsg, record.carryEdits]);
   /** Today-only changes to a carried-over row (patch: qty / estMin / desc, null removes one; hidden: true removes the row from today). Saved at once. */
   const changeCarried = (rowId, patch) => {
-    const merged = { ...(record.carryEdits?.[rowId] ?? {}), ...patch };
+    // saveDaily replaces a field as a whole, so send the whole map (read fresh, not from this render): changing one row must keep the
+    // other rows' edits.
+    const all = { ...(useStore.getState().daily[`${personId}|${key}`]?.carryEdits ?? {}) };
+    const merged = { ...(all[rowId] ?? {}), ...patch };
     const empty = Object.values(merged).every((v) => v == null || v === false);
-    save({ carryEdits: { [rowId]: empty ? null : Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, v === false ? null : v])) } });
+    if (empty) delete all[rowId];
+    else all[rowId] = Object.fromEntries(Object.entries(merged).filter(([, v]) => v != null && v !== false));
+    save({ carryEdits: all });
   };
   const assignedPids = useMemo(() => new Set(assignedNow.rows.map((r) => r.projectId)), [assignedNow]);
 
