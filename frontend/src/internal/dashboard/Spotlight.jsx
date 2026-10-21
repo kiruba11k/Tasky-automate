@@ -1,4 +1,6 @@
 import { ReadMore } from '@/internal/ui/ReadMore';
+import { MIN_TIMED } from '@/internal/lib/domain';
+import { personStat, completionPct, pickStar, pickProject } from '@/internal/lib/spotlightPick';
 import { useMemo, useState } from 'react';
 import { Sparkles, Trophy, Crown } from 'lucide-react';
 import {
@@ -13,33 +15,13 @@ import {
   nt as personName,
   be as firstName,
   oe as cx,
-  $e as dayKey,
 } from '@/internal/min';
 
-/** Share (%) of the work assigned to a person this month, up to today, that has been done (or null when nothing was assigned). */
-function completionThisMonth(tasks, personId) {
-  const from = `${dayKey(0).slice(0, 7)}-01`;
-  let assigned = 0;
-  let done = 0;
-  tasks.forEach((t) => {
-    if (t.assigneeId !== personId || t.adhoc || t.date < from || t.date > dayKey(0)) return;
-    assigned += t.qty;
-    if (t.status === 'done') done += Math.min(t.qty, t.doneQty ?? t.qty);
-  });
-  return assigned ? Math.round((done / assigned) * 100) : null;
-}
-
 /** Best person of a role this month, ranked by the average of on-time % and assigned-work-done % (or undefined). */
-function topByRole(stats, tasks, role) {
+function topByRole(stats, role) {
   const ids = new Set(PEOPLE.filter((p) => p.role === role).map((p) => p.id));
-  const best = stats
-    .filter((r) => ids.has(r.personId) && r.onTime != null && r.tasks > 0)
-    .map((row) => {
-      const completion = completionThisMonth(tasks, row.personId) ?? 0;
-      return { row, completion, score: (row.onTime + completion) / 2 };
-    })
-    .sort((a, b) => b.score - a.score || b.row.tasks - a.row.tasks)[0];
-  return best ? { ...PEOPLE.find((p) => p.id === best.row.personId), row: best.row, completion: best.completion } : undefined;
+  const row = pickStar(stats.filter((r) => ids.has(r.personId)), MIN_TIMED);
+  return row ? { ...PEOPLE.find((p) => p.id === row.personId), row } : undefined;
 }
 
 /** Monthly "Star Resource / Project of the Month / Star Project Manager" cards with a detail dialog. */
@@ -55,14 +37,10 @@ export function Spotlight() {
     [tasks, daily],
   );
   const winners = useMemo(() => {
-    // ranked by meetings booked, so only projects whose template books meetings compete
-    const project = [...projects.filter((p) => p.status === 'active' && (p.template ?? 'outbound') === 'outbound')].sort(
-      (a, b) =>
-        (b.month.meetings ?? 0) / Math.max(1, b.monthTarget.meetings ?? 0) -
-        (a.month.meetings ?? 0) / Math.max(1, a.monthTarget.meetings ?? 0),
-    )[0];
-    return { resource: topByRole(stats, tasks, 'resource'), pm: topByRole(stats, tasks, 'pm'), project };
-  }, [projects, stats, tasks]);
+    // ranked by progress to this month's targets, whatever the template, so it follows the numbers the day tables feed
+    const project = pickProject(projects, (m) => metricInPeriod(m, 'month'));
+    return { resource: topByRole(stats, 'resource'), pm: topByRole(stats, 'pm'), project: project?.p, projectPct: project?.pct };
+  }, [projects, stats]);
 
   const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
   const cards = [
@@ -72,9 +50,7 @@ export function Spotlight() {
       title: 'Star Resource',
       id: winners.resource?.id,
       name: winners.resource ? personName(winners.resource.id) : 'Not picked yet',
-      stat: winners.resource
-        ? `${winners.resource.row.onTime}% on time · ${winners.resource.completion}% of assigned work done`
-        : '',
+      stat: winners.resource ? personStat(winners.resource.row) : '',
       bg: 'from-[#0E9F6E] via-[#0B7F5B] to-[#065F46]',
     },
     {
@@ -83,7 +59,7 @@ export function Spotlight() {
       title: 'Project of the Month',
       id: undefined,
       name: winners.project?.name ?? 'Not picked yet',
-      stat: winners.project ? `${winners.project.month.meetings ?? 0} meetings booked` : '',
+      stat: winners.project ? `${winners.projectPct}% of this month's targets` : '',
       bg: 'from-[#F59E0B] via-[#D97706] to-[#B45309]',
     },
     {
@@ -92,7 +68,7 @@ export function Spotlight() {
       title: 'Star Project Manager',
       id: winners.pm?.id,
       name: winners.pm ? personName(winners.pm.id) : 'Not picked yet',
-      stat: winners.pm ? `${winners.pm.row.onTime}% on time · ${winners.pm.completion}% of assigned work done` : '',
+      stat: winners.pm ? personStat(winners.pm.row) : '',
       bg: 'from-[#1D3FA0] via-[#2747C9] to-[#4F46E5]',
     },
   ];
@@ -125,7 +101,6 @@ export function Spotlight() {
       </div>
     );
   } else if (person) {
-    const approved = tasks.filter((t) => t.assigneeId === person.id && t.status === 'done').length;
     detail = (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -137,9 +112,9 @@ export function Spotlight() {
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
-            ['On time this month', `${person.row.onTime}%`],
-            ['Tasks done this month', person.row.tasks],
-            ['Tasks approved', approved],
+            ['On time this month', person.row.onTime == null ? 'n/a' : `${person.row.onTime}%`],
+            ['Work done this month', `${person.row.tasks} of ${person.row.assigned}`],
+            ['Assigned work done', completionPct(person.row) == null ? 'n/a' : `${completionPct(person.row)}%`],
           ].map(([label, value]) => (
             <div key={label} className="rounded-xl bg-surface-2 p-3">
               <p className="text-xl font-bold">{value}</p>
