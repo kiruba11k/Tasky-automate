@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardList, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
 import {
   oe as cx,
@@ -216,12 +216,38 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     setUnlocked(false);
     setAdded([]);
   }, [personId, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Edits are saved as they are typed (see the effect below). When the saved rows change underneath (another save, a refresh from
+  // the server) the local rows are only replaced if they hold no edits of their own, so typing is never reset to the old values.
+  const seenEntries = useRef(JSON.stringify(stored));
+  const seenAsg = useRef(JSON.stringify(record.asg ?? {}));
   useEffect(() => {
-    if (!unlocked) setRows(stored);
+    const before = seenEntries.current;
+    seenEntries.current = JSON.stringify(stored);
+    if (!unlocked && JSON.stringify(rows) === before) setRows(stored);
   }, [record.entries]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!unlocked) setAsg(record.asg ?? {});
+    const before = seenAsg.current;
+    seenAsg.current = JSON.stringify(record.asg ?? {});
+    if (!unlocked && JSON.stringify(asg) === before) setAsg(record.asg ?? {});
   }, [record.asg]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-save: whatever is typed in the day's tables is saved a moment later, so Today's targets, the hours and the manager views
+  // follow it live and nothing is lost if the page refreshes. Locking still stamps the lock times.
+  useEffect(() => {
+    if (readOnly) return undefined;
+    const valid = (r) => r.task && (r.task !== CUSTOM_TASK || r.custom?.trim());
+    const kept = rows.filter(valid);
+    const entriesChanged = JSON.stringify(kept) !== JSON.stringify(stored.filter(valid));
+    const asgChanged = JSON.stringify(asg) !== JSON.stringify(record.asg ?? {}) && (Object.keys(asg).length > 0 || !!record.asg);
+    if (!entriesChanged && !asgChanged) return undefined;
+    const timer = setTimeout(() => {
+      try {
+        save({ ...(entriesChanged ? { entries: kept } : {}), ...(asgChanged ? { asg } : {}) });
+      } catch {
+        /* a refused save (for example a locked day) leaves the typed values as they are */
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [rows, asg, readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (readOnly) return undefined;
     const open = () => {
