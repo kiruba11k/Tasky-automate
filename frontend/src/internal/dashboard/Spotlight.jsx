@@ -1,6 +1,6 @@
 import { ReadMore } from '@/internal/ui/ReadMore';
 import { MIN_TIMED } from '@/internal/lib/domain';
-import { personStat, completionPct, pickStar, pickProject } from '@/internal/lib/spotlightPick';
+import { personStat, completionPct, pickStars, pickProject } from '@/internal/lib/spotlightPick';
 import { useMemo, useState } from 'react';
 import { Sparkles, Trophy, Crown } from 'lucide-react';
 import {
@@ -17,91 +17,24 @@ import {
   oe as cx,
 } from '@/internal/min';
 
-/** Best person of a role this month, ranked by the average of on-time % and assigned-work-done % (or undefined). */
+/** Star(s) of a role this month: { people: [{...person, row}], team } (several people when they tie on everything), or undefined. */
 function topByRole(stats, role) {
   const ids = new Set(PEOPLE.filter((p) => p.role === role).map((p) => p.id));
-  const row = pickStar(stats.filter((r) => ids.has(r.personId)), MIN_TIMED);
-  return row ? { ...PEOPLE.find((p) => p.id === row.personId), row } : undefined;
+  const picked = pickStars(stats.filter((r) => ids.has(r.personId)), MIN_TIMED);
+  return picked && { team: !!picked.team, people: picked.rows.map((row) => ({ ...PEOPLE.find((p) => p.id === row.personId), row })) };
 }
 
-/** Monthly "Star Resource / Project of the Month / Star Project Manager" cards with a detail dialog. */
-export function Spotlight() {
-  const projects = useStore((s) => s.projects);
-  const tasks = useStore((s) => s.tasks);
-  useStore((s) => s.profiles);
-  const [openKey, setOpenKey] = useState(null);
-  const daily = useStore((s) => s.daily);
+/** Card text for a role's stars: shared names, the first one's avatar and stats, or a whole-team note when no one stands out. */
+function starCard(star) {
+  if (!star) return { id: undefined, name: 'Not picked yet', stat: '' };
+  if (star.team) return { id: undefined, name: 'Whole team', stat: 'Everyone is level this month' };
+  const first = star.people[0];
+  return { id: first.id, name: star.people.map((p) => firstName(p.id)).join(' & '), stat: personStat(first.row) };
+}
 
-  const stats = useMemo(
-    () => buildPeopleStats({ tasks, daily }, 'month', 'current', { people: PEOPLE.map((p) => p.id) }),
-    [tasks, daily],
-  );
-  const winners = useMemo(() => {
-    // ranked by progress to this month's targets, whatever the template, so it follows the numbers the day tables feed
-    const project = pickProject(projects, (m) => metricInPeriod(m, 'month'));
-    return { resource: topByRole(stats, 'resource'), pm: topByRole(stats, 'pm'), project: project?.p, projectPct: project?.pct };
-  }, [projects, stats]);
-
-  const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
-  const cards = [
-    {
-      key: 'resource',
-      icon: Sparkles,
-      title: 'Star Resource',
-      id: winners.resource?.id,
-      name: winners.resource ? personName(winners.resource.id) : 'Not picked yet',
-      stat: winners.resource ? personStat(winners.resource.row) : '',
-      bg: 'from-[#0E9F6E] via-[#0B7F5B] to-[#065F46]',
-    },
-    {
-      key: 'project',
-      icon: Trophy,
-      title: 'Project of the Month',
-      id: undefined,
-      name: winners.project?.name ?? 'Not picked yet',
-      stat: winners.project ? `${winners.projectPct}% of this month's targets` : '',
-      bg: 'from-[#F59E0B] via-[#D97706] to-[#B45309]',
-    },
-    {
-      key: 'pm',
-      icon: Crown,
-      title: 'Star Project Manager',
-      id: winners.pm?.id,
-      name: winners.pm ? personName(winners.pm.id) : 'Not picked yet',
-      stat: winners.pm ? personStat(winners.pm.row) : '',
-      bg: 'from-[#1D3FA0] via-[#2747C9] to-[#4F46E5]',
-    },
-  ];
-
-  const person = openKey === 'resource' ? winners.resource : openKey === 'pm' ? winners.pm : undefined;
-  const weeklySeries = person ? personSeries({ tasks, daily }, person.id, 'week', 'onTime', 8) : [];
-
-  let detail = null;
-  if (openKey === 'project' && winners.project) {
-    const project = winners.project;
-    detail = (
-      <div className="space-y-3">
-        <ReadMore text={project.description} className="text-sm text-muted" />
-        <p className="text-sm">
-          Led by <b>{firstName(project.pmId)}</b> · team {project.teamIds.map(firstName).join(', ')}
-        </p>
-        {project.metrics
-          .filter((m) => metricInPeriod(m, 'month'))
-          .map((m) => (
-            <div key={m.id} className="text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted">{m.label} this month</span>
-                <b>
-                  {project.month[m.id] ?? 0} / {project.monthTarget[m.id] ?? 0}
-                </b>
-              </div>
-              <ProgressBar value={project.month[m.id] ?? 0} max={project.monthTarget[m.id] ?? 0} tone="sky" />
-            </div>
-          ))}
-      </div>
-    );
-  } else if (person) {
-    detail = (
+/** One star's numbers and their eight-week on-time bars. */
+function PersonDetail({ person, series: weeklySeries }) {
+  return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Avatar id={person.id} size="lg" />
@@ -133,6 +66,91 @@ export function Spotlight() {
             />
           ))}
         </div>
+      </div>
+  );
+}
+
+/** Monthly "Star Resource / Project of the Month / Star Project Manager" cards with a detail dialog. */
+export function Spotlight() {
+  const projects = useStore((s) => s.projects);
+  const tasks = useStore((s) => s.tasks);
+  useStore((s) => s.profiles);
+  const [openKey, setOpenKey] = useState(null);
+  const daily = useStore((s) => s.daily);
+
+  const stats = useMemo(
+    () => buildPeopleStats({ tasks, daily }, 'month', 'current', { people: PEOPLE.map((p) => p.id) }),
+    [tasks, daily],
+  );
+  const winners = useMemo(() => {
+    // ranked by progress to this month's targets, whatever the template, so it follows the numbers the day tables feed
+    const project = pickProject(projects, (m) => metricInPeriod(m, 'month'));
+    return { resource: topByRole(stats, 'resource'), pm: topByRole(stats, 'pm'), project: project?.p, projectPct: project?.pct };
+  }, [projects, stats]);
+
+  const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
+  const cards = [
+    {
+      key: 'resource',
+      icon: Sparkles,
+      title: 'Star Resource',
+      ...starCard(winners.resource),
+      bg: 'from-[#0E9F6E] via-[#0B7F5B] to-[#065F46]',
+    },
+    {
+      key: 'project',
+      icon: Trophy,
+      title: 'Project of the Month',
+      id: undefined,
+      name: winners.project?.name ?? 'Not picked yet',
+      stat: winners.project ? `${winners.projectPct}% of this month's targets` : '',
+      bg: 'from-[#F59E0B] via-[#D97706] to-[#B45309]',
+    },
+    {
+      key: 'pm',
+      icon: Crown,
+      title: 'Star Project Manager',
+      ...starCard(winners.pm),
+      bg: 'from-[#1D3FA0] via-[#2747C9] to-[#4F46E5]',
+    },
+  ];
+
+  const star = openKey === 'resource' ? winners.resource : openKey === 'pm' ? winners.pm : undefined;
+  const people = star?.people ?? [];
+
+  let detail = null;
+  if (openKey === 'project' && winners.project) {
+    const project = winners.project;
+    detail = (
+      <div className="space-y-3">
+        <ReadMore text={project.description} className="text-sm text-muted" />
+        <p className="text-sm">
+          Led by <b>{firstName(project.pmId)}</b> · team {project.teamIds.map(firstName).join(', ')}
+        </p>
+        {project.metrics
+          .filter((m) => metricInPeriod(m, 'month'))
+          .map((m) => (
+            <div key={m.id} className="text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted">{m.label} this month</span>
+                <b>
+                  {project.month[m.id] ?? 0} / {project.monthTarget[m.id] ?? 0}
+                </b>
+              </div>
+              <ProgressBar value={project.month[m.id] ?? 0} max={project.monthTarget[m.id] ?? 0} tone="sky" />
+            </div>
+          ))}
+      </div>
+    );
+  } else if (star?.team) {
+    detail = <p className="text-sm text-muted">Everyone with enough timed work is level on score, hours and tasks, so no one is singled out this month.</p>;
+  } else if (people.length) {
+    detail = (
+      <div className="space-y-6">
+        {people.length > 1 && <p className="text-sm text-muted">Level on score, hours worked and tasks done, so they share the title.</p>}
+        {people.map((person) => (
+      <PersonDetail key={person.id} person={person} series={personSeries({ tasks, daily }, person.id, 'week', 'onTime', 8)} />
+        ))}
       </div>
     );
   }

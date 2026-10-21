@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { completionPct, personStat, pickStar, projectProgress, pickProject } from './spotlightPick.js';
+import { completionPct, personStat, pickStar, pickStars, projectProgress, pickProject } from './spotlightPick.js';
 
 test('completion comes from all counted work and is not shown when nothing was assigned', () => {
   assert.equal(completionPct({ tasks: 5, assigned: 10 }), 50);
@@ -35,4 +35,13 @@ test('equal scores go to more hours worked (big tasks vs many small ones), then 
   const small = { personId: 'b', onTime: 100, tasks: 9, assigned: 9, timed: 9, hours: 20 };
   assert.equal(pickStar([big, small], 3).personId, 'a');
   assert.equal(pickStar([small, { ...small, personId: 'c', tasks: 12 }], 3).personId, 'c');
+});
+
+test('a full tie shares the title; when everyone or too many tie, no one stands out', () => {
+  const r = (id, over = {}) => ({ personId: id, onTime: 90, tasks: 5, assigned: 5, timed: 5, hours: 10, ...over });
+  assert.deepEqual(pickStars([r('a'), r('b'), r('c', { hours: 5 })], 3).rows.map((x) => x.personId), ['a', 'b']);
+  assert.deepEqual(pickStars([r('a'), r('b')], 3).rows.length, 2);
+  assert.equal(pickStars([r('a'), r('b'), r('c')], 3).team, true);
+  assert.equal(pickStars([r('a'), r('b'), r('c'), r('d'), r('e', { hours: 1 })], 3).team, true);
+  assert.equal(pickStars([r('a', { timed: 1 })], 3), undefined);
 });
