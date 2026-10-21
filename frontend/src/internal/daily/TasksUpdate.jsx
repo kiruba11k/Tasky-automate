@@ -14,7 +14,7 @@ import {
 } from '@/internal/min';
 import { leaveLabel, leaveOn } from '../lib/leave.js';
 import { emptyDaily } from '../lib/domain.js';
-import { dayRowsWithAssigned } from '../lib/assigned.js';
+import { dayCarryEdits, dayRowsWithAssigned } from '../lib/assigned.js';
 import { assignedMinutesByProject, autoPlanBlocks } from '../lib/autoPlan.js';
 import { changeProject } from '../lib/changeProject.js';
 import { PROJECT_CHANGED } from './ProjectChanger';
@@ -80,7 +80,7 @@ export function TasksUpdate() {
     const sameExtra = (a, b) => (a ?? []).map((x) => `${x.id}|${x.minutes}`).join() === (b ?? []).map((x) => `${x.id}|${x.minutes}`).join();
     const byStart = (l) => blocksKey([...l].sort((a, b) => a.start.localeCompare(b.start)));
     if (byStart(plan) !== byStart(r.plan ?? []) || !sameExtra(extra, r.extra)) return; // unsaved edits in the builder
-    const assigned = assignedMinutesByProject(st.tasks, me, date, { projects: st.projects });
+    const assigned = assignedMinutesByProject(st.tasks, me, date, { projects: st.projects, carryEdits: dayCarryEdits(st.daily, me, date) });
     const names = Object.fromEntries(st.projects.map((p) => [p.id, p.name]));
     const res = autoPlanBlocks({
       plan: r.plan ?? [],
@@ -100,7 +100,7 @@ export function TasksUpdate() {
     const total = Object.values(res.added).reduce((a, b) => a + b, 0);
     const first = Object.keys(res.added).length === 1 ? ` ${names[Object.keys(res.added)[0]] ?? ''}` : '';
     toast({ title: `Added ${formatMinutes(total)}${first} from tasks assigned to you`, tone: 'success' });
-  }, [tasks, me, date, projects, profiles, editable, planLocked, record.plan, record.extra, record.autoPlanned, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tasks, me, date, projects, profiles, editable, planLocked, record.plan, record.extra, record.autoPlanned, record.carryEdits, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Change the project of one block / extra row (or, with no id, of every block of `from`), also when the day is locked or sent.
@@ -115,7 +115,7 @@ export function TasksUpdate() {
         extra: nonEmptyExtras(extra),
         entries: r.entries ?? [],
         autoPlanned: r.autoPlanned ?? {},
-        assigned: assignedMinutesByProject(st.tasks, me, date, { projects: st.projects }),
+        assigned: assignedMinutesByProject(st.tasks, me, date, { projects: st.projects, carryEdits: dayCarryEdits(st.daily, me, date) }),
         projects: st.projects,
         from,
         to,

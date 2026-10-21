@@ -52,7 +52,20 @@ const STATUS_LABEL = { todo: 'To do', in_progress: 'In progress', in_review: 'In
  * A task assigned to the person, in the project's day table. The row comes from the task itself (never saved with the day's rows);
  * what the person types on it, the time taken and a note, is kept in the day record's `asg`.
  */
-function AssignedRow({ r, project, showRemoveCell, locked, onType }) {
+function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, onChange, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState({});
+  const carried = !!r.carriedFrom;
+  const startEdit = () => {
+    setDraft({ qty: r.qty ?? 0, estMin: r.estMin, desc: r.titles.filter((t) => t && t !== r.label).join('; ') });
+    setAsking(false);
+    setEditing(true);
+  };
+  const saveEdit = () => {
+    onChange({ qty: Number(draft.qty) >= 0 ? Number(draft.qty) : 0, estMin: draft.estMin > 0 ? draft.estMin : 0, desc: draft.desc?.trim() || null });
+    setEditing(false);
+  };
   const by = r.assignedBy.map((id) => personName(id).split(' ')[0]).join(', ');
   const titles = r.titles.filter((t) => t && t !== r.label);
   const status = [...new Set(r.statuses.map((s) => STATUS_LABEL[s] ?? s))].join(', ');
@@ -74,14 +87,37 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType }) {
         </span>
         <span className="font-medium">
           {entryName(r, project)}
-          {titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
+          {!editing && titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
         </span>
+        {editing && (
+          <input aria-label="Task description" className={cx(FIELD, 'mt-1')} placeholder="Description (today only)" value={draft.desc ?? ''} onChange={(e) => setDraft((d) => ({ ...d, desc: e.target.value }))} />
+        )}
+        {r.edited && !editing && (
+          <span className="mt-0.5 block text-[10px] text-muted" data-testid="carry-edited" title="Changed for today only. Earlier days keep the original.">
+            edited for today only
+          </span>
+        )}
+        {asking && (
+          <span className="mt-1 flex items-center gap-1.5 text-xs" data-testid="carry-confirm">
+            Remove from today?
+            <button className="focus-ring rounded-full border border-line px-2 py-0.5 font-semibold text-coral-ink hover:bg-surface-2" onClick={onRemove}>
+              Yes
+            </button>
+            <button className="focus-ring rounded-full border border-line px-2 py-0.5 font-semibold hover:bg-surface-2" onClick={() => setAsking(false)}>
+              No
+            </button>
+          </span>
+        )}
       </td>
       <td className="px-2 py-2">
         <EntryKindSelect value="number" disabled />
       </td>
       <td className="px-2 py-2">
-        <span className="tabular-nums">{r.qty || '·'}</span>
+        {editing ? (
+          <input aria-label="Target" type="number" min={0} className={cx(FIELD, 'w-24')} value={draft.qty} onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))} />
+        ) : (
+          <span className="tabular-nums">{r.qty || '·'}</span>
+        )}
       </td>
       <td className="px-2 py-2">
         <span className="tabular-nums" title="Fills in with the approved number">
@@ -90,7 +126,11 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType }) {
         </span>
       </td>
       <td className="px-2 py-2">
-        <span className="tabular-nums">{formatMinutes(r.estMin)}</span>
+        {editing ? (
+          <DurationInput label="Estimated time" placeholder="..." value={draft.estMin} onChange={(m) => setDraft((d) => ({ ...d, estMin: m ?? 0 }))} />
+        ) : (
+          <span className="tabular-nums">{formatMinutes(r.estMin)}</span>
+        )}
       </td>
       <td className="px-2 py-2">
         {locked ? (
@@ -106,7 +146,43 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType }) {
           <input aria-label="Notes" className={FIELD} placeholder="Add note..." value={r.remarks ?? ''} onChange={(e) => onType({ remarks: e.target.value })} />
         )}
       </td>
-      {showRemoveCell && <td />}
+      {showRemoveCell && (
+        <td className="whitespace-nowrap py-2 pr-2">
+          {carried && canChange && editing && (
+            <>
+              <button aria-label="Save task" title="Save (today only)" className="focus-ring rounded-lg p-1.5 text-accent-ink hover:bg-surface-2" onClick={saveEdit}>
+                <Check size={14} />
+              </button>
+              {r.edited && (
+                <button
+                  aria-label="Reset task"
+                  title="Back to the original task numbers"
+                  className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2"
+                  onClick={() => {
+                    onChange({ qty: null, estMin: null, desc: null });
+                    setEditing(false);
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+              <button aria-label="Cancel edit" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2" onClick={() => setEditing(false)}>
+                <X size={14} />
+              </button>
+            </>
+          )}
+          {carried && canChange && !editing && (
+            <>
+              <button aria-label="Edit task" title="Edit for today only" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={startEdit}>
+                <Pencil size={14} />
+              </button>
+              <button aria-label="Delete task" title="Remove from today" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink" onClick={() => setAsking(true)}>
+                <Trash size={14} />
+              </button>
+            </>
+          )}
+        </td>
+      )}
     </tr>
   );
 }
@@ -178,7 +254,13 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const targetsEditable = !readOnly && !targetsLocked;
   // Tasks assigned to this person for the day (and unfinished ones carried over to today): read-only rows next to the logged ones.
   const shownAsg = readOnly ? (record.asg ?? {}) : asg;
-  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown, asg: shownAsg }), [tasks, personId, date, projects, shown, shownAsg]);
+  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown, asg: shownAsg, carryEdits: record.carryEdits }), [tasks, personId, date, projects, shown, shownAsg, record.carryEdits]);
+  /** Today-only changes to a carried-over row (patch: qty / estMin / desc, null removes one; hidden: true removes the row from today). Saved at once. */
+  const changeCarried = (rowId, patch) => {
+    const merged = { ...(record.carryEdits?.[rowId] ?? {}), ...patch };
+    const empty = Object.values(merged).every((v) => v == null || v === false);
+    save({ carryEdits: { [rowId]: empty ? null : Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, v === false ? null : v])) } });
+  };
   const assignedPids = useMemo(() => new Set(assignedNow.rows.map((r) => r.projectId)), [assignedNow]);
 
   // Projects with a table, and the time planned for each (from the plan and the extra hours).
@@ -533,7 +615,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       <th className="min-w-[11rem] px-2 py-2">
                         Notes <span className="font-normal normal-case">(optional)</span>
                       </th>
-                      {targetsEditable && <th className="w-8" />}
+                      {targetsEditable && <th className="w-20" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -711,7 +793,16 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       );
                     })}
                     {assignedMine.map((r) => (
-                      <AssignedRow key={r.id} r={r} project={project} showRemoveCell={targetsEditable} locked={actualsReadOnly} onType={(patch) => typeOnAssigned(r, patch)} />
+                      <AssignedRow
+                        key={r.id}
+                        r={r} project={project} showRemoveCell={targetsEditable} locked={actualsReadOnly} onType={(patch) => typeOnAssigned(r, patch)}
+                        canChange={targetsEditable}
+                        onChange={(patch) => changeCarried(r.id, patch)}
+                        onRemove={() => {
+                          changeCarried(r.id, { hidden: true });
+                          toast({ title: 'Removed from today. The task stays assigned.', tone: 'info' });
+                        }}
+                      />
                     ))}
                   </tbody>
                   <tfoot>
@@ -745,6 +836,25 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
           );
         })}
       </div>
+      {assignedNow.hidden.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 text-xs" data-testid="carry-removed">
+          <span className="font-semibold text-muted">Removed from today ({assignedNow.hidden.length})</span>
+          {assignedNow.hidden.map((h) => (
+            <span key={h.id} className="flex items-center gap-1.5 rounded-full border border-line bg-surface-2/60 py-0.5 pl-2.5 pr-1">
+              {h.titles.filter(Boolean)[0] ?? h.label}
+              {!readOnly && targetsEditable && (
+                <button
+                  aria-label={`Restore ${h.titles.filter(Boolean)[0] ?? h.label}`}
+                  className="focus-ring rounded-full px-2 py-0.5 font-semibold text-accent-ink hover:bg-surface"
+                  onClick={() => changeCarried(h.id, { hidden: false })}
+                >
+                  Restore
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3" aria-label="Add a project">
           <span className="text-sm font-semibold">Worked on something else?</span>
