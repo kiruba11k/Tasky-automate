@@ -85,6 +85,17 @@ export function asgProblem(doc) {
   return ok ? null : 'A time or note on an assigned task is not valid.';
 }
 
+/** Why today-only edits of carried-over task rows ("carryEdits": { rowId: { qty, estMin, desc, hidden } }) are refused, or null. */
+export function carryEditsProblem(doc) {
+  if (doc?.carryEdits === undefined) return null;
+  const c = doc.carryEdits;
+  const ok = c && typeof c === 'object' && !Array.isArray(c) && Object.keys(c).length <= 300
+    && Object.entries(c).every(([id, v]) => id.length > 0 && id.length <= 200 && v && typeof v === 'object' && !Array.isArray(v)
+      && Object.keys(v).every((k) => ['qty', 'estMin', 'desc', 'hidden'].includes(k))
+      && count(v.qty) && count(v.estMin) && short(v.desc, 500) && (v.hidden === undefined || typeof v.hidden === 'boolean'));
+  return ok ? null : 'A change to a carried-over task is not valid.';
+}
+
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Why a day's lunch break is refused, or null. It is a start and an end time within the working day. */
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -132,7 +143,7 @@ export function dailyProblem(patch) {
   if (!stamps.every((k) => when(doc[k]))) return 'A time of sending is not valid.';
   if (doc.planAt !== undefined && !(typeof doc.planAt === 'string' && doc.planAt.length <= 40 && !Number.isNaN(Date.parse(doc.planAt)))) return 'The time the plan was locked is not valid.'; // ISO text, or absent when unlocked
   if (!['sodNote', 'eodNote'].every((k) => text(doc[k], 5000))) return 'A note is too long.';
-  if (!['sodTargets', 'eodActuals', 'eodSnapshot', 'snapshots', 'asg'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A day record is not valid.';
+  if (!['sodTargets', 'eodActuals', 'eodSnapshot', 'snapshots', 'asg', 'carryEdits'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A day record is not valid.';
   return null;
 }
 export function weeklyProblem(patch) {
@@ -391,7 +402,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
-        const why = entriesProblem(data) || asgProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) : weeklyProblem(patch));
+        const why = entriesProblem(data) || asgProblem(data) || carryEditsProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) : weeklyProblem(patch));
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'profile') {

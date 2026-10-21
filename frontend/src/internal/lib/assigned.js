@@ -20,9 +20,11 @@ export const isCarriedOver = (task, date, today = todayKey(0)) => date === today
  * The assigned rows of one person for one day: { rows, covers }. `rows` are read-only rows (assigned: true) in the shape of a
  * logged row, per project and kind of work, with the part the `logged` rows do not already cover. `covers` maps the id of a
  * logged row to the assigned tasks it stands in for. `carry: false` leaves out the carried-over tasks (used for week sums, where
- * the task is already on its own day).
+ * the task is already on its own day). `carryEdits` ({ rowId: { qty, estMin, desc, hidden } }, saved in that day's record) are
+ * the person's changes to the carried-over part of a row for this day only: the tasks and the earlier days are never touched.
+ * `hidden` lists the carried rows the person removed from today (so they can be restored).
  */
-export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true, asg = {} } = {}) {
+export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true, asg = {}, carryEdits = {} } = {}) {
   const buckets = new Map();
   tasks.forEach((t) => {
     if (t.assigneeId !== personId) return;
@@ -32,11 +34,16 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
     const planned = t.date === date || carried; // the target belongs to the assigned (or carried-over) day
     const k = taskBreakdownKey(t);
     const id = `${t.projectId}|${k.key}`;
-    const b = buckets.get(id) ?? { id, k, projectId: t.projectId, tasks: [], qty: 0, done: 0, est: 0, minutes: 0, approved: false };
+    const b = buckets.get(id) ?? { id, k, projectId: t.projectId, tasks: [], qty: 0, done: 0, est: 0, minutes: 0, approved: false, cQty: 0, cEst: 0, cTasks: 0 };
     b.tasks.push({ t, carried: t.date !== date });
     if (planned) {
       b.qty += t.qty ?? 0;
       b.est += t.targetMinutes ?? 0;
+      if (carried && t.date !== date) {
+        b.cQty += t.qty ?? 0; // the carried-over part, the only part today's changes apply to
+        b.cEst += t.targetMinutes ?? 0;
+        b.cTasks++;
+      }
     }
     if (finishedHere) {
       if (t.status === "done") {
@@ -67,6 +74,25 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
   buckets.forEach((b) => projectMinutes.set(b.projectId, (projectMinutes.get(b.projectId) ?? 0) + b.minutes));
   const rows = [];
   const covers = new Map();
+  const hidden = [];
+  const edits = carryEdits ?? {};
+  buckets.forEach((b) => {
+    const e = b.cTasks ? edits[`asg|${personId}|${date}|${b.id}`] : undefined;
+    if (!e) return;
+    const all = b.tasks.every((x) => x.carried);
+    if (e.hidden) {
+      hidden.push({ id: `asg|${personId}|${date}|${b.id}`, projectId: b.projectId, label: b.k.label, titles: b.tasks.filter((x) => x.carried).map((x) => x.t.title), qty: b.cQty, estMin: b.cEst });
+      b.qty -= b.cQty;
+      b.est -= b.cEst;
+      b.tasks = b.tasks.filter((x) => !x.carried);
+      if (!b.tasks.length) buckets.delete(b.id);
+      return;
+    }
+    if (e.qty != null) b.qty += e.qty - b.cQty;
+    if (e.estMin != null) b.est += e.estMin - b.cEst;
+    if (e.desc) b.desc = e.desc;
+    b.edited = all && (e.qty != null || e.estMin != null || !!e.desc);
+  });
   [...buckets.values()]
     .sort((a, b) => a.k.order - b.k.order || a.k.label.localeCompare(b.k.label))
     .forEach((b) => {
@@ -97,7 +123,8 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         typedMin,
         remarks: typed?.remarks ?? "",
         taskIds: b.tasks.map((x) => x.t.id),
-        titles: b.tasks.map((x) => x.t.title),
+        titles: b.desc && b.tasks.every((x) => x.carried) ? [b.desc] : b.tasks.map((x) => x.t.title),
+        edited: !!b.edited,
         assignedBy: [...new Set(b.tasks.map((x) => x.t.assignedById).filter(Boolean))],
         priority: b.tasks.some((x) => x.t.priority),
         statuses: b.tasks.map((x) => x.t.status),
@@ -110,13 +137,16 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
       }
       rows.push(row);
     });
-  return { rows, covers };
+  return { rows, covers, hidden };
 }
+
+/** Today's changes to the carried-over rows of a person's day: { rowId: { qty, estMin, desc, hidden } }. */
+export const dayCarryEdits = (daily, personId, date) => daily?.[`${personId}|${date}`]?.carryEdits ?? {};
 
 /** A person's logged rows for a day followed by the assigned rows they do not cover. */
 export function dayRowsWithAssigned(tasks, daily, personId, date, opts = {}) {
   const logged = dayEntries(daily, personId, date);
-  return [...logged, ...assignedDay(tasks ?? [], personId, date, { ...opts, logged, asg: dayAsg(daily, personId, date) }).rows];
+  return [...logged, ...assignedDay(tasks ?? [], personId, date, { carryEdits: dayCarryEdits(daily, personId, date), ...opts, logged, asg: dayAsg(daily, personId, date) }).rows];
 }
 
 /** The assigned rows (no carried-over copies) of Monday to Friday of the week of `monday`, to add to the week's rows. */

@@ -2,7 +2,7 @@ import test, { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, bootstrapAdmin } from '../src/app.js';
 import { MemoryStore } from '../src/store.js';
-import { entriesProblem, asgProblem, taskLinksProblem, lunchProblem, dailyProblem } from '../src/tracker.js';
+import { entriesProblem, asgProblem, carryEditsProblem, taskLinksProblem, lunchProblem, dailyProblem } from '../src/tracker.js';
 
 test('links and task rows are checked', () => {
   assert.equal(taskLinksProblem({}), null);
@@ -135,4 +135,17 @@ test('time and notes typed on assigned rows of a day are checked', () => {
   assert.ok(asgProblem({ asg: { a: { projectId: 'p', actualMin: -1 } } }));
   assert.ok(asgProblem({ asg: { a: { actualMin: 5 } } }));
   assert.ok(asgProblem({ asg: { a: { projectId: 'p', remarks: 'x'.repeat(1001) } } }));
+});
+
+test('today-only edits of carried-over rows are checked', () => {
+  const ok = { 'asg|u|2026-10-16|p|l1': { qty: 3, estMin: 20, desc: 'fewer today' }, 'asg|u|2026-10-16|p|l2': { hidden: true } };
+  assert.equal(carryEditsProblem({}), null);
+  assert.equal(carryEditsProblem({ carryEdits: ok }), null);
+  assert.ok(carryEditsProblem({ carryEdits: 'x' }));
+  assert.ok(carryEditsProblem({ carryEdits: [] }));
+  assert.ok(carryEditsProblem({ carryEdits: { a: { qty: -1 } } }));
+  assert.ok(carryEditsProblem({ carryEdits: { a: { hidden: 'yes' } } }));
+  assert.ok(carryEditsProblem({ carryEdits: { a: { other: 1 } } }));
+  assert.ok(carryEditsProblem({ carryEdits: { a: { desc: 'x'.repeat(501) } } }));
+  assert.ok(carryEditsProblem({ carryEdits: { ['k'.repeat(201)]: { qty: 1 } } }));
 });
