@@ -130,7 +130,30 @@ export function PeriodPlan({ p, api, period, ws, title, prevTitle, prev, onSave 
             <tr key={m.id} className="border-t border-line">
               <td className="px-3 py-1.5 font-medium">{m.label}</td>
               <td className="px-2 py-1.5">
-                <KindBadge kind="number" />
+                {edit ? (
+                  <select
+                    aria-label={`${m.label} type`}
+                    className={TABLE_INPUT_CLASS}
+                    value="number"
+                    // a project number stays a number; Milestone or Text turns it into a target of that type with the same name
+                    onChange={(e) =>
+                      e.target.value !== 'number' &&
+                      setEdit({
+                        ...edit,
+                        off: [...edit.off, m.id],
+                        rows: [...edit.rows, { id: newTargetId(edit.rows.length), label: m.label, target: '', kind: e.target.value }],
+                      })
+                    }
+                  >
+                    {TARGET_KINDS.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <KindBadge kind="number" />
+                )}
               </td>
               <td className="px-2 py-1.5">
                 {edit ? (
