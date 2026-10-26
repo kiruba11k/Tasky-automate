@@ -8,6 +8,7 @@ import {
   newTargetId,
   targetKind,
 } from './targetKinds';
+import { TargetSheet } from './TargetSheet';
 
 /** The targets table of one week / month: project numbers plus custom Number / Milestone / Text targets. */
 export function PeriodPlan({ p, api, period, ws, title, prevTitle, prev, onSave }) {
@@ -100,6 +101,21 @@ export function PeriodPlan({ p, api, period, ws, title, prevTitle, prev, onSave 
           )}
         </span>
       </div>
+      {!edit && saved && shown.length + rows.length > 0 ? (
+        <TargetSheet
+          title={`${title} targets`}
+          heading={title}
+          columns={['Target', 'Type', 'Goal']}
+          rows={[
+            ...shown.map((m) => [m.label, 'Number', String(plan[m.id] ?? 0)]),
+            ...rows.map((r) => {
+              const kind = targetKind(r);
+              return [r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
+            }),
+          ]}
+          filename={`${p.name}-${title}-targets.png`}
+        />
+      ) : (
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -224,6 +240,7 @@ export function PeriodPlan({ p, api, period, ws, title, prevTitle, prev, onSave 
           })}
         </tbody>
       </table>
+      )}
       {edit && (
         <div className="flex flex-wrap items-center border-t border-line px-3 py-2">
           <button

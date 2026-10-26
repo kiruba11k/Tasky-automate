@@ -12,6 +12,7 @@ import {
 import { ProgressBar } from '../ui/ProgressBar';
 import { weekTargetFor } from '@/internal/lib/domain';
 import { formatDayMonth, todayKey } from '@/internal/lib/dates';
+import { TargetSheet } from './TargetSheet';
 import { TABLE_INPUT_CLASS, MILESTONE_STATUSES, sortedWeeks, targetKind } from './targetKinds';
 
 const ACHIEVED_INPUT_CLASS =
@@ -138,6 +139,26 @@ function WeekNumbersTable({ p, canEdit }) {
       </div>
       {metrics.length + current.rows.length === 0 ? (
         <p className="text-sm text-muted">No targets for this week. Set them in the Targets tab.</p>
+      ) : !editable ? (
+        <TargetSheet
+          title="This week's numbers"
+          heading={week ? `${formatDayMonth(week.start)} to ${formatDayMonth(week.end)}` : "This week's numbers"}
+          columns={['Target', 'Goal', 'Achieved', '%']}
+          rows={[
+            ...metrics.map((m) => {
+              const goal = goals[m.id] ?? 0;
+              const value = +current.m[m.id] || 0;
+              return [m.label, String(goal), String(value), goal ? `${Math.round((value / goal) * 100)}%` : '·'];
+            }),
+            ...current.rows.map((r) => {
+              const kind = targetKind(r);
+              return kind === 'number'
+                ? [r.label, String(r.targetNum ?? 0), String(r.actualNum ?? 0), r.targetNum ? `${Math.round(((r.actualNum ?? 0) / r.targetNum) * 100)}%` : '·']
+                : [r.label, r.target || '·', kind === 'milestone' ? (r.status ?? 'Not started') : r.actual || '·', '·'];
+            }),
+          ]}
+          filename={`${p.name}-week-numbers.png`}
+        />
       ) : (
         <table className="w-full text-sm" aria-label="This week's numbers">
           <thead>
