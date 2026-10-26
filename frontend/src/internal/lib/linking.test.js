@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { targetVsActualRows, dailySnapshot, weeklySnapshot, dayHours, personMetrics, dayLoggedMinutes, timeBreakdown } from './domain.js';
-import { loggedKpiExtras } from './entries.js';
+import { loggedKpiExtras, rowKey } from './entries.js';
 
 const P = 'p1'; const ME = 'me';
 const row = (o) => ({ id: 'e' + Math.random(), projectId: P, task: 'l2', desc: '', estMin: 0, ...o });
@@ -31,6 +31,13 @@ test('weekly rows give the week its target, and achieved adds up from the days u
   assert.deepEqual([r.target, r.actual], [40, 15]);
   const typed = weeklySnapshot([], ME, '2026-10-12', { entries: [row({ qty: 40, doneQty: 30 })] }, 'now', { daily, projects: [] });
   assert.equal(Object.values(typed.byType)[0].actual, 30);
+});
+
+test('numbers typed over a row in the weekly table (target and achieved) reach the end of week, even after it was sent', () => {
+  const daily = { [`${ME}|2026-10-12`]: { entries: [row({ qty: 10, doneQty: 8 })] } };
+  const week = { entries: [row({ qty: 40 })], overrides: { [rowKey(row({}))]: { qty: 25, doneQty: 22 } } };
+  const r = Object.values(weeklySnapshot([], ME, '2026-10-12', week, 'now', { daily, projects: [] }).byType)[0];
+  assert.deepEqual([r.target, r.actual], [25, 22]);
 });
 
 test('actual time typed in a project table is the day\'s actual for that project', () => {

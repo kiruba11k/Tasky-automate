@@ -14,7 +14,8 @@ import {
   weekStart,
   WEEKDAY_SHORT,
 } from "./dates.js";
-import { entryAsTask, entriesBetween, weeklyDone, dayEntries, dayAsg, plannedWeekTargets, rowDoneCount, CUSTOM_TASK } from "./entries.js";
+import { entryAsTask, entriesBetween, weeklyDone, weekRows, rowKey, dayEntries, dayAsg, plannedWeekTargets, rowDoneCount, CUSTOM_TASK } from "./entries.js";
+import { weekAssignedRows } from "./assigned.js";
 import {
   PEOPLE,
   TASK_TYPES,
@@ -531,6 +532,23 @@ export function targetVsActualRows(tasks, assigneeId, from, to, opts = {}) {
       perKind.set(id, cur);
     });
   }
+  // numbers typed over a row in the Weekly update table (its target and achieved) replace what was added up for that row
+  if (opts.weeklyOverrides && assigneeId && Object.keys(opts.weeklyOverrides).length) {
+    const monday = weekStart(from);
+    const assignedRows = weekAssignedRows(tasks, opts.daily ?? {}, assigneeId, monday, { projects: opts.projects });
+    const base = weekRows(assigneeId, monday, opts.daily ?? {}, opts.weeklyEntries ?? [], {}, assignedRows);
+    const cellOf = (row) => `${row.projectId}|${taskBreakdownKey(entryAsTask(row, projectOf(row.projectId))).key}`;
+    const rowsPerCell = new Map();
+    base.forEach((row) => rowsPerCell.set(cellOf(row), (rowsPerCell.get(cellOf(row)) ?? 0) + 1));
+    base.forEach((row) => {
+      const typed = opts.weeklyOverrides[rowKey(row)];
+      const cur = typed && perKind.get(cellOf(row));
+      if (!cur) return;
+      const alone = rowsPerCell.get(cellOf(row)) === 1; // the typed number is then the whole figure; with several rows it moves it by the difference
+      if (typed.qty != null) cur.target = Math.max(0, alone ? typed.qty : cur.target + typed.qty - (row.qty ?? 0));
+      if (typed.doneQty != null) cur.actual = Math.max(0, alone ? typed.doneQty : cur.actual + typed.doneQty - (row.doneQty ?? 0));
+    });
+  }
   const rows = new Map();
   perKind.forEach(({ k, target, actual }) => {
     const row = rows.get(k.key) ?? { key: k.key, label: k.label, unit: k.unit, target: 0, actual: 0, pct: 0, order: k.order };
@@ -576,7 +594,7 @@ export function dailySnapshot(tasks, personId, day, daily, at, ctx = {}) {
 export function weeklySnapshot(tasks, personId, week, weekly, at, ctx = {}) {
   const monday = weekStart(week);
   return buildSnapshot(
-    targetVsActualRows(tasks, personId, monday, addDays(monday, 6), { daily: ctx.daily, projects: ctx.projects, weeklyEntries: weekly.entries }),
+    targetVsActualRows(tasks, personId, monday, addDays(monday, 6), { daily: ctx.daily, projects: ctx.projects, weeklyEntries: weekly.entries, weeklyOverrides: weekly.overrides }),
     weekly.targetsCustom ?? [],
     weekly.eowCustom ?? [],
     at,

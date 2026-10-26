@@ -602,6 +602,9 @@ export const useStore = create()(
             if (patch.eowAt)
               record.eowSnapshot = weeklySnapshot(get().tasks, personId, monday, record, patch.eowAt, { daily: get().daily, projects: get().projects });
             else delete record.eowSnapshot;
+          } else if (record.eowAt && ["entries", "overrides", "targetsCustom", "eowCustom"].some((f) => f in patch)) {
+            // numbers changed after the end of week was sent: the sent report follows them, still stamped with the time it was sent
+            record.eowSnapshot = weeklySnapshot(get().tasks, personId, monday, record, record.eowAt, { daily: get().daily, projects: get().projects });
           }
           set((s) => ({ weekly: { ...s.weekly, [key]: record } }));
         },
