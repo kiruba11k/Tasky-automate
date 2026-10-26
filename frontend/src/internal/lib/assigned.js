@@ -22,9 +22,10 @@ export const isCarriedOver = (task, date, today = todayKey(0)) => date === today
  * logged row to the assigned tasks it stands in for. `carry: false` leaves out the carried-over tasks (used for week sums, where
  * the task is already on its own day). `carryEdits` ({ rowId: { qty, estMin, desc, hidden } }, saved in that day's record) are
  * the person's changes to the carried-over part of a row for this day only: the tasks and the earlier days are never touched.
- * `hidden` lists the carried rows the person removed from today (so they can be restored).
+ * `hidden` lists the carried rows the person removed from today (so they can be restored). With `defaultTaken` (the day's end of day
+ * was sent) a row with no time typed or logged takes its estimate as the time taken, which the person can edit.
  */
-export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true, asg = {}, carryEdits = {} } = {}) {
+export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true, asg = {}, carryEdits = {}, defaultTaken = false } = {}) {
   const buckets = new Map();
   tasks.forEach((t) => {
     if (t.assigneeId !== personId) return;
@@ -106,7 +107,10 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
       const rowId = `asg|${personId}|${date}|${b.id}`;
       const typed = asg?.[rowId];
       const typedMin = typed?.actualMin > 0 ? typed.actualMin : undefined;
-      const totalMin = typedMin || actualMin ? (typedMin ?? 0) + (actualMin ?? 0) : undefined;
+      const estMin = Math.max(0, b.est - (l?.est ?? 0));
+      const loggedTotal = typedMin || actualMin ? (typedMin ?? 0) + (actualMin ?? 0) : undefined;
+      const defaulted = !loggedTotal && defaultTaken && estMin > 0;
+      const totalMin = defaulted ? estMin : loggedTotal;
       const row = {
         id: rowId,
         assigned: true,
@@ -118,8 +122,9 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         qty: Math.max(0, b.qty - (l?.qty ?? 0)),
         doneQty: Math.max(0, b.done - (l?.done ?? 0)),
         approved: b.approved, // false = the number "fills in with the approved number" and is still awaiting approval
-        estMin: Math.max(0, b.est - (l?.est ?? 0)),
+        estMin,
         actualMin: totalMin,
+        defaultTime: defaulted,
         typedMin,
         remarks: typed?.remarks ?? "",
         taskIds: b.tasks.map((x) => x.t.id),
@@ -146,14 +151,14 @@ export const dayCarryEdits = (daily, personId, date) => daily?.[`${personId}|${d
 /** A person's logged rows for a day followed by the assigned rows they do not cover. */
 export function dayRowsWithAssigned(tasks, daily, personId, date, opts = {}) {
   const logged = dayEntries(daily, personId, date);
-  return [...logged, ...assignedDay(tasks ?? [], personId, date, { carryEdits: dayCarryEdits(daily, personId, date), ...opts, logged, asg: dayAsg(daily, personId, date) }).rows];
+  return [...logged, ...assignedDay(tasks ?? [], personId, date, { carryEdits: dayCarryEdits(daily, personId, date), defaultTaken: !!daily?.[`${personId}|${date}`]?.eodAt, ...opts, logged, asg: dayAsg(daily, personId, date) }).rows];
 }
 
 /** The assigned rows (no carried-over copies) of Monday to Friday of the week of `monday`, to add to the week's rows. */
 export function weekAssignedRows(tasks, daily, personId, monday, opts = {}) {
   return [0, 1, 2, 3, 4].flatMap((i) => {
     const date = addDays(monday, i);
-    return assignedDay(tasks ?? [], personId, date, { ...opts, carry: false, logged: dayEntries(daily, personId, date), asg: dayAsg(daily, personId, date) }).rows;
+    return assignedDay(tasks ?? [], personId, date, { ...opts, carry: false, defaultTaken: !!daily?.[`${personId}|${date}`]?.eodAt, logged: dayEntries(daily, personId, date), asg: dayAsg(daily, personId, date) }).rows;
   });
 }
 

@@ -141,7 +141,7 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
         {locked ? (
           <span className="tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</span>
         ) : (
-          <DurationInput label="Actual time" placeholder="..." value={r.actualMin} onChange={(m) => onType({ actualMin: m ?? undefined })} />
+          <DurationInput label="Actual time" placeholder={r.estMin > 0 ? formatMinutes(r.estMin) : '...'} value={r.actualMin} onChange={(m) => onType({ actualMin: m ?? undefined })} />
         )}
       </td>
       <td className="px-2 py-2">
@@ -302,7 +302,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const targetsEditable = !readOnly && !targetsLocked;
   // Tasks assigned to this person for the day (and unfinished ones carried over to today): read-only rows next to the logged ones.
   const shownAsg = readOnly ? (record.asg ?? {}) : asg;
-  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown, asg: shownAsg, carryEdits: record.carryEdits }), [tasks, personId, date, projects, shown, shownAsg, record.carryEdits]);
+  const assignedNow = useMemo(() => assignedDay(tasks, personId, date, { projects, logged: shown, asg: shownAsg, carryEdits: record.carryEdits, defaultTaken: !!record.eodAt }), [tasks, personId, date, projects, shown, shownAsg, record.carryEdits]);
   /** Today-only changes to a carried-over row (patch: qty / estMin / desc, null removes one; hidden: true removes the row from today). Saved at once. */
   const changeCarried = (rowId, patch) => {
     // saveDaily replaces a field as a whole, so send the whole map (read fresh, not from this render): changing one row must keep the
