@@ -31,7 +31,11 @@ export function ProgressBars({ items, compact, expected, planned }) {
               className={cx('col-span-3 row-start-2', !compact && 'sm:col-span-1 sm:col-start-2 sm:row-start-1')}
             />
             <span className="text-right text-sm tabular-nums">
-              {planned ? (
+              {item.status || item.text ? (
+                <span className="text-muted" title={item.note || undefined}>
+                  {item.status ?? (item.note ? <span className="inline-block max-w-[10rem] truncate align-bottom">{item.note}</span> : 'Text')}
+                </span>
+              ) : planned ? (
                 <span className="text-muted">
                   target <b className="text-ink">{item.target ?? 0}</b>
                 </span>
@@ -48,7 +52,7 @@ export function ProgressBars({ items, compact, expected, planned }) {
                 PROGRESS_CHIP_CLASSES[tone],
               )}
             >
-              {planned ? 'Planned' : pct == null ? 'No target' : `${pct}%`}
+              {planned ? 'Planned' : item.text ? 'Text' : item.status ? (item.status === 'Completed' ? 'Done' : item.status) : pct == null ? 'No target' : `${pct}%`}
             </span>
           </li>
         );

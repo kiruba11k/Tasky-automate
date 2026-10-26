@@ -83,16 +83,22 @@ export function ProjectProgress({ p: project, compact }) {
         : undefined;
   const isFuture = kind === 'week' && week > currentWeek;
   const expected = (kind === 'week' ? week === currentWeek : month === currentMonth) ? expectedProgressPct(kind, week) : undefined;
-  const metrics = project.metrics.filter((m) => metricInPeriod(m, kind));
-  const items = metrics
-    .filter((m) => filter === 'all' || m.id === filter)
-    .map((m) => ({
-      id: m.id,
-      label: m.label,
-      value: counts[m.id] ?? 0,
-      target: targets?.[m.id] || undefined,
-      auto: auto[m.id],
-    }));
+  // numbers switched off for this period are left out; the period's own Number / Milestone / Text targets join the project numbers
+  const off = (kind === 'week' ? project.weekOff?.[week] : project.monthOff?.[month]) ?? [];
+  const custom = (kind === 'week' ? project.weekText?.[week] : project.monthText?.[month]) ?? [];
+  const metrics = project.metrics.filter((m) => metricInPeriod(m, kind) && !off.includes(m.id));
+  const customItems = custom
+    .filter((r) => r.label?.trim())
+    .map((r) => {
+      const type = r.kind ?? (r.targetNum != null ? 'number' : 'text');
+      if (type === 'milestone') return { id: r.id, label: r.label, value: r.status === 'Completed' ? 1 : 0, target: 1, status: r.status ?? 'Not started', note: r.target };
+      if (type === 'text') return { id: r.id, label: r.label, value: 0, target: undefined, text: true, note: r.actual || r.target };
+      return { id: r.id, label: r.label, value: r.actualNum ?? 0, target: r.targetNum || undefined };
+    });
+  const items = [
+    ...metrics.map((m) => ({ id: m.id, label: m.label, value: counts[m.id] ?? 0, target: targets?.[m.id] || undefined, auto: auto[m.id] })),
+    ...customItems,
+  ].filter((i) => filter === 'all' || i.id === filter);
   const withTarget = items.filter((i) => i.target);
   const average = withTarget.length
     ? Math.round(withTarget.reduce((sum, i) => sum + Math.min(100, (i.value / i.target) * 100), 0) / withTarget.length)
@@ -133,7 +139,7 @@ export function ProjectProgress({ p: project, compact }) {
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="all">All numbers</option>
-          {metrics.map((m) => (
+          {[...metrics, ...customItems].map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
             </option>
@@ -204,7 +210,7 @@ export function ProjectProgress({ p: project, compact }) {
           )}
         >
           {items.map((i) => (
-            <ProgressTile key={i.id} label={i.label} value={i.value} target={i.target} auto={i.auto} />
+            <ProgressTile key={i.id} label={i.label} value={i.value} target={i.target} auto={i.auto} status={i.status} text={i.text} note={i.note} />
           ))}
         </div>
       )}

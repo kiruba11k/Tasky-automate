@@ -3,7 +3,7 @@ import { ProgressMeter } from './ProgressMeter';
 import { progressTone, PROGRESS_CHIP_CLASSES } from './progressTones';
 
 /** KPI tile: big number, target, percentage chip and a small bar. */
-export function ProgressTile({ label, value, target, auto }) {
+export function ProgressTile({ label, value, target, auto, status, text, note }) {
   const pct = target ? Math.round((value / target) * 100) : null;
   const tone = progressTone(pct);
   return (
@@ -11,7 +11,12 @@ export function ProgressTile({ label, value, target, auto }) {
       <p className="truncate text-[11px] font-bold uppercase tracking-wide text-muted" title={label}>
         {label}
       </p>
-      <p className="mt-1 flex flex-wrap items-baseline gap-1">
+      {status || text ? (
+        <p className="mt-1 text-sm font-semibold" title={note || undefined}>
+          {status ?? (note || 'Text target')}
+        </p>
+      ) : null}
+      <p className={cx('mt-1 flex flex-wrap items-baseline gap-1', (status || text) && 'hidden')}>
         <span className="text-2xl font-extrabold leading-none">{value}</span>
         {target ? <span className="text-sm text-muted">/ {target}</span> : null}
         {pct != null && (
