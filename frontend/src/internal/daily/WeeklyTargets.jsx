@@ -1,9 +1,10 @@
 import { Target } from 'lucide-react';
-import { Se as useStore, rt as Card, tc as tracksPeriod } from '@/internal/min';
+import { Se as useStore, rt as Card, tc as tracksPeriod, We as formatMinutes } from '@/internal/min';
 import { projectWeekStart, savedWeekPlan, weekTargetFor } from '../lib/domain.js';
-import { formatDayMonth, weekStart } from '../lib/dates.js';
+import { addDays, formatDayMonth, weekStart } from '../lib/dates.js';
 import { weekRows } from '../lib/entries.js';
 import { entryName, projectLabel } from './entryHelpers';
+import { OTHER_PREFIX, groupBlocks } from './planBlocks';
 import { TARGET_KINDS, targetKind } from '../projects/targetKinds';
 import { TargetSheet } from '../projects/TargetSheet';
 
@@ -28,15 +29,29 @@ export function weeklyTargetRows(project, date) {
  * The person's own work that belongs to no project (company work they gave themselves, "Other work" tables): the rows of the week's
  * tables with a target, as [name, target, type, goal] grouped under the name of the work.
  */
-export function ownWorkRows(personId, date, daily, weekly) {
+export function ownWorkRows(personId, date, daily, weekly, projects = []) {
   const monday = weekStart(date);
   const record = weekly?.[`${personId}|${monday}`];
-  return weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, [])
-    .filter((r) => String(r.projectId).startsWith('other:') && (r.qty > 0 || r.targetText?.trim()))
+  const rows = weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, [])
+    .filter((r) => String(r.projectId).startsWith(OTHER_PREFIX) && (r.qty > 0 || r.targetText?.trim()))
     .map((r) => {
       const kind = r.kind ?? 'number';
       return [projectLabel(r.projectId, []), entryName(r), TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.qty) : r.targetText.trim()];
     });
+  // time planned in "Plan your day" for work that is no project (typed names, custom blocks, extra hours), added up over the week
+  const planned = new Map();
+  const add = (name, minutes) => minutes > 0 && planned.set(name, (planned.get(name) ?? 0) + minutes);
+  for (let i = 0; i < 5; i++) {
+    const day = daily?.[`${personId}|${addDays(monday, i)}`];
+    if (!day) continue;
+    groupBlocks((day.plan ?? []).filter((b) => b.id !== 'lunch')).forEach((g) => {
+      const pid = g.custom ? (g.custom.projectId ?? g.projectId) : g.projectId;
+      if (projects.some((p) => p.id === pid)) return;
+      add(String(pid).startsWith(OTHER_PREFIX) ? pid.slice(OTHER_PREFIX.length) : (g.custom?.title ?? 'Other work'), g.minutes);
+    });
+    (day.extra ?? []).forEach((x) => !projects.some((p) => p.id === x.projectId) && add(x.work || 'Other work', x.minutes));
+  }
+  return [...rows, ...[...planned].map(([name, minutes]) => [name, name, 'Planned time', formatMinutes(minutes)])];
 }
 
 /** "Weekly targets" on the Tasks update page: the fixed weekly targets of every project the person is on, as one sheet with Copy as image. */
@@ -45,7 +60,7 @@ export function WeeklyTargets({ personId, date }) {
   const daily = useStore((s) => s.daily);
   const weekly = useStore((s) => s.weekly);
   const mine = projects.filter((p) => p.status === 'active' && (p.pmId === personId || p.teamIds?.includes(personId) || p.admins?.includes(personId)));
-  const rows = [...mine.flatMap((p) => weeklyTargetRows(p, date)), ...ownWorkRows(personId, date, daily, weekly)];
+  const rows = [...mine.flatMap((p) => weeklyTargetRows(p, date)), ...ownWorkRows(personId, date, daily, weekly, projects)];
   if (!rows.length) return null;
   return (
     <div data-testid="weekly-targets">
