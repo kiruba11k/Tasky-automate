@@ -29,7 +29,8 @@ export function WeeklyTargets({ personId, date }) {
   const rows = mine.flatMap((p) => weeklyTargetRows(p, date));
   if (!rows.length) return null;
   return (
-    <Card className="!p-0" data-testid="weekly-targets">
+    <div data-testid="weekly-targets">
+    <Card className="!p-0">
       <div className="border-b border-line px-4 py-3">
         <h2 className="flex items-center gap-2 text-base font-bold">
           <Target size={17} className="text-accent-ink" /> Weekly targets
@@ -46,6 +47,7 @@ export function WeeklyTargets({ personId, date }) {
         testId="weekly-targets-sheet"
       />
     </Card>
+    </div>
   );
 }
 
