@@ -8,7 +8,7 @@ import { sheetColorOf } from '../daily/sheetText';
  * A fixed set of targets (or the numbers against them) as a spreadsheet: coloured header, a grid of rows and columns, and a
  * "Copy as image" button, the same look as the day and week update tables. `rows` is an array of arrays of cell text.
  */
-export function TargetSheet({ title, heading, columns, rows, filename = 'weekly-targets.png', testId = 'target-sheet' }) {
+export function TargetSheet({ title, heading, columns, rows, filename = 'weekly-targets.png', testId = 'target-sheet', group = false }) {
   const me = useStore((s) => s.me);
   const profile = useStore((s) => s.profiles[s.me]);
   const ref = useRef(null);
@@ -54,15 +54,28 @@ export function TargetSheet({ title, heading, columns, rows, filename = 'weekly-
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} className={i % 2 ? 'bg-surface-2/40' : 'bg-surface'}>
-                {r.map((c, j) => (
-                  <td key={j} className={`${cell} ${j === 0 ? 'font-medium' : 'text-center tabular-nums'}`}>
-                    {c}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              // with `group`, the first column is merged down over the consecutive rows that share it (one cell per project)
+              const first = !group || i === 0 || rows[i - 1][0] !== r[0];
+              const span = group ? rows.slice(i).findIndex((x) => x[0] !== r[0]) : -1;
+              return (
+                <tr key={i} className={i % 2 ? 'bg-surface-2/40' : 'bg-surface'}>
+                  {r.map((c, j) =>
+                    group && j === 0 ? (
+                      first && (
+                        <td key={j} rowSpan={span < 0 ? rows.length - i : span} className={`${cell} bg-surface text-center align-middle font-semibold`}>
+                          {c}
+                        </td>
+                      )
+                    ) : (
+                      <td key={j} className={`${cell} ${j === 0 ? 'font-medium' : 'text-center tabular-nums'}`}>
+                        {c}
+                      </td>
+                    ),
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

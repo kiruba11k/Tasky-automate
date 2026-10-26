@@ -32,6 +32,7 @@ import { EntriesLog } from './EntriesLog';
 import { EntriesProgress } from './EntriesProgress';
 import { PlanBuilder } from './PlanBuilder';
 import { WeeklyUpdate } from './WeeklyUpdate';
+import { WeeklyTargets } from './WeeklyTargets';
 import { WeeklyHours } from './WeeklyHours';
 import { latestWorkday, formatShortDate } from './dateHelpers';
 import { nonEmptyExtras } from './planHelpers';
@@ -305,6 +306,7 @@ export function TasksUpdate() {
           </div>
         </section>
       </div>
+      <WeeklyTargets personId={me} date={date} />
       <WeeklyUpdate personId={me} date={date} />
       <WeeklyHours personId={me} date={date} />
     </div>

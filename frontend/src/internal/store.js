@@ -23,7 +23,9 @@ import {
   dailySnapshot,
   projectWeekStart,
 } from "./lib/domain.js";
-import { buildEodRequests, eodReviewerOf, decisionFor, eodProjectWork, reviewsAfterMove, sendSummary } from "./lib/eodReview.js";
+import { buildEodRequests, eodReviewerOf, decisionFor, eodProjectWork, weekProjectWork, reviewsAfterMove, sendSummary } from "./lib/eodReview.js";
+import { assignedDay, weekAssignedRows } from "./lib/assigned.js";
+import { weekRows } from "./lib/entries.js";
 import { DEFAULT_TEMPLATE_ID, PROJECT_TEMPLATES, templateMetrics, validateMetrics } from "./lib/projectTemplates.js";
 
 /** What the app starts with before the backend answers: nothing. All data lives on the server (see sync.js). */
@@ -120,6 +122,9 @@ export const useStore = create()(
         return project;
       };
       /** Ids of the other approvers: project proposals are sent only to them. */
+      /** The day's assigned rows (tasks given to the person), used as work for approvals. */
+      const dayAssigned = (personId, day, record) =>
+        assignedDay(get().tasks, personId, day, { projects: get().projects, logged: record?.entries ?? [], asg: record?.asg ?? {}, carryEdits: record?.carryEdits ?? {}, defaultTaken: true }).rows;
       const ownerId = () => PEOPLE.find((p) => p.owner)?.id;
       const approverIds = () => PEOPLE.filter((p) => p.approver && p.id !== get().me).map((p) => p.id);
       /** `p` - ids of the other admins: managers, founders and project managers (they approve projects). */
@@ -606,7 +611,45 @@ export const useStore = create()(
             // numbers changed after the end of week was sent: the sent report follows them, still stamped with the time it was sent
             record.eowSnapshot = weeklySnapshot(get().tasks, personId, monday, record, record.eowAt, { daily: get().daily, projects: get().projects });
           }
+          // Sending the end of week asks each project's manager to approve the week's work on it (same rules as the end of day).
+          let sends = [];
+          if (patch.eowAt && patch.eowAt !== get().weekly[key]?.eowAt && personId === get().me) {
+            const rows = weekRows(personId, monday, get().daily, record.entries ?? [], record.overrides, weekAssignedRows(get().tasks, get().daily, personId, monday, { projects: get().projects }));
+            const work = weekProjectWork(rows);
+            const built = buildEodRequests({ record, projects: get().projects, personId, at: patch.eowAt, ownerId: ownerId(), work });
+            const worked = new Set(work.map((w) => w.projectId));
+            const kept = Object.fromEntries(Object.entries(record.eowReviews ?? {}).filter(([pid]) => worked.has(pid)));
+            const merged = { ...kept, ...built.reviews };
+            if (Object.keys(merged).length) record.eowReviews = merged;
+            else delete record.eowReviews;
+            sends = built.sends;
+          }
           set((s) => ({ weekly: { ...s.weekly, [key]: record } }));
+          for (const send of sends) {
+            const name = get().projects.find((p) => p.id === send.projectId)?.name ?? "a project";
+            notify(send.reviewerId, `${firstName(personId)} sent end of week for ${name} (${sendSummary(send.rows, send.minutes)}), waiting for your approval`, "eod");
+          }
+        },
+        /** The project's manager (or leadership) approves, or sends back with feedback, the work a person reported for a project in a week. */
+        decideEow: (personId, week, projectId, verdict, note = "") => {
+          const key = `${personId}|${week}`;
+          const record = get().weekly[key];
+          const review = record?.eowReviews?.[projectId];
+          const project = requireProject(projectId);
+          const me = get().me;
+          if (eodReviewerOf(project, ownerId()) !== me && !isLeadership(roleOf(me)))
+            throw new Error(`Only ${displayName(eodReviewerOf(project, ownerId()))}, who approves this project, can do that.`);
+          if (!review) throw new Error("That end of week is no longer waiting for approval.");
+          if (review.status !== "pending") throw new Error("This end of week was already handled.");
+          const decision = decisionFor(review, verdict, me, nowIso(), note);
+          set((s) => ({ weekly: { ...s.weekly, [key]: { ...s.weekly[key], eowReviews: { ...s.weekly[key].eowReviews, [projectId]: decision } } } }));
+          notify(
+            personId,
+            verdict === "approved"
+              ? `${firstName(me)} approved your end of week for ${project.name} ✓`
+              : `${firstName(me)} asked for changes on your end of week for ${project.name}: ${decision.note}`,
+            "eod",
+          );
         },
         updateProject: (projectId, patch) => {
           requireManage(projectId);
@@ -724,8 +767,9 @@ export const useStore = create()(
           // only re-saves the same sending time does not ask again. Reviews never change any number.
           let sends = [];
           if (next.eodAt && next.eodAt !== get().daily[key]?.eodAt && personId === get().me) {
-            const built = buildEodRequests({ record, projects: get().projects, personId, at: next.eodAt, ownerId: ownerId() });
-            const worked = new Set(eodProjectWork(record).map((w) => w.projectId));
+            const assigned = dayAssigned(personId, day, record);
+            const built = buildEodRequests({ record, projects: get().projects, personId, at: next.eodAt, ownerId: ownerId(), assigned });
+            const worked = new Set(eodProjectWork(record, assigned).map((w) => w.projectId));
             const kept = Object.fromEntries(Object.entries(record.eodReviews ?? {}).filter(([pid]) => worked.has(pid))); // a request for work that is gone is dropped
             const merged = { ...kept, ...built.reviews };
             if (Object.keys(merged).length) record.eodReviews = merged;
@@ -733,7 +777,7 @@ export const useStore = create()(
             sends = built.sends;
           } else if (next.eodAt && next.eodAt === get().daily[key]?.eodAt && personId === get().me) {
             // Change project on a sent day: the review moves with the rows and plan time.
-            const moved = reviewsAfterMove({ prev: get().daily[key], record, projects: get().projects, personId, at: nowIso(), ownerId: ownerId() });
+            const moved = reviewsAfterMove({ prev: get().daily[key], record, projects: get().projects, personId, at: nowIso(), ownerId: ownerId(), assigned: dayAssigned(personId, day, record), prevAssigned: dayAssigned(personId, day, get().daily[key]) });
             if (moved.changed) {
               if (Object.keys(moved.reviews).length) record.eodReviews = moved.reviews;
               else delete record.eodReviews;

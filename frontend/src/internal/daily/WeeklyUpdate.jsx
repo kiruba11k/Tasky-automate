@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { CalendarRange, Pencil, Send } from 'lucide-react';
-import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Ye as toast, We as formatMinutes } from '@/internal/min';
+import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Ye as toast, We as formatMinutes, be as firstName } from '@/internal/min';
 import { weekStart } from '../lib/dates.js';
 import { weekRows } from '../lib/entries.js';
 import { weekAssignedRows } from '../lib/assigned.js';
+import { eodStatusText } from '../lib/eodReview.js';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
@@ -83,6 +84,19 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
           )}
         </div>
       </div>
+      {Object.keys(record?.eowReviews ?? {}).length > 0 && (
+        <div className="flex flex-wrap gap-2 border-b border-line px-4 py-2 text-xs" data-testid="eow-reviews">
+          {Object.entries(record.eowReviews).map(([pid, review]) => {
+            const project = projects.find((p) => p.id === pid);
+            const st = eodStatusText(review, firstName(review.reviewerId), firstName(review.by ?? review.reviewerId));
+            return (
+              <Badge key={pid} tone={st.tone}>
+                {project?.name ?? 'Project'}: {st.text}
+              </Badge>
+            );
+          })}
+        </div>
+      )}
       <div className="space-y-3 p-4">
         {editing && !readOnly && <AddToWeek personId={personId} mon={mon} />}
         <EntriesProgress personId={personId} date={date} kind="week" editable={editing && !readOnly} />

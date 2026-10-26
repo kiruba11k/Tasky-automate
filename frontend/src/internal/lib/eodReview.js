@@ -14,7 +14,7 @@ export const rowsOfProject = (record, projectId) => (record?.entries ?? []).filt
  * What a day's record reports per project: { projectId, rows, minutes }. Rows come from the Daily update tables; a project that only has
  * plan blocks or extra hours with minutes counts too (rows: []). "Other work" (not a project) and tasks assigned by others are left out.
  */
-export function eodProjectWork(record) {
+export function eodProjectWork(record, assigned = []) {
   const by = new Map();
   const slot = (pid) => {
     if (!pid || String(pid).startsWith(OTHER_PREFIX)) return null;
@@ -29,6 +29,13 @@ export function eodProjectWork(record) {
     s.fromRows = true;
     s.minutes += r.actualMin ?? r.estMin ?? 0;
   }
+  // tasks assigned to the person (the assigned rows of the day tables) are work for their project too: they count even with no logged row
+  for (const r of assigned) {
+    const s = slot(r.projectId);
+    if (!s || !((r.actualMin ?? r.estMin ?? 0) > 0 || r.qty > 0)) continue;
+    s.assignedRows = (s.assignedRows ?? 0) + 1;
+    s.assignedMin = (s.assignedMin ?? 0) + (r.actualMin ?? r.estMin ?? 0);
+  }
   const extraMinutes = new Map();
   for (const b of record?.plan ?? []) {
     const pid = planProject(b);
@@ -39,7 +46,23 @@ export function eodProjectWork(record) {
     const s = slot(pid);
     if (s && !s.fromRows) s.minutes += min; // projects with rows are summed from the rows
   }
-  return [...by.values()].filter((s) => s.rows.length || s.minutes > 0).map(({ fromRows, ...rest }) => rest); // eslint-disable-line no-unused-vars
+  return [...by.values()]
+    .map(({ fromRows, assignedRows = 0, assignedMin = 0, ...rest }) => ({ ...rest, minutes: rest.minutes + assignedMin, assignedRows })) // eslint-disable-line no-unused-vars
+    .filter((s) => s.rows.length || s.assignedRows || s.minutes > 0);
+}
+
+/** What a week's table reports per project (the rows of the Weekly update): { projectId, rows, minutes, assignedRows: 0 }. */
+export function weekProjectWork(rows = []) {
+  const by = new Map();
+  for (const r of rows) {
+    const pid = r.projectId;
+    if (!pid || String(pid).startsWith(OTHER_PREFIX) || !(r.task || r.assigned)) continue;
+    if (!by.has(pid)) by.set(pid, { projectId: pid, rows: [], minutes: 0, assignedRows: 0 });
+    const s = by.get(pid);
+    s.rows.push(r);
+    s.minutes += r.actualMin ?? r.estMin ?? 0;
+  }
+  return [...by.values()];
 }
 
 /** Who approves a project's end of day: its manager, or the main admin (`ownerId`, the ADMIN_EMAIL account) when it has none. */
@@ -50,17 +73,17 @@ export const eodReviewerOf = (project, ownerId) => project?.pmId || ownerId || n
  * manager (the main admin when it has none); the approver's own work is approved at once (`auto`).
  * Returns { reviews: { projectId: review }, sends: [{ projectId, reviewerId, rows, minutes }] } (`sends` = who to tell).
  */
-export function buildEodRequests({ record, projects, personId, at, ownerId }) {
+export function buildEodRequests({ record, projects, personId, at, ownerId, assigned = [], work }) {
   const reviews = {};
   const sends = [];
-  for (const work of eodProjectWork(record)) {
-    const project = projects.find((p) => p.id === work.projectId);
+  for (const item of work ?? eodProjectWork(record, assigned)) {
+    const project = projects.find((p) => p.id === item.projectId);
     const reviewer = eodReviewerOf(project, ownerId);
     if (!project || !reviewer) continue;
     if (reviewer === personId) reviews[project.id] = { status: "approved", reviewerId: personId, sentAt: at, decidedAt: at, by: personId, for: at, auto: true };
     else {
       reviews[project.id] = { status: "pending", reviewerId: reviewer, sentAt: at };
-      sends.push({ projectId: project.id, reviewerId: reviewer, rows: work.rows.length, minutes: work.minutes });
+      sends.push({ projectId: project.id, reviewerId: reviewer, rows: item.rows.length + (item.assignedRows ?? 0), minutes: item.minutes });
     }
   }
   return { reviews, sends };
@@ -89,19 +112,23 @@ export function sendSummary(rows, minutes) {
  * The pending requests a person decides: a project's manager sees theirs, `seesAll` (leadership) sees every project's.
  * Newest day first. Each item: { key, personId, day, projectId, review, rows }. Own work is never listed.
  */
-export function pendingForReviewer({ daily, projects, me, seesAll = false, ownerId }) {
+export function pendingForReviewer({ daily, weekly, projects, me, seesAll = false, ownerId }) {
   const mineIds = new Set(projects.filter((p) => seesAll || eodReviewerOf(p, ownerId) === me).map((p) => p.id));
   const out = [];
-  for (const [key, record] of Object.entries(daily ?? {})) {
-    if (!record?.eodReviews) continue;
-    const [personId, day] = key.split("|");
-    if (personId === me) continue;
-    for (const [projectId, review] of Object.entries(record.eodReviews)) {
-      if (review?.status !== "pending" || !mineIds.has(projectId)) continue;
-      out.push({ key, personId, day, projectId, review, rows: rowsOfProject(record, projectId) });
+  const collect = (records, field, kind) => {
+    for (const [key, record] of Object.entries(records ?? {})) {
+      if (!record?.[field]) continue;
+      const [personId, day] = key.split("|");
+      if (personId === me) continue;
+      for (const [projectId, review] of Object.entries(record[field])) {
+        if (review?.status !== "pending" || !mineIds.has(projectId)) continue;
+        out.push({ key: `${kind}:${key}`, kind, personId, day, projectId, review, rows: rowsOfProject(record, projectId) });
+      }
     }
-  }
-  return out.sort((a, b) => b.day.localeCompare(a.day) || a.personId.localeCompare(b.personId) || a.projectId.localeCompare(b.projectId));
+  };
+  collect(daily, "eodReviews", "day");
+  collect(weekly, "eowReviews", "week");
+  return out.sort((a, b) => b.day.localeCompare(a.day) || a.personId.localeCompare(b.personId) || a.projectId.localeCompare(b.projectId) || a.kind.localeCompare(b.kind));
 }
 
 /** Group pending items by project: [{ projectId, items }] in order of first appearance. */
@@ -127,7 +154,7 @@ export function decisionFor(review, verdict, by, at, note = "") {
 /** Projects whose end of day was sent back: their tables are open for editing again until the day is sent again. */
 export const reopenedProjects = (record) => new Set(Object.entries(record?.eodReviews ?? {}).filter(([, r]) => r?.status === "changes").map(([pid]) => pid));
 
-const workSignature = (record) => new Map(eodProjectWork(record).map((w) => [w.projectId, JSON.stringify([w.rows.map((r) => r.id).sort(), w.minutes])]));
+const workSignature = (record, assigned = []) => new Map(eodProjectWork(record, assigned).map((w) => [w.projectId, JSON.stringify([w.rows.map((r) => r.id).sort(), w.minutes])]));
 
 /**
  * A day that is already sent had rows or plan time moved to another project (Change project). The review moves with the work:
@@ -135,9 +162,9 @@ const workSignature = (record) => new Map(eodProjectWork(record).map((w) => [w.p
  * when that is the sender, the main admin when it has no manager). A pending or sent-back request stays as it is; an approved one becomes
  * pending again because there is new work to look at. Returns { reviews, sends, changed }.
  */
-export function reviewsAfterMove({ prev, record, projects, personId, at, ownerId }) {
-  const before = workSignature(prev);
-  const after = workSignature(record);
+export function reviewsAfterMove({ prev, record, projects, personId, at, ownerId, assigned = [], prevAssigned = assigned }) {
+  const before = workSignature(prev, prevAssigned);
+  const after = workSignature(record, assigned);
   const reviews = { ...(record?.eodReviews ?? {}) };
   const sends = [];
   let changed = false;
@@ -154,8 +181,8 @@ export function reviewsAfterMove({ prev, record, projects, personId, at, ownerId
       reviews[pid] = { status: "approved", reviewerId: personId, sentAt: at, decidedAt: at, by: personId, for: at, auto: true };
     } else {
       reviews[pid] = { status: "pending", reviewerId: reviewer, sentAt: at };
-      const work = eodProjectWork(record).find((w) => w.projectId === pid);
-      sends.push({ projectId: pid, reviewerId: reviewer, rows: work?.rows.length ?? 0, minutes: work?.minutes ?? 0 });
+      const work = eodProjectWork(record, assigned).find((w) => w.projectId === pid);
+      sends.push({ projectId: pid, reviewerId: reviewer, rows: (work?.rows.length ?? 0) + (work?.assignedRows ?? 0), minutes: work?.minutes ?? 0 });
     }
     changed = true;
   }

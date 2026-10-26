@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { eodProjectWork, buildEodRequests, eodStatusText, pendingForReviewer, groupByProject, decisionFor, sendSummary, reviewsAfterMove, reopenedProjects, taskReviewLabel, assignedContext } from './eodReview.js';
+import { eodProjectWork, weekProjectWork, buildEodRequests, eodStatusText, pendingForReviewer, groupByProject, decisionFor, sendSummary, reviewsAfterMove, reopenedProjects, taskReviewLabel, assignedContext } from './eodReview.js';
 
 const projects = [
   { id: 'a', name: 'A', pmId: 'pmA' },
@@ -134,4 +134,22 @@ test('a project without a manager goes to the main admin; the admin\'s own work 
   const daily = { 'u1|2026-10-14': { eodReviews: sent.reviews } };
   assert.equal(pendingForReviewer({ daily, projects, me: 'root', ownerId: 'root' }).length, 1);
   assert.equal(pendingForReviewer({ daily, projects, me: 'pmA', ownerId: 'root' }).length, 0);
+});
+
+test('work done only through assigned tasks still goes to the project manager', () => {
+  const assigned = [{ id: 'asg|x', projectId: 'a', assigned: true, estMin: 60, actualMin: 45, qty: 10 }];
+  const { reviews, sends } = buildEodRequests({ record: { entries: [] }, projects, personId: 'u1', at: AT, assigned });
+  assert.deepEqual(reviews.a, { status: 'pending', reviewerId: 'pmA', sentAt: AT });
+  assert.deepEqual(sends.map((s) => [s.projectId, s.rows, s.minutes]), [['a', 1, 45]]);
+});
+
+test('a sent week goes to each project manager and shows in their pending list', () => {
+  const rows = [{ id: 'r1', projectId: 'a', task: 'l2', estMin: 30, actualMin: 40 }, { id: 'r2', projectId: 'b', task: 'deck', estMin: 20 }, { id: 'r3', projectId: 'a', assigned: true, estMin: 10 }];
+  const work = weekProjectWork(rows);
+  assert.deepEqual(work.map((w) => [w.projectId, w.rows.length, w.minutes]), [['a', 2, 50], ['b', 1, 20]]);
+  const { reviews } = buildEodRequests({ record: {}, projects, personId: 'u1', at: AT, work });
+  assert.equal(reviews.a.reviewerId, 'pmA');
+  const weekly = { 'u1|2026-10-26': { eowReviews: reviews } };
+  const items = pendingForReviewer({ daily: {}, weekly, projects, me: 'pmA' });
+  assert.deepEqual(items.map((i) => [i.kind, i.projectId, i.day]), [['week', 'a', '2026-10-26']]);
 });

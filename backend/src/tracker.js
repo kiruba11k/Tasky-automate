@@ -159,10 +159,10 @@ const isStamp = (v) => typeof v === 'string' && v.length <= 40 && !Number.isNaN(
  * A request is `pending` with only who reviews it and when it was sent; a decision (`approved`, `changes`) names who decided, when,
  * and which send it answers (`for` = that send's `sentAt`). A send-back needs a note.
  */
-export function eodReviewsProblem(doc) {
-  const r = doc?.eodReviews;
+export function eodReviewsProblem(doc, field = 'eodReviews') {
+  const r = doc?.[field];
   if (r === undefined || r === null) return null;
-  const bad = 'An end of day approval is not valid.';
+  const bad = field === 'eowReviews' ? 'An end of week approval is not valid.' : 'An end of day approval is not valid.';
   if (!isMap(r) || Object.keys(r).length > 100) return bad;
   for (const [pid, v] of Object.entries(r)) {
     if (!pid || pid.length > 200 || !isMap(v) || !Object.keys(v).every((k) => EOD_KEYS.includes(k))) return bad;
@@ -305,16 +305,16 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     return !!project && project.status === 'active' && (project.pmId === u.id || (project.teamIds || []).includes(u.id) || (project.admins || []).includes(u.id));
   }
 
-  const eodChanged = (data, prev) => {
-    const a = data?.eodReviews || {};
-    const b = prev?.eodReviews || {};
+  const eodChanged = (data, prev, field = 'eodReviews') => {
+    const a = data?.[field] || {};
+    const b = prev?.[field] || {};
     return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((pid) => JSON.stringify(a[pid]) !== JSON.stringify(b[pid]));
   };
 
   /** The owner of a day sends its end of day to each project's manager: a pending request for that manager (or, on their own project, approved at once). */
-  async function eodOwnerOk(u, data, prev) {
-    for (const pid of eodChanged(data, prev)) {
-      const v = data.eodReviews?.[pid];
+  async function eodOwnerOk(u, data, prev, field = 'eodReviews') {
+    for (const pid of eodChanged(data, prev, field)) {
+      const v = data[field]?.[pid];
       if (v === undefined) continue; // a request taken back
       const project = (await find('project', pid))?.data;
       if (!project) return false;
@@ -327,13 +327,13 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
   }
 
   /** Someone else's day: only the end of day decision on a project, by that project's manager or the main admins, and nothing else on the record. */
-  async function eodDecisionOk(u, data, prev, changed) {
-    if (!prev || changed.length !== 1 || changed[0] !== 'eodReviews') return false;
-    const pids = eodChanged(data, prev);
+  async function eodDecisionOk(u, data, prev, changed, field = 'eodReviews') {
+    if (!prev || changed.length !== 1 || changed[0] !== field) return false;
+    const pids = eodChanged(data, prev, field);
     if (!pids.length) return false;
     for (const pid of pids) {
-      const v = data.eodReviews?.[pid];
-      const was = prev.eodReviews?.[pid];
+      const v = data[field]?.[pid];
+      const was = prev[field]?.[pid];
       if (!v || !was) return false;
       const project = (await find('project', pid))?.data;
       if (!project || !(leadership(u) || (project.pmId ? project.pmId === u.id : isOwner(u)))) return false;
@@ -389,7 +389,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         return !!prev && (prev.teamIds || []).includes(u.id) && changed.every((k) => k === 'finalized');
       }
       case 'daily': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev) : eodDecisionOk(u, data, prev, changed); // a person's own days; another person's day only gets end of day decisions
-      case 'weekly': return key.startsWith(`${u.id}|`); // a person's own weeks; nobody edits another person's record
+      case 'weekly': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev, 'eowReviews') : eodDecisionOk(u, data, prev, changed, 'eowReviews'); // a person's own weeks; another person's week only gets end of week decisions
       case 'profile': return mine(key);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
       case 'conv': case 'msg': case 'alias':
@@ -470,7 +470,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'daily' || kind === 'weekly') {
-        const why = entriesProblem(data) || asgProblem(data) || carryEditsProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) || eodReviewsProblem(data) : weeklyProblem(patch));
+        const why = entriesProblem(data) || asgProblem(data) || carryEditsProblem(data) || lunchProblem(data) || (kind === 'daily' ? dailyProblem(patch) || eodReviewsProblem(data) : weeklyProblem(patch) || eodReviewsProblem(data, 'eowReviews'));
         if (why) { results.push({ ...id, ok: false, error: why }); continue; }
       }
       if (kind === 'profile') {

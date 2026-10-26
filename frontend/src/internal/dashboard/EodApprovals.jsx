@@ -15,6 +15,8 @@ import {
   Ye as showToast,
 } from '@/internal/min';
 import { PEOPLE, isLeadership, roleOf } from '../lib/constants.js';
+import { weekRows } from '../lib/entries.js';
+import { assignedDay, weekAssignedRows } from '../lib/assigned.js';
 import { assignedContext, eodReviewerOf, groupByProject, pendingForReviewer, sendSummary, taskReviewLabel } from '../lib/eodReview.js';
 import { todayKey } from '../lib/dates.js';
 import { entryName, rowDone, rowTarget } from '../daily/entryHelpers';
@@ -80,22 +82,34 @@ function TaskContext({ task }) {
 
 /** One person's day for one project: the rows they reported, with Approve and Send back (feedback is required). */
 function EodItem({ item, project }) {
-  const decideEod = useStore((s) => s.decideEod);
+  const decideDay = useStore((s) => s.decideEod);
+  const decideWeek = useStore((s) => s.decideEow);
   const tasks = useStore((s) => s.tasks);
-  const context = assignedContext(tasks, item.personId, item.day, item.projectId, todayKey(0));
+  const daily = useStore((s) => s.daily);
+  const weekly = useStore((s) => s.weekly);
+  const projectsAll = useStore((s) => s.projects);
+  const isWeek = item.kind === 'week';
+  const decideEod = isWeek ? decideWeek : decideDay;
+  const context = isWeek ? [] : assignedContext(tasks, item.personId, item.day, item.projectId, todayKey(0));
+  // a week's rows are the week table as the person sees it: day rows, assigned rows and rows added to the week, added up
+  const record = daily[item.key.slice(item.key.indexOf(':') + 1)];
+  const assignedRows = isWeek ? [] : assignedDay(tasks, item.personId, item.day, { projects: projectsAll, logged: record?.entries ?? [], asg: record?.asg ?? {}, carryEdits: record?.carryEdits ?? {}, defaultTaken: true }).rows.filter((r) => r.projectId === item.projectId);
+  const shownRows = isWeek
+    ? weekRows(item.personId, item.day, daily, weekly[`${item.personId}|${item.day}`]?.entries ?? [], weekly[`${item.personId}|${item.day}`]?.overrides, weekAssignedRows(tasks, daily, item.personId, item.day, { projects: projectsAll })).filter((r) => r.projectId === item.projectId)
+    : [...item.rows, ...assignedRows];
   const [panel, setPanel] = useState(false);
   const [note, setNote] = useState('');
-  const minutes = item.rows.reduce((s, r) => s + (r.actualMin ?? r.estMin ?? 0), 0);
+  const minutes = shownRows.reduce((s, r) => s + (r.actualMin ?? r.estMin ?? 0), 0);
   return (
     <li className="px-4 py-3" data-eod={`${item.key}:${item.projectId}`}>
       <div className="flex flex-wrap items-center gap-3">
         <Avatar id={item.personId} size="sm" />
         <div className="min-w-[200px] flex-1">
           <p className="text-sm font-semibold">
-            {firstName(item.personId)} · {formatDate(item.day)}
+            {firstName(item.personId)} · {isWeek ? `Week of ${formatDate(item.day)}` : formatDate(item.day)}
           </p>
           <p className="text-xs text-muted">
-            {sendSummary(item.rows.length, minutes)} · sent {formatClock(item.review.sentAt)}
+            {sendSummary(shownRows.length, minutes)} · sent {formatClock(item.review.sentAt)}
           </p>
         </div>
         <Button
@@ -112,7 +126,7 @@ function EodItem({ item, project }) {
           <MessageSquare size={13} /> Send back
         </Button>
       </div>
-      {item.rows.length > 0 && (
+      {shownRows.length > 0 && (
         <div className="mt-2 overflow-x-auto sm:ml-10">
           <table className="w-full min-w-[560px] text-xs" aria-label={`${personName(item.personId)} ${project?.name ?? ''} rows`}>
             <thead>
@@ -126,7 +140,7 @@ function EodItem({ item, project }) {
               </tr>
             </thead>
             <tbody>
-              {item.rows.map((r) => {
+              {shownRows.map((r) => {
                 const kind = r.kind ?? 'number';
                 return (
                   <tr key={r.id} className="border-t border-line align-top">
@@ -180,22 +194,22 @@ function EodItem({ item, project }) {
  * managers and founders see every project's. Only shown to people who can decide something.
  */
 export function EodApprovals() {
-  const { me, daily, projects } = useStore();
+  const { me, daily, weekly, projects } = useStore();
   const seesAll = isLeadership(roleOf(me));
   const ownerId = PEOPLE.find((p) => p.owner)?.id;
   const manages = projects.some((p) => eodReviewerOf(p, ownerId) === me);
   if (!seesAll && !manages) return null;
-  const items = pendingForReviewer({ daily, projects, me, seesAll, ownerId });
+  const items = pendingForReviewer({ daily, weekly, projects, me, seesAll, ownerId });
   const groups = groupByProject(items);
   return (
     <div data-testid="eod-approvals">
     <Card className="p-0">
       <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3">
         <h2 className="flex items-center gap-2 font-bold">
-          <Moon size={16} className="text-accent-ink" /> End of day approvals <Badge tone="lavender">{items.length}</Badge>
+          <Moon size={16} className="text-accent-ink" /> End of day and week approvals <Badge tone="lavender">{items.length}</Badge>
         </h2>
       </div>
-      {!items.length && <p className="px-5 py-3 text-sm text-muted">No end of day is waiting for you.</p>}
+      {!items.length && <p className="px-5 py-3 text-sm text-muted">No end of day or end of week is waiting for you.</p>}
       {groups.map(({ projectId, items: list }) => {
         const project = projects.find((p) => p.id === projectId);
         return (
