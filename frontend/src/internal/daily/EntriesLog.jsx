@@ -225,6 +225,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const [rows, setRows] = useState(stored);
   const [asg, setAsg] = useState(record.asg ?? {}); // time and notes typed on assigned rows, saved with the actuals
   const [unlocked, setUnlocked] = useState(false);
+  const [actualsOpen, setActualsOpen] = useState(false); // a sent day: only the actuals (time taken, done, notes) are open for editing
   const [added, setAdded] = useState([]); // projects (or "other:" work) added below the tables
   const [pick, setPick] = useState('');
   const [otherName, setOtherName] = useState('');
@@ -235,6 +236,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     setRows(stored);
     setAsg(record.asg ?? {});
     setUnlocked(false);
+    setActualsOpen(false);
     setAdded([]);
   }, [personId, key]); // eslint-disable-line react-hooks/exhaustive-deps
   // Edits are saved as they are typed (see the effect below). When the saved rows change underneath (another save, a refresh from
@@ -262,7 +264,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     if (!entriesChanged && !asgChanged) return undefined;
     const timer = setTimeout(() => {
       try {
-        save({ ...(entriesChanged ? { entries: kept } : {}), ...(asgChanged ? { asg } : {}) });
+        save({ ...(entriesChanged ? { entries: kept } : {}), ...(asgChanged ? { asg } : {}), ...(actualsOpen && record.eodAt ? { eodAt: record.eodAt } : {}) }); // the same sending time again refreshes the sent report
       } catch {
         /* a refused save (for example a locked day) leaves the typed values as they are */
       }
@@ -295,7 +297,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const targetsLocked = !!record.entriesAt && !unlocked;
   const actualsAt = record.actualsAt ?? record.entriesDoneAt;
   const actualsLocked = !!actualsAt && !unlocked;
-  const actualsReadOnly = readOnly || actualsLocked;
+  const actualsReadOnly = readOnly || (actualsLocked && !actualsOpen);
   const canSend =
     !!record.entriesAt && !!actualsAt && !unlocked && (!record.entriesDoneAt || (record.actualsAt ?? '') > record.entriesDoneAt || reopenedPids.size > 0);
   const shown = readOnly ? stored : rows;
@@ -548,6 +550,17 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
             record.entriesAt && <Badge tone="grey">End of day not sent</Badge>
           )}
           {!readOnly && <TaskMenuSettings personId={personId} />}
+          {!readOnly && targetsLocked && record.entriesDoneAt && (
+            <Button
+              tone="ghost"
+              className="border border-line"
+              data-testid="edit-actuals"
+              title="Change the time taken, how many got done or the notes of a sent day. Targets stay locked."
+              onClick={() => setActualsOpen((v) => !v)}
+            >
+              <Pencil size={13} /> {actualsOpen ? 'Done editing actuals' : 'Edit actuals'}
+            </Button>
+          )}
           {!readOnly && targetsLocked && (
             <Button tone="ghost" className="border border-line" onClick={() => setUnlocked(true)}>
               <Pencil size={13} /> Update
