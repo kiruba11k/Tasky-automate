@@ -20,3 +20,11 @@ test('a sent day record turns the default on for its rows', () => {
   assert.equal(dayRowsWithAssigned([task()], daily, ME, D, { projects: [], today: D })[0].actualMin, 45);
   assert.equal(dayRowsWithAssigned([task()], {}, ME, D, { projects: [], today: D })[0].actualMin, undefined);
 });
+
+test('a done number typed on an assigned row shows, and the approved number wins when larger', () => {
+  const opts = { projects: [], today: D, asg: { [`asg|${ME}|${D}|p|l2`]: { projectId: 'p', doneQty: 6 } } };
+  const row = assignedDay([task()], ME, D, opts).rows[0];
+  assert.deepEqual([row.doneQty, row.typedDone, row.approved], [6, 6, false]);
+  const done = task({ status: 'done', doneQty: 9, minutes: 30, date: D });
+  assert.equal(assignedDay([done], ME, D, { ...opts, today: D }).rows[0].doneQty, 9);
+});

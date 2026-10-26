@@ -107,6 +107,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
       const rowId = `asg|${personId}|${date}|${b.id}`;
       const typed = asg?.[rowId];
       const typedMin = typed?.actualMin > 0 ? typed.actualMin : undefined;
+      const typedDone = typed?.doneQty > 0 ? typed.doneQty : undefined; // a number typed on the row; the approved number wins when it is larger
       const estMin = Math.max(0, b.est - (l?.est ?? 0));
       const loggedTotal = typedMin || actualMin ? (typedMin ?? 0) + (actualMin ?? 0) : undefined;
       const defaulted = !loggedTotal && defaultTaken && estMin > 0;
@@ -120,8 +121,9 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         label: b.k.label,
         kind: "number",
         qty: Math.max(0, b.qty - (l?.qty ?? 0)),
-        doneQty: Math.max(0, b.done - (l?.done ?? 0)),
-        approved: b.approved, // false = the number "fills in with the approved number" and is still awaiting approval
+        doneQty: Math.max(0, b.done - (l?.done ?? 0), typedDone ?? 0),
+        typedDone,
+        approved: b.approved && !(typedDone > b.done - (l?.done ?? 0)), // false = the number "fills in with the approved number" and is still awaiting approval
         estMin,
         actualMin: totalMin,
         defaultTime: defaulted,

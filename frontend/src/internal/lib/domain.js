@@ -504,6 +504,13 @@ export function targetVsActualRows(tasks, assigneeId, from, to, opts = {}) {
   });
   const projectOf = (id) => opts.projects?.find((p) => p.id === id);
   if (opts.daily && assigneeId) {
+    // a done number typed on an assigned row counts like a logged row (the larger of it and the approved number is used)
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      Object.values(dayAsg(opts.daily, assigneeId, d)).forEach((v) => {
+        if (!(v?.doneQty > 0) || (opts.projectId && v.projectId !== opts.projectId)) return;
+        bucket(d, v.projectId, taskBreakdownKey(entryAsTask(v, projectOf(v.projectId)))).rowsA += v.doneQty;
+      });
+    }
     entriesBetween(opts.daily, assigneeId, from, to).forEach(({ date, entry }) => {
       if (opts.projectId && entry.projectId !== opts.projectId) return;
       const b = bucket(date, entry.projectId, taskBreakdownKey(entryAsTask(entry, projectOf(entry.projectId))));

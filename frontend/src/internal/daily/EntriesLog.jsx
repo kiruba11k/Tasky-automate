@@ -125,10 +125,25 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
         )}
       </td>
       <td className="px-2 py-2">
-        <span className="tabular-nums" title="Fills in with the approved number">
-          {r.doneQty ?? 0}
-          <span className="ml-1 text-[10px] text-muted">{r.approved ? 'approved' : 'awaiting approval'}</span>
-        </span>
+        {locked ? (
+          <span className="tabular-nums" title="Fills in with the approved number, or the number you typed">
+            {r.doneQty ?? 0}
+            <span className="ml-1 text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
+          </span>
+        ) : (
+          <span className="flex items-center gap-1">
+            <input
+              aria-label="Actual done"
+              type="number"
+              min={0}
+              className={cx(FIELD, 'w-20')}
+              placeholder={String(r.doneQty ?? 0)}
+              value={r.typedDone ?? ''}
+              onChange={(e) => onType({ doneQty: e.target.value === '' ? undefined : Math.max(0, Math.round(+e.target.value)) })}
+            />
+            <span className="text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
+          </span>
+        )}
       </td>
       <td className="px-2 py-2">
         {editing ? (
@@ -432,7 +447,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
   const typeOnAssigned = (row, patch) =>
     setAsg((all) => {
       const next = { ...(all[row.id] ?? { projectId: row.projectId, task: row.task, custom: row.custom }), ...patch };
-      const empty = !(next.actualMin > 0) && !next.remarks;
+      const empty = !(next.actualMin > 0) && !(next.doneQty > 0) && !next.remarks;
       const { [row.id]: _gone, ...rest } = all; // eslint-disable-line no-unused-vars
       return empty ? rest : { ...rest, [row.id]: next };
     });

@@ -359,3 +359,9 @@ test('a few minutes over a long task is still on time (10% grace)', async () => 
   assert.equal(wasOnTime({ status: 'done', qty: 1, doneQty: 1, minutes: 365, targetMinutes: 360 }), true);
   assert.equal(wasOnTime({ status: 'done', qty: 1, doneQty: 1, minutes: 400, targetMinutes: 360 }), false);
 });
+
+test('a done number typed on an assigned row reaches the day snapshot', () => {
+  const daily = { [`${ME}|2026-10-13`]: { asg: { a: { projectId: P, task: 'l2', doneQty: 7 } } } };
+  const r = targetVsActualRows([task({ qty: 10 })], ME, '2026-10-13', '2026-10-13', { daily })[0];
+  assert.deepEqual([r.target, r.actual], [10, 7]);
+});

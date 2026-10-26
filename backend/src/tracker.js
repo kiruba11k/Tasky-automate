@@ -81,7 +81,7 @@ export function asgProblem(doc) {
   const a = doc.asg;
   const ok = a && typeof a === 'object' && !Array.isArray(a) && Object.keys(a).length <= 300
     && Object.entries(a).every(([id, v]) => id.length <= 200 && v && typeof v === 'object' && typeof v.projectId === 'string' && v.projectId.length <= 200
-      && short(v.task, 200) && short(v.custom, 200) && count(v.actualMin) && short(v.remarks, 1000));
+      && short(v.task, 200) && short(v.custom, 200) && count(v.actualMin) && count(v.doneQty) && short(v.remarks, 1000));
   return ok ? null : 'A time or note on an assigned task is not valid.';
 }
 
