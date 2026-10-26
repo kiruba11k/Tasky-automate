@@ -59,6 +59,63 @@ export function weeklyDone(entry, personId, monday, daily) {
   return matches.length ? matches.reduce((sum, { entry: row }) => sum + (row.doneQty ?? 0), 0) : undefined;
 }
 
+const STATUS_RANK = { "Not started": 0, "In progress": 1, Blocked: 1, Completed: 2 };
+
+/**
+ * What the team's daily work says about a period's own targets (the Number / Milestone / Text rows of a week or month), matched by
+ * name within the project: Map(lower-case name -> { done, status, text }). Numbers add up the achieved counts of the day-table rows
+ * (and approved tasks) with that name, a milestone is the furthest status any row with that name reached, text is the latest note.
+ */
+export function matchedTargetWork(project, tasks, daily, start, end) {
+  const out = new Map();
+  const slot = (name) => {
+    const key = String(name ?? "").trim().toLowerCase();
+    if (!key) return null;
+    if (!out.has(key)) out.set(key, { done: 0, status: undefined, text: undefined });
+    return out.get(key);
+  };
+  const mark = (cell, status) => {
+    if (status && (STATUS_RANK[status] ?? 0) >= (STATUS_RANK[cell.status] ?? -1)) cell.status = status;
+  };
+  Object.entries(daily ?? {}).forEach(([key, record]) => {
+    const date = key.split("|")[1];
+    if (date < start || date >= end) return;
+    (record.entries ?? []).forEach((row) => {
+      if (row.projectId !== project.id) return;
+      const cell = slot(entryAsTask(row, project).title);
+      if (!cell) return;
+      const kind = row.kind ?? "number";
+      if (kind === "milestone") mark(cell, row.status);
+      else if (kind === "text") cell.text = row.actualText?.trim() || cell.text;
+      else cell.done += row.doneQty ?? 0;
+    });
+    Object.values(record.asg ?? {}).forEach((v) => {
+      if (v?.projectId !== project.id || !(v.doneQty > 0)) return;
+      const cell = slot(entryAsTask(v, project).title);
+      if (cell) cell.done += v.doneQty;
+    });
+  });
+  (tasks ?? []).forEach((t) => {
+    if (t.historic || t.projectId !== project.id || t.date < start || t.date >= end || t.status !== "done") return;
+    const cell = slot(t.customName || TASK_TYPES.find((x) => x.id === t.typeId)?.name || t.title);
+    if (cell) {
+      cell.done += t.doneQty ?? 0;
+      mark(cell, "Completed");
+    }
+  });
+  return out;
+}
+
+/** A period target row with whatever its owner has not typed filled from the daily work (`matched` from `matchedTargetWork`). */
+export function withDerivedTarget(row, matched) {
+  const seen = matched?.get(String(row.label ?? "").trim().toLowerCase());
+  if (!seen) return row;
+  const kind = row.kind ?? (row.targetNum != null ? "number" : "text");
+  if (kind === "number") return row.actualNum != null ? row : seen.done > 0 ? { ...row, actualNum: seen.done, derived: true } : row;
+  if (kind === "milestone") return row.status && row.status !== "Not started" ? row : seen.status ? { ...row, status: seen.status, derived: true } : row;
+  return row.actual ? row : seen.text ? { ...row, actual: seen.text, derived: true } : row;
+}
+
 /**
  * Project numbers (messages, l2, decks) from work logged in the day tables over [start, end): per person, day and task type the
  * amount by which the logged "done" exceeds what the person's submitted tasks already count. { messages: n, ... }
@@ -146,6 +203,12 @@ export function loggedMetricExtras(project, tasks, daily, start, end, { includeT
       if (row.projectId !== project.id) return;
       const metric = rowMetric(project, row);
       if (metric) slot(person, date, metric).logged += rowDoneCount(row);
+    });
+    // a done number typed on an assigned row counts like a logged one
+    Object.values(record.asg ?? {}).forEach((v) => {
+      if (v?.projectId !== project.id || !(v.doneQty > 0)) return;
+      const metric = rowMetric(project, v);
+      if (metric) slot(person, date, metric).logged += v.doneQty;
     });
   });
   (tasks ?? []).forEach((t) => {

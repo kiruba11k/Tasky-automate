@@ -15,7 +15,8 @@ import {
   tc as metricInPeriod,
 } from '@/internal/min';
 import { projectWeekStart, savedWeekPlan } from '@/internal/lib/domain';
-import { plannedWeekTargets } from '@/internal/lib/entries';
+import { matchedTargetWork, plannedWeekTargets, withDerivedTarget } from '@/internal/lib/entries';
+import { periodRange } from '../ui/projectStats.js';
 import { ProgressBars } from './ProgressBars';
 import { ProgressTile } from './ProgressTile';
 import { weekOptions, monthOptions } from './weekOptions';
@@ -87,9 +88,12 @@ export function ProjectProgress({ p: project, compact }) {
   const off = (kind === 'week' ? project.weekOff?.[week] : project.monthOff?.[month]) ?? [];
   const custom = (kind === 'week' ? project.weekText?.[week] : project.monthText?.[month]) ?? [];
   const metrics = project.metrics.filter((m) => metricInPeriod(m, kind) && !off.includes(m.id));
+  const [from, to] = periodRange({ kind, key: periodKey });
+  const matched = useMemo(() => matchedTargetWork(project, tasks, daily, from, to), [project, tasks, daily, from, to]);
   const customItems = custom
     .filter((r) => r.label?.trim())
-    .map((r) => {
+    .map((raw) => {
+      const r = withDerivedTarget(raw, matched);
       const type = r.kind ?? (r.targetNum != null ? 'number' : 'text');
       if (type === 'milestone') return { id: r.id, label: r.label, value: r.status === 'Completed' ? 1 : 0, target: 1, status: r.status ?? 'Not started', note: r.target };
       if (type === 'text') return { id: r.id, label: r.label, value: 0, target: undefined, text: true, note: r.actual || r.target };

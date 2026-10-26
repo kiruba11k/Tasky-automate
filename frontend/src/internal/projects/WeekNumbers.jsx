@@ -11,7 +11,8 @@ import {
 } from '@/internal/min';
 import { ProgressBar } from '../ui/ProgressBar';
 import { weekTargetFor } from '@/internal/lib/domain';
-import { formatDayMonth, todayKey } from '@/internal/lib/dates';
+import { matchedTargetWork, withDerivedTarget } from '@/internal/lib/entries';
+import { addDays, formatDayMonth, todayKey } from '@/internal/lib/dates';
 import { TargetSheet } from './TargetSheet';
 import { TABLE_INPUT_CLASS, MILESTONE_STATUSES, sortedWeeks, targetKind } from './targetKinds';
 
@@ -47,7 +48,7 @@ function WeekNumbersTable({ p, canEdit }) {
   const metrics = p.metrics.filter((m) => tracksPeriod(m, 'week') && !off.includes(m.id));
   const goals = week ? weekTargetFor(p, week.start) : {};
   const actuals = (week && p.weekActuals?.[week.start]) || {};
-  const textRows = (week && p.weekText?.[week.start]) || [];
+  const rawRows = (week && p.weekText?.[week.start]) || [];
   const lockedAt = week ? p.weekDoneAt?.[week.start] : undefined;
   const [draft, setDraft] = useState(null);
   useEffect(() => {
@@ -59,6 +60,9 @@ function WeekNumbersTable({ p, canEdit }) {
     () => (week && week.start <= today ? countWeek(p, tasks, daily, { kind: 'week', key: week.start, end: week.end }).counts : {}),
     [p, tasks, daily, week, today],
   );
+  // custom targets start from what the team's daily work says (a row with the same name), unless a manager already typed them
+  const matched = useMemo(() => (week && week.start <= today ? matchedTargetWork(p, tasks, daily, week.start, addDays(week.end, 1)) : new Map()), [p, tasks, daily, week, today]);
+  const textRows = useMemo(() => rawRows.map((r) => withDerivedTarget(r, matched)), [rawRows, matched]);
   const startValue = (id) => String(actuals[id] ?? derived[id] ?? 0);
   const current = draft ?? {
     m: Object.fromEntries(metrics.map((m) => [m.id, startValue(m.id)])),
