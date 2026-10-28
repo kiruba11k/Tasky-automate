@@ -10,15 +10,13 @@ import {
   lt as guarded,
   Ye as toast,
   zw as computeDayHours,
-  We as formatMinutes,
 } from '@/internal/min';
 import { leaveLabel, leaveOn } from '../lib/leave.js';
 import { emptyDaily } from '../lib/domain.js';
 import { dayCarryEdits, dayRowsWithAssigned } from '../lib/assigned.js';
-import { assignedMinutesByProject, autoPlanBlocks } from '../lib/autoPlan.js';
+import { assignedMinutesByProject } from '../lib/autoPlan.js';
 import { changeProject } from '../lib/changeProject.js';
 import { PROJECT_CHANGED } from './ProjectChanger';
-import { isWeekday, lunchFor, todayKey } from '../lib/dates.js';
 import { DatePicker } from './DatePicker';
 import { MarkLeave } from './MarkLeave';
 import { HoursStats } from './HoursStats';
@@ -36,7 +34,6 @@ import { WeeklyTargets } from './WeeklyTargets';
 import { WeeklyHours } from './WeeklyHours';
 import { latestWorkday, formatShortDate } from './dateHelpers';
 import { nonEmptyExtras } from './planHelpers';
-import { blocksKey } from './planBlocks';
 
 /** Member "Tasks update" page (route /daily). */
 export function TasksUpdate() {
@@ -71,38 +68,8 @@ export function TasksUpdate() {
     }
   };
 
-  // The plan follows the assigned work: top it up with the minutes assigned per project that it does not hold yet. Only on the
-  // owner's own editable day, and never over unsaved edits in the builder.
+  // The plan is never filled in from assigned tasks: blocks are added by the person only.
   const planLocked = !!record.planAt; // 'Save plan and times' locks the plan until Update is pressed
-  const editable = date >= todayKey(0) && isWeekday(date) && !record.eodAt && !(leave && leave.kind !== 'half');
-  useEffect(() => {
-    if (!editable || planLocked) return; // a locked plan is never rewritten behind the person's back; the top-up runs again after Update
-    const st = useStore.getState();
-    const r = st.daily[`${me}|${date}`] ?? emptyDaily();
-    const sameExtra = (a, b) => (a ?? []).map((x) => `${x.id}|${x.minutes}`).join() === (b ?? []).map((x) => `${x.id}|${x.minutes}`).join();
-    const byStart = (l) => blocksKey([...l].sort((a, b) => a.start.localeCompare(b.start)));
-    if (byStart(plan) !== byStart(r.plan ?? []) || !sameExtra(extra, r.extra)) return; // unsaved edits in the builder
-    const assigned = assignedMinutesByProject(st.tasks, me, date, { projects: st.projects, carryEdits: dayCarryEdits(st.daily, me, date) });
-    const names = Object.fromEntries(st.projects.map((p) => [p.id, p.name]));
-    const res = autoPlanBlocks({
-      plan: r.plan ?? [],
-      extra: r.extra ?? [],
-      autoPlanned: r.autoPlanned ?? {},
-      assigned,
-      lunch: lunchFor(st.daily, me, date, st.profiles),
-      names,
-    });
-    if (!res) return;
-    try {
-      st.saveDaily(me, date, { plan: res.plan, extra: res.extra, autoPlanned: res.autoPlanned });
-    } catch {
-      return;
-    }
-    syncPlanFromStore();
-    const total = Object.values(res.added).reduce((a, b) => a + b, 0);
-    const first = Object.keys(res.added).length === 1 ? ` ${names[Object.keys(res.added)[0]] ?? ''}` : '';
-    toast({ title: `Added ${formatMinutes(total)}${first} from tasks assigned to you`, tone: 'success' });
-  }, [tasks, me, date, projects, profiles, editable, planLocked, record.plan, record.extra, record.autoPlanned, record.carryEdits, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Change the project of one block / extra row (or, with no id, of every block of `from`), also when the day is locked or sent.
