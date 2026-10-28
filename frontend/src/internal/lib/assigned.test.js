@@ -28,3 +28,10 @@ test('a done number typed on an assigned row shows, and the approved number wins
   const done = task({ status: 'done', doneQty: 9, minutes: 30, date: D });
   assert.equal(assignedDay([done], ME, D, { ...opts, today: D }).rows[0].doneQty, 9);
 });
+
+test('a task assigned earlier and sent in today shows as sent in today, not as carried over', () => {
+  const sent = task({ date: '2026-10-12', status: 'in_review', doneQty: 10, minutes: 30, submittedAt: `${D}T09:00:00.000Z` });
+  const row = assignedDay([sent], ME, D, { projects: [], today: D }).rows[0];
+  assert.deepEqual([row.sentFrom, row.carriedFrom, row.actualMin], ['2026-10-12', undefined, 30]);
+  assert.equal(assignedDay([task({ date: '2026-10-12', status: 'todo' })], ME, D, { projects: [], today: D }).rows.length, 0);
+});

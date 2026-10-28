@@ -83,6 +83,10 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
             <span className="rounded bg-butter px-1.5 py-px text-[10px] font-bold text-butter-ink" data-testid="carried-badge" title={badgeTitle}>
               From yesterday's tasks
             </span>
+          ) : r.sentFrom ? (
+            <span className="rounded bg-lavender px-1.5 py-px text-[10px] font-bold text-lavender-ink" data-testid="sent-in-badge" title={`Assigned on ${r.sentFrom}, sent in today`}>
+              Sent in today · assigned {r.sentFrom.slice(8, 10)}/{r.sentFrom.slice(5, 7)}
+            </span>
           ) : (
             <span className="rounded bg-sky px-1.5 py-px text-[10px] font-bold text-sky-ink" data-testid="assigned-badge" title={badgeTitle}>
               Assigned

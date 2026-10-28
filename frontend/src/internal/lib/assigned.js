@@ -36,7 +36,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
     const k = taskBreakdownKey(t);
     const id = `${t.projectId}|${k.key}`;
     const b = buckets.get(id) ?? { id, k, projectId: t.projectId, tasks: [], qty: 0, done: 0, est: 0, minutes: 0, approved: false, cQty: 0, cEst: 0, cTasks: 0 };
-    b.tasks.push({ t, carried: t.date !== date });
+    b.tasks.push({ t, carried: carried && t.date !== date, late: finishedHere && t.date !== date && !carried }); // `late`: assigned on an earlier day, sent in on this one
     if (planned) {
       b.qty += t.qty ?? 0;
       b.est += t.targetMinutes ?? 0;
@@ -136,6 +136,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         priority: b.tasks.some((x) => x.t.priority),
         statuses: b.tasks.map((x) => x.t.status),
         carriedFrom: b.tasks.every((x) => x.carried) ? b.tasks.map((x) => x.t.date).sort()[0] : undefined,
+        sentFrom: b.tasks.every((x) => x.late) ? b.tasks.map((x) => x.t.date).sort()[0] : undefined,
         covering: !!l,
       };
       if (l && !row.qty && !row.doneQty && !row.estMin && !row.actualMin) {
