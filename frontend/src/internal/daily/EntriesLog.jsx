@@ -141,6 +141,16 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
               value={r.typedDone ?? ''}
               onChange={(e) => onType({ doneQty: e.target.value === '' ? undefined : Math.max(0, Math.round(+e.target.value)) })}
             />
+            {r.qty > 0 && r.typedDone !== r.qty && (
+              <button
+                type="button"
+                className="focus-ring rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-accent-ink hover:bg-surface-2"
+                title="Everything assigned is done"
+                onClick={() => onType({ doneQty: r.qty })}
+              >
+                All {r.qty}
+              </button>
+            )}
             <span className="text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
           </span>
         )}
@@ -513,7 +523,8 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     guarded(() => {
       const at = new Date().toISOString();
       save({ entries: stored, entriesDoneAt: at, eodAt: at });
-      toast({ title: `End of day sent at ${formatClock(at)} 🌙`, tone: 'success' });
+      const sentTasks = useStore.getState().autoSubmitDay(personId, key);
+      toast({ title: `End of day sent at ${formatClock(at)} 🌙${sentTasks ? ` ${sentTasks} task${sentTasks === 1 ? '' : 's'} sent for approval.` : ''}`, tone: 'success' });
     });
   const sendHint = record.entriesAt
     ? actualsAt
@@ -571,7 +582,13 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
               className="border border-line"
               data-testid="edit-actuals"
               title="Change the time taken, how many got done or the notes of a sent day. Targets stay locked."
-              onClick={() => setActualsOpen((v) => !v)}
+              onClick={() => {
+                if (actualsOpen) {
+                  const sentTasks = useStore.getState().autoSubmitDay(personId, key); // numbers typed while editing send their tasks too
+                  if (sentTasks) toast({ title: `${sentTasks} task${sentTasks === 1 ? '' : 's'} sent for approval`, tone: 'success' });
+                }
+                setActualsOpen((v) => !v);
+              }}
             >
               <Pencil size={13} /> {actualsOpen ? 'Done editing actuals' : 'Edit actuals'}
             </Button>

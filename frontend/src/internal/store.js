@@ -25,6 +25,7 @@ import {
 } from "./lib/domain.js";
 import { buildEodRequests, eodReviewerOf, decisionFor, eodProjectWork, weekProjectWork, reviewsAfterMove, sendSummary } from "./lib/eodReview.js";
 import { assignedDay, weekAssignedRows } from "./lib/assigned.js";
+import { planSubmissions } from "./lib/autoSubmit.js";
 import { weekRows } from "./lib/entries.js";
 import { DEFAULT_TEMPLATE_ID, PROJECT_TEMPLATES, templateMetrics, validateMetrics } from "./lib/projectTemplates.js";
 
@@ -629,6 +630,26 @@ export const useStore = create()(
             const name = get().projects.find((p) => p.id === send.projectId)?.name ?? "a project";
             notify(send.reviewerId, `${firstName(personId)} sent end of week for ${name} (${sendSummary(send.rows, send.minutes)}), waiting for your approval`, "eod");
           }
+        },
+        /**
+         * Sends the person's assigned tasks that have a done number typed on their row in the day's table for approval, with the
+         * numbers from the row (done, time taken) and the project's manager as reviewer. Returns how many were sent.
+         */
+        autoSubmitDay: (personId, day) => {
+          if (personId !== get().me) return 0;
+          const record = get().daily[`${personId}|${day}`];
+          if (!record) return 0;
+          const rows = dayAssigned(personId, day, record);
+          let sent = 0;
+          for (const p of planSubmissions({ rows, tasks: get().tasks, projects: get().projects, me: personId })) {
+            try {
+              get().submitForReview(p.taskId, p.doneQty, p.minutes, p.reviewerId);
+              sent++;
+            } catch {
+              /* a task that cannot be sent in (no reviewer, already handled) stays for the person to submit */
+            }
+          }
+          return sent;
         },
         /** The project's manager (or leadership) approves, or sends back with feedback, the work a person reported for a project in a week. */
         decideEow: (personId, week, projectId, verdict, note = "") => {
