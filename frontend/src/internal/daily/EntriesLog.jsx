@@ -986,6 +986,19 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             <Plus size={12} /> Add task
                           </button>
                         )}
+                        {!tableEditable && !readOnly && (
+                          <button
+                            className="focus-ring flex items-center gap-1 rounded-full border border-line px-3 py-1 text-accent-ink hover:bg-surface-2"
+                            title="Opens the day for changes, then adds a row. Lock it again when you are done."
+                            data-testid="add-task-locked"
+                            onClick={() => {
+                              setUnlocked(true);
+                              setRows((list) => [...list, blankEntry(pid)]);
+                            }}
+                          >
+                            <Plus size={12} /> Add task
+                          </button>
+                        )}
                       </td>
                       <td className="px-2 py-2 text-right text-muted" colSpan={3}>
                         Total
