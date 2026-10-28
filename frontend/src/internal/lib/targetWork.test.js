@@ -34,3 +34,21 @@ test('a done number typed on an assigned row counts toward the project number', 
   const d = { 'u1|2026-10-27': { entries: [], asg: { x: { projectId: 'p', task: 'std:w', doneQty: 4 } } } };
   assert.deepEqual(loggedMetricExtras(project, [], d, '2026-10-26', '2026-11-02'), { workflows: 4 });
 });
+
+import { weekRows, rowKey } from './entries.js';
+import { weeklySnapshot } from './domain.js';
+
+test('the week table takes typed estimated and taken time, and rows removed from the week leave it', () => {
+  const row = { id: 'r', projectId: 'p', task: 'l2', kind: 'number', qty: 10, doneQty: 8, estMin: 60, actualMin: 50 };
+  const d = { 'u1|2026-10-27': { entries: [row] } };
+  const key = rowKey(row);
+  const typed = weekRows('u1', '2026-10-26', d, [], { [key]: { estMin: 90, actualMin: 75 } })[0];
+  assert.deepEqual([typed.estMin, typed.actualMin], [90, 75]);
+  assert.equal(weekRows('u1', '2026-10-26', d, [], { [key]: { hidden: true } }).length, 0);
+  const all = weekRows('u1', '2026-10-26', d, [], { [key]: { hidden: true } }, [], true);
+  assert.deepEqual([all.length, all[0].hidden], [1, true]);
+  assert.equal(weekRows('u1', '2026-10-26', d, [], { [key]: { hidden: false } }).length, 1);
+  const snap = weeklySnapshot([], 'u1', '2026-10-26', { entries: [], overrides: { [key]: { hidden: true } } }, 'now', { daily: d, projects: [] });
+  const r = Object.values(snap.byType)[0];
+  assert.deepEqual([r?.target ?? 0, r?.actual ?? 0], [0, 0]);
+});

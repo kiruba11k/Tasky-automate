@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CalendarDays, Image as ImageIcon, Pencil } from 'lucide-react';
+import { CalendarDays, Image as ImageIcon, Pencil, Trash } from 'lucide-react';
 import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes, Ye as toast, lt as guarded } from '@/internal/min';
 import { addDays, formatDayMonth, parseDateKey, weekStart, WEEKDAY_SHORT } from '../lib/dates.js';
 import { rowKey, weekRows } from '../lib/entries.js';
@@ -7,6 +7,7 @@ import { dayRowsWithAssigned, weekAssignedRows } from '../lib/assigned.js';
 import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
 import { copyElementAsImage } from '../lib/copyTableImage';
+import { DurationInput } from './DurationInput';
 import { DateMenu, DayMarker } from './DateMenu';
 import { DayMover } from './DayMover';
 import { sheetAchievedText, sheetColorOf, sheetTargetText } from './sheetText';
@@ -102,6 +103,11 @@ export function EntriesProgress({ personId, date, kind, editable }) {
     kind === 'day'
       ? dayRowsWithAssigned(tasks, daily, personId, date, { projects })
       : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
+  // rows taken out of this week's table (restorable while editing)
+  const removedRows =
+    kind === 'week'
+      ? weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }), true).filter((r) => r.hidden)
+      : [];
   const override = (row, patch) => {
     const key = rowKey(row);
     saveWeekly(personId, monday, {
@@ -187,6 +193,22 @@ export function EntriesProgress({ personId, date, kind, editable }) {
         {editButton}
       </div>
       {kind === 'week' && <WeekDays personId={personId} monday={monday} />}
+      {kind === 'week' && editable && removedRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted" data-testid="removed-week-rows">
+          Removed from this week ({removedRows.length})
+          {removedRows.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              title="Put it back in this week's table"
+              className="focus-ring rounded-full border border-line px-2.5 py-0.5 font-semibold hover:bg-surface-2"
+              onClick={() => override(r, { hidden: false })}
+            >
+              {entryName(r, projects.find((p) => p.id === r.projectId))}
+            </button>
+          ))}
+        </div>
+      )}
       {!editable && (
         <div className="overflow-x-auto" data-testid={`sheet-${kind}`} ref={sheetRef}>
           <table className="w-full min-w-[860px] border-collapse text-sm">
@@ -308,6 +330,27 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                               </button>
                             )}
                           />
+                        )}
+                        {editable && kind === 'week' && (
+                          <span className="flex flex-wrap items-center gap-2 text-xs text-muted" data-edit-times={r.id}>
+                            <span className="flex items-center gap-1">
+                              Estimated
+                              <DurationInput label={`${name} estimated time`} placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
+                            </span>
+                            <span className="flex items-center gap-1">
+                              Taken
+                              <DurationInput label={`${name} time taken`} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${name}`}
+                              title="Remove from this week's table (your daily updates keep it)"
+                              className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink"
+                              onClick={() => override(r, { hidden: true })}
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </span>
                         )}
                         {editable && kindOf === 'milestone' ? (
                           <select

@@ -60,6 +60,8 @@ export function AddToWeek({ personId, mon }) {
       ? {
           ...record.overrides,
           [key]: {
+            ...typed,
+            hidden: false, // adding a task that was removed from the week brings it back
             qty: typed.qty != null ? typed.qty + (row.qty ?? 0) : undefined,
             doneQty: typed.doneQty != null ? typed.doneQty + (row.doneQty ?? 0) : undefined,
           },

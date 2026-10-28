@@ -258,9 +258,10 @@ export const rowKey = (row) => `${row.projectId}|${row.task}|${(row.custom ?? ""
  * The rows of a person's "Weekly update": every row of the week's Monday to Friday day tables plus the rows added to the week
  * itself, with the same work added up into one row (targets, achieved, estimated and taken time, latest status / text, notes
  * joined). `overrides` are numbers or statuses typed over the sums in the week table, by `rowKey`. `assignedRows` are the
- * week's assigned-task rows (`weekAssignedRows`), added up with the rest.
+ * week's assigned-task rows (`weekAssignedRows`), added up with the rest. Rows removed from the week (`overrides[key].hidden`) are left out
+ * unless `includeHidden`.
  */
-export function weekRows(personId, monday, daily, weekEntries = [], overrides = {}, assignedRows = []) {
+export function weekRows(personId, monday, daily, weekEntries = [], overrides = {}, assignedRows = [], includeHidden = false) {
   const all = [...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i))), ...assignedRows, ...weekEntries];
   const merged = new Map();
   all.forEach((row) => {
@@ -288,6 +289,9 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (typed?.doneQty != null) sum.doneQty = typed.doneQty;
     if (typed?.status) sum.status = typed.status;
     if (typed?.actualText != null) sum.actualText = typed.actualText;
+    if (typed?.estMin != null) sum.estMin = typed.estMin;
+    if (typed?.actualMin != null) sum.actualMin = typed.actualMin;
+    if (typed?.hidden) sum.hidden = true; // removed from this week's table (the daily updates keep it)
   });
-  return [...merged.values()];
+  return [...merged.values()].filter((r) => includeHidden || !r.hidden);
 }

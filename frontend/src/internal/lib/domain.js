@@ -552,8 +552,10 @@ export function targetVsActualRows(tasks, assigneeId, from, to, opts = {}) {
       const cur = typed && perKind.get(cellOf(row));
       if (!cur) return;
       const alone = rowsPerCell.get(cellOf(row)) === 1; // the typed number is then the whole figure; with several rows it moves it by the difference
-      if (typed.qty != null) cur.target = Math.max(0, alone ? typed.qty : cur.target + typed.qty - (row.qty ?? 0));
-      if (typed.doneQty != null) cur.actual = Math.max(0, alone ? typed.doneQty : cur.actual + typed.doneQty - (row.doneQty ?? 0));
+      const qty = typed.hidden ? 0 : typed.qty; // a row removed from the week counts for nothing
+      const doneQty = typed.hidden ? 0 : typed.doneQty;
+      if (qty != null) cur.target = Math.max(0, alone ? qty : cur.target + qty - (row.qty ?? 0));
+      if (doneQty != null) cur.actual = Math.max(0, alone ? doneQty : cur.actual + doneQty - (row.doneQty ?? 0));
     });
   }
   const rows = new Map();

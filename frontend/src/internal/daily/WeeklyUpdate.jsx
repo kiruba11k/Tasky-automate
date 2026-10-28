@@ -31,7 +31,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
     return () => window.removeEventListener(EDIT_WEEK, open);
   }, [readOnly]);
 
-  const rows = weekRows(personId, mon, daily, record?.entries ?? [], undefined, weekAssignedRows(tasks, daily, personId, mon, { projects }));
+  const rows = weekRows(personId, mon, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, mon, { projects }));
   const estimated = rows.reduce((sum, r) => sum + r.estMin, 0);
   const taken = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
   const submit = () =>
