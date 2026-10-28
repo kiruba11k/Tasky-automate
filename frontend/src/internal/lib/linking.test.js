@@ -149,11 +149,12 @@ test('time on submitted tasks and typed time do not add up in the hours', () => 
 test('unfinished tasks of earlier days are carried over to today only', () => {
   const old = task({ date: '2026-10-12', status: 'in_progress', qty: 8 });
   const finished = task({ date: '2026-10-12', status: 'done', doneQty: 8, qty: 8 });
-  const today = assignedDay([old, finished], ME, '2026-10-13', OPTS).rows;
+  const today = assignedDay([old, finished], ME, '2026-10-13', { ...OPTS, carry: true }).rows;
   assert.deepEqual(today.map((r) => [r.qty, r.carriedFrom]), [[8, '2026-10-12']]);
   assert.equal(assignedDay([old], ME, '2026-10-12', OPTS).rows[0].carriedFrom, undefined); // on its own day it is just assigned
   assert.equal(assignedDay([old], ME, '2026-10-14', { ...OPTS, today: '2026-10-13' }).rows.length, 0); // not carried to a later day
   assert.equal(assignedDay([old], ME, '2026-10-13', { ...OPTS, carry: false }).rows.length, 0);
+  assert.equal(assignedDay([old], ME, '2026-10-13', OPTS).rows.length, 0); // by default a task shows only on the day it was assigned for
 });
 
 test('the weekly rows add the days\' assigned tasks up once, without the carried-over copy', () => {

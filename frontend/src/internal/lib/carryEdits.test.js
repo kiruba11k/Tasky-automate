@@ -6,7 +6,7 @@ import { assignedMinutesByProject } from './autoPlan.js';
 const ME = 'me';
 const TODAY = '2026-10-13';
 const YDAY = '2026-10-12';
-const OPTS = { projects: [], today: TODAY };
+const OPTS = { projects: [], today: TODAY, carry: true };
 const old = { id: 'old1', assigneeId: ME, projectId: 'p1', typeId: 'l2', qty: 10, doneQty: 0, status: 'in_progress', date: YDAY, title: 'Leads batch', unit: 'messages', targetMinutes: 60 };
 const rowId = (d, tasks = [old]) => assignedDay(tasks, ME, d, OPTS).rows[0].id;
 

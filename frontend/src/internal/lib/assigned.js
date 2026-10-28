@@ -13,19 +13,19 @@ const projectOfRow = (projects, id) => projects?.find((p) => p.id === id);
 /** Dedupe key of a logged row and of an assigned task: project and kind of work. */
 const rowBucket = (row, projects) => `${row.projectId}|${taskBreakdownKey(entryAsTask(row, projectOfRow(projects, row.projectId))).key}`;
 
-/** Unfinished tasks from earlier days show on today's tables too, like the Dashboard's "carried over". */
+/** Unfinished tasks from earlier days. They are only brought onto today's tables when asked for (`carry: true`): an assigned task belongs to the day it was assigned for. */
 export const isCarriedOver = (task, date, today = todayKey(0)) => date === today && task.date < today && task.status !== "done";
 
 /**
  * The assigned rows of one person for one day: { rows, covers }. `rows` are read-only rows (assigned: true) in the shape of a
  * logged row, per project and kind of work, with the part the `logged` rows do not already cover. `covers` maps the id of a
- * logged row to the assigned tasks it stands in for. `carry: false` leaves out the carried-over tasks (used for week sums, where
- * the task is already on its own day). `carryEdits` ({ rowId: { qty, estMin, desc, hidden } }, saved in that day's record) are
+ * logged row to the assigned tasks it stands in for. `carry: true` adds the unfinished tasks of earlier days to today (off by default: a task shows only on the day it
+ * was assigned for; "Fill from" brings earlier work forward on request). `carryEdits` ({ rowId: { qty, estMin, desc, hidden } }, saved in that day's record) are
  * the person's changes to the carried-over part of a row for this day only: the tasks and the earlier days are never touched.
  * `hidden` lists the carried rows the person removed from today (so they can be restored). With `defaultTaken` (the day's end of day
  * was sent) a row with no time typed or logged takes its estimate as the time taken, which the person can edit.
  */
-export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = true, asg = {}, carryEdits = {}, defaultTaken = false } = {}) {
+export function assignedDay(tasks, personId, date, { projects, logged = [], today = todayKey(0), carry = false, asg = {}, carryEdits = {}, defaultTaken = false } = {}) {
   const buckets = new Map();
   tasks.forEach((t) => {
     if (t.assigneeId !== personId) return;

@@ -52,7 +52,7 @@ test("minutes already in Extra hours for the project count as planned", () => {
   assert.equal(run({ extra: [{ id: "e", start: "19:00", end: "20:00", minutes: 60, work: "x", projectId: "p1" }], assigned: { p1: 60 } }), null);
 });
 
-test("carried-over tasks count once, with the day's tasks", () => {
+test("the plan holds the day's own tasks; earlier unfinished ones only when carry is asked for", () => {
   const today = "2026-10-15";
   const tasks = [
     { id: "1", assigneeId: "me", projectId: "p1", title: "T", date: today, targetMinutes: 60, status: "todo" },
@@ -60,7 +60,8 @@ test("carried-over tasks count once, with the day's tasks", () => {
     { id: "3", assigneeId: "me", projectId: "p1", title: "T", date: "2026-10-14", targetMinutes: 90, status: "done" },
     { id: "4", assigneeId: "other", projectId: "p1", title: "T", date: today, targetMinutes: 500, status: "todo" },
   ];
-  assert.deepEqual(assignedMinutesByProject(tasks, "me", today, { projects: [], today }), { p1: 90 });
+  assert.deepEqual(assignedMinutesByProject(tasks, "me", today, { projects: [], today }), { p1: 60 });
+  assert.deepEqual(assignedMinutesByProject(tasks, "me", today, { projects: [], today, carry: true }), { p1: 90 });
   assert.deepEqual(assignedMinutesByProject(tasks, "me", "2026-10-16", { projects: [], today }), {});
 });
 
