@@ -23,6 +23,9 @@ import { formatDateTime, formatTimeOrDateTime } from './taskFormat';
 import { sortedHistory } from './historyMeta';
 
 /** A submitted task waiting for my review: approve, send feedback, or forward. */
+/** " messages" for a unit that is a word; nothing for a missing unit or one that is only digits (a custom task's unit can hold the quantity). */
+const unitText = (unit) => (unit && !/^\d+$/.test(String(unit).trim()) ? ` ${String(unit).trim()}` : '');
+
 export function ReviewRow({ task, projectName }) {
   const { approve, approvePart, sendBack, forwardReview } = useStore();
   const forwardTargets = useReviewerOptions(task.projectId).filter((o) => o.id !== task.assigneeId);
@@ -59,7 +62,7 @@ export function ReviewRow({ task, projectName }) {
           <p className="text-xs text-muted">
             {task.adhoc
               ? `${firstName(task.assigneeId)} · ${projectName} · sent for approval without an assigned task`
-              : `${firstName(task.assigneeId)} · ${projectName} · ${task.doneQty} ${task.unit} in ${formatMinutes(task.minutes ?? 0)} (target ${formatMinutes(task.targetMinutes)})`}
+              : `${firstName(task.assigneeId)} · ${projectName} · ${task.doneQty} out of ${task.qty}${unitText(task.unit)} in ${formatMinutes(task.minutes ?? 0)} (target ${formatMinutes(task.targetMinutes)})`}
           </p>
           {task.adhoc && task.feedback[0] && <p className="text-xs">Note: {task.feedback[0].text}</p>}
           <LinkChips links={task.links} className="mt-1" />
@@ -137,7 +140,7 @@ export function ReviewRow({ task, projectName }) {
             onClick={() => setApproveMode('all')}
           >
             <p className="flex items-center gap-2 font-semibold">
-              <CheckCheck size={15} className="text-mint-ink" /> Approve all {task.doneQty ?? task.qty} {task.unit}
+              <CheckCheck size={15} className="text-mint-ink" /> Approve all {task.doneQty ?? task.qty} out of {task.qty}{unitText(task.unit)}
             </p>
             <p className="text-xs text-muted">Everything submitted is good.</p>
           </button>
@@ -170,7 +173,7 @@ export function ReviewRow({ task, projectName }) {
                     placeholder={String(Math.floor(task.qty / 2))}
                   />
                   <span className="text-sm text-ink">
-                    of {task.qty} {task.unit}
+                    of {task.qty}{unitText(task.unit)}
                   </span>
                 </span>
               </label>

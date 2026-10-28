@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BellRing, Pencil, Star, Trash2 } from 'lucide-react';
 import { ConfirmModal } from '../kit/ConfirmModal';
+import { taskBreakdownKey } from '../lib/domain';
 import {
   Se as useStore,
   vt as Avatar,
@@ -24,7 +25,9 @@ import {
 
 /** One still-open task the manager assigned: remind or edit. */
 export function AssignedTaskRow({ t: task }) {
-  const { projects, editTask, remind, deleteTask } = useStore();
+  const { projects, editTask, remind, deleteTask, daily } = useStore();
+  // what the assignee has typed for this work in their Daily update so far (it goes for approval when they send the day)
+  const logged = daily[`${task.assigneeId}|${task.date}`]?.asg?.[`asg|${task.assigneeId}|${task.date}|${task.projectId}|${taskBreakdownKey(task).key}`]?.doneQty;
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -61,6 +64,11 @@ export function AssignedTaskRow({ t: task }) {
             {task.date !== dayKey(0) ? ` · for ${formatDay(task.date)}` : ''}
             {task.reminders > 0 && ` · reminded ${task.reminders}x`}
           </p>
+          {logged > 0 && task.status !== 'done' && task.status !== 'in_review' && (
+            <p className="text-xs text-accent-ink" data-testid="logged-hint">
+              {personName(task.assigneeId).split(' ')[0]} has logged {logged} in their daily update, not sent for approval yet
+            </p>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
             <TaskProgress task={task} />
             <TaskDetailsToggle task={task} open={detailsOpen} onClick={() => setDetailsOpen((k) => !k)} />

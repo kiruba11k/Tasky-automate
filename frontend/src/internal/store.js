@@ -76,6 +76,15 @@ export const useStore = create()(
         set((s) => ({
           notices: [{ id: newId(), to, text, at: nowIso(), read: false, kind }, ...s.notices],
         }));
+      /**
+       * Tell whoever assigned a task what happened to it (sent in, approved, sent back), unless they are the person who did it, the
+       * person it is about, or someone already told (`also`): the reviewer of a task is often not the person who assigned it.
+       */
+      const notifyAssigner = (task, text, also = []) => {
+        const to = task.assignedById;
+        if (!to || to === get().me || to === task.assigneeId || also.includes(to)) return;
+        notify(to, text);
+      };
       /** `r` - merge a patch into one task. */
       const patchTask = (id, patch) =>
         set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
@@ -308,6 +317,7 @@ export const useStore = create()(
               ? `${firstName(task.assigneeId)} resubmitted ${task.title} for review (resubmit ${resubmits})`
               : `${firstName(task.assigneeId)} sent ${task.title} to you for review`,
           );
+          notifyAssigner(task, `${firstName(task.assigneeId)} ${isResubmit ? "resubmitted" : "sent in"} ${task.title}, with ${firstName(reviewerId)} for review`, [reviewerId]);
         },
         approve: (id) => {
           const task = requireTask(id);
@@ -321,6 +331,7 @@ export const useStore = create()(
             history: [...(task.history ?? []), { at, by: get().me, action: "approved" }],
           });
           notify(task.assigneeId, `${firstName(get().me)} approved ${task.title} ✓`);
+          notifyAssigner(task, `${firstName(get().me)} approved ${firstName(task.assigneeId)}'s ${task.title} ✓`);
         },
         /** Approve some of a submitted task and send the rest back for rework as a new task. */
         approvePart: (id, count, note) => {
@@ -372,6 +383,7 @@ export const useStore = create()(
           };
           set((s) => ({ tasks: [redo, ...s.tasks] }));
           notify(task.assigneeId, `${firstName(me)} approved ${part} of ${task.qty} on ${task.title}. ${rest} need rework: ${note.trim()}`);
+          notifyAssigner(task, `${firstName(me)} approved ${part} of ${task.qty} on ${firstName(task.assigneeId)}'s ${task.title}; ${rest} need rework`);
         },
         sendBack: (id, text) => {
           const task = requireTask(id);
@@ -389,6 +401,7 @@ export const useStore = create()(
             ],
           });
           notify(task.assigneeId, `${firstName(get().me)} left feedback on ${task.title}`);
+          notifyAssigner(task, `${firstName(get().me)} sent ${firstName(task.assigneeId)}'s ${task.title} back with feedback`);
         },
         deleteTask: (id) => {
           const task = requireTask(id);

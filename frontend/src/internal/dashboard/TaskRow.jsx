@@ -180,7 +180,7 @@ export function TaskRow({ task }) {
           ))}
         </div>
         <p className="mt-3 text-sm text-muted">
-          Target: {formatMinutes(task.targetMinutes)} for {task.qty} {task.unit}
+          Target: {formatMinutes(task.targetMinutes)} for {task.qty}{task.unit && !/^\d+$/.test(String(task.unit).trim()) ? ` ${task.unit}` : ''}
         </p>
         <div className="mt-4 text-sm font-semibold">
           Links <span className="font-normal text-muted">(optional: the sheet or doc to check)</span>
