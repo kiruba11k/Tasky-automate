@@ -289,6 +289,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (typed?.doneQty != null) sum.doneQty = typed.doneQty;
     if (typed?.status) sum.status = typed.status;
     if (typed?.actualText != null) sum.actualText = typed.actualText;
+    if (typed?.targetText != null) sum.targetText = typed.targetText;
     if (typed?.estMin != null) sum.estMin = typed.estMin;
     if (typed?.actualMin != null) sum.actualMin = typed.actualMin;
     if (typed?.hidden) sum.hidden = true; // removed from this week's table (the daily updates keep it)

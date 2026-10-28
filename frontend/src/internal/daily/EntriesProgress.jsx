@@ -18,6 +18,8 @@ export const EDIT_WEEK = 'ls-edit-week';
 const percentOf = (done, target) => (target ? Math.round((done / target) * 100) : 0);
 const toneOf = (pct) => (pct >= 100 ? 'mint' : pct >= 60 ? 'sky' : 'peach');
 
+const kindOf = (row) => row.kind ?? 'number';
+
 /** A whole-number box that saves when it loses focus or Enter is pressed. */
 function NumberBox({ value, onSave, label }) {
   const [text, setText] = useState(String(value));
@@ -45,7 +47,7 @@ function NumberBox({ value, onSave, label }) {
 }
 
 /** A text box that saves when it loses focus or Enter is pressed. */
-function TextBox({ value, onSave, label }) {
+function TextBox({ value, onSave, label, placeholder = 'What got done' }) {
   const [text, setText] = useState(value);
   useEffect(() => {
     setText(value);
@@ -57,7 +59,7 @@ function TextBox({ value, onSave, label }) {
       onChange={(e) => setText(e.target.value)}
       onBlur={() => text !== value && onSave(text)}
       onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-      placeholder="What got done"
+      placeholder={placeholder}
       className="focus-ring w-full rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs"
     />
   );
@@ -209,7 +211,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
           ))}
         </div>
       )}
-      {!editable && (
+      {(!editable || kind === 'week') && (
         <div className="overflow-x-auto" data-testid={`sheet-${kind}`} ref={sheetRef}>
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
@@ -220,6 +222,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                 <th className={headCell}>Estimated time</th>
                 <th className={cx(headCell, 'w-[32%]')}>Targets achieved</th>
                 <th className={headCell}>Actual time taken</th>
+                {editable && <th className={cx(headCell, 'w-10')} aria-label="Remove" />}
               </tr>
             </thead>
             <tbody>
@@ -266,10 +269,65 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                           {projectLabel(pid, projects)}
                         </td>
                       )}
-                      <td className={cell}>{sheetTargetText(r, name)}</td>
-                      <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
-                      <td className={cell}>{achieved || <span className="text-xs text-muted">Not updated yet</span>}</td>
-                      <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.actualMin ? formatMinutes(r.actualMin) : '·'}</td>
+                      {editable ? (
+                        <>
+                          <td className={cell}>
+                            {kindOf(r) === 'number' ? (
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <NumberBox label={`${name} target`} value={r.qty ?? 0} onSave={(n) => override(r, { qty: n })} />
+                                <span>{name}</span>
+                              </span>
+                            ) : (
+                              <TextBox label={`${name} target text`} value={r.targetText ?? ''} placeholder={name} onSave={(t) => override(r, { targetText: t })} />
+                            )}
+                          </td>
+                          <td className={cx(cell, 'text-center')}>
+                            <DurationInput label={`${name} estimated time`} placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
+                          </td>
+                          <td className={cell}>
+                            {kindOf(r) === 'number' ? (
+                              <span className="flex items-center gap-1.5">
+                                <NumberBox label={`${name} achieved`} value={r.doneQty ?? 0} onSave={(n) => override(r, { doneQty: n })} />
+                                <span className="text-xs text-muted">of {r.qty ?? 0}</span>
+                              </span>
+                            ) : kindOf(r) === 'milestone' ? (
+                              <select
+                                aria-label={`${name} status`}
+                                className="focus-ring rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs font-semibold"
+                                value={r.status ?? 'Not started'}
+                                onChange={(e) => override(r, { status: e.target.value })}
+                              >
+                                {ROW_STATUSES.map((st) => (
+                                  <option key={st}>{st}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <TextBox label={`${name} actual`} value={r.actualText ?? ''} placeholder="What got done" onSave={(t) => override(r, { actualText: t })} />
+                            )}
+                          </td>
+                          <td className={cx(cell, 'text-center')}>
+                            <DurationInput label={`${name} time taken`} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
+                          </td>
+                          <td className={cx(cell, 'text-center')}>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${name}`}
+                              title="Remove from this week's table (your daily updates keep it)"
+                              className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink"
+                              onClick={() => override(r, { hidden: true })}
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className={cell}>{sheetTargetText(r, name)}</td>
+                          <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
+                          <td className={cell}>{achieved || <span className="text-xs text-muted">Not updated yet</span>}</td>
+                          <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.actualMin ? formatMinutes(r.actualMin) : '·'}</td>
+                        </>
+                      )}
                     </tr>
                   );
                 });
@@ -278,7 +336,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
           </table>
         </div>
       )}
-      {editable &&
+      {editable && kind === 'day' &&
         projectIds.map((pid) => {
           const project = projects.find((p) => p.id === pid);
           const mine = rows.filter((r) => r.projectId === pid);
