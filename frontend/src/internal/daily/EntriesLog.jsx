@@ -515,13 +515,16 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       });
       setRows(kept);
       setUnlocked(false);
+      // locking the actuals says the work is done: the tasks behind the rows with a done number go for approval now
+      const sentTasks = withActuals ? useStore.getState().autoSubmitDay(personId, key) : 0;
+      const sentNote = sentTasks ? ` ${sentTasks} task${sentTasks === 1 ? '' : 's'} sent for approval.` : '';
       toast({
         title:
-          which === 'actuals'
+          (which === 'actuals'
             ? 'Actuals locked 🔒 You can send your end of day now.'
             : withActuals
               ? 'Updated and locked 🔒 Send it again when ready.'
-              : 'Targets locked 🔒 Fill in the actuals as you go.',
+              : 'Targets locked 🔒 Fill in the actuals as you go.') + sentNote,
         tone: 'success',
       });
     });
