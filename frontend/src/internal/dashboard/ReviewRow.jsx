@@ -33,6 +33,7 @@ export function ReviewRow({ task, projectName }) {
   const [approveOpen, setApproveOpen] = useState(false);
   const [approveMode, setApproveMode] = useState('all');
   const [partQty, setPartQty] = useState('');
+  const [leftover, setLeftover] = useState('end'); // what happens to the part not done: end it here, or send it to the next working day
   const [note, setNote] = useState('');
   const [forwardTo, setForwardTo] = useState(forwardTargets[0]?.id ?? '');
   const history = sortedHistory(task);
@@ -144,6 +145,25 @@ export function ReviewRow({ task, projectName }) {
             </p>
             <p className="text-xs text-muted">Everything submitted is good.</p>
           </button>
+          {approveMode === 'all' && (task.doneQty ?? task.qty) < task.qty && (
+            <fieldset className="space-y-1.5 rounded-xl bg-surface-2/60 p-3 text-sm" data-testid="approve-leftover">
+              <legend className="px-1 text-xs font-semibold text-muted">
+                {task.qty - (task.doneQty ?? task.qty)} of {task.qty} were not done. What next?
+              </legend>
+              {[
+                ['end', 'End it here', 'Nothing more is asked of them for this task.'],
+                ['tomorrow', 'Send the rest to the next working day', `A new task for the ${task.qty - (task.doneQty ?? task.qty)} left, assigned to ${firstName(task.assigneeId)}.`],
+              ].map(([value, label, hint]) => (
+                <label key={value} className="flex cursor-pointer items-start gap-2">
+                  <input type="radio" name={`leftover-${task.id}`} className="mt-1" checked={leftover === value} onChange={() => setLeftover(value)} />
+                  <span>
+                    <span className="font-semibold">{label}</span>
+                    <span className="block text-xs text-muted">{hint}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
           <button
             className={cx(
               'focus-ring w-full rounded-xl border-2 p-3 text-left transition',
@@ -196,7 +216,7 @@ export function ReviewRow({ task, projectName }) {
             {approveMode === 'all' ? (
               <Button
                 onClick={() => {
-                  if (runAction(() => approve(task.id))) {
+                  if (runAction(() => approve(task.id, { carryRest: leftover === 'tomorrow' }))) {
                     setApproveOpen(false);
                     showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
                   }

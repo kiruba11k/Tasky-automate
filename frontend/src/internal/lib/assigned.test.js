@@ -35,3 +35,12 @@ test('a task assigned earlier and sent in today shows as sent in today, not as c
   assert.deepEqual([row.sentFrom, row.carriedFrom, row.actualMin], ['2026-10-12', undefined, 30]);
   assert.equal(assignedDay([task({ date: '2026-10-12', status: 'todo' })], ME, D, { projects: [], today: D }).rows.length, 0);
 });
+
+test('a row removed from the day (even one that is not carried over) leaves the table and can be restored', () => {
+  const t = task();
+  const id = assignedDay([t], ME, D, { projects: [], today: D }).rows[0].id;
+  const hidden = assignedDay([t], ME, D, { projects: [], today: D, carryEdits: { [id]: { hidden: true } } });
+  assert.equal(hidden.rows.length, 0);
+  assert.deepEqual(hidden.hidden.map((h) => [h.id, h.qty]), [[id, 10]]);
+  assert.equal(assignedDay([t], ME, D, { projects: [], today: D, carryEdits: {} }).rows.length, 1);
+});

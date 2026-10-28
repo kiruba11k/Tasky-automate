@@ -319,19 +319,57 @@ export const useStore = create()(
           );
           notifyAssigner(task, `${firstName(task.assigneeId)} ${isResubmit ? "resubmitted" : "sent in"} ${task.title}, with ${firstName(reviewerId)} for review`, [reviewerId]);
         },
-        approve: (id) => {
+        /**
+         * Approve what was submitted. When less than the target was done, `carryRest` asks what happens to the rest: false ends the
+         * task as it is, true closes it at what was done and sends the rest to the next working day as a new task for the same person.
+         */
+        approve: (id, { carryRest = false } = {}) => {
           const task = requireTask(id);
           requireReviewer(task);
           requireWaiting(task);
           const at = nowIso();
+          const done = task.doneQty ?? task.qty;
+          const rest = task.qty - done;
+          const carry = carryRest && rest > 0 && done > 0;
+          const mins = (n) => Math.max(1, Math.round((task.targetMinutes * n) / task.qty));
+          const title = (n) => (/^\d+/.test(task.title) ? task.title.replace(/^\d+/, String(n)) : `${n} of ${task.title}`);
+          const day = nextWeekday(todayKey(0));
           patchTask(id, {
             status: "done",
             approvedAt: at,
+            ...(carry ? { qty: done, title: title(done), targetMinutes: mins(done), standardMinutes: task.standardMinutes ? Math.round((task.standardMinutes * done) / task.qty) : undefined } : {}),
             reviews: [...task.reviews, { by: get().me, verdict: "approved", at }],
-            history: [...(task.history ?? []), { at, by: get().me, action: "approved" }],
+            history: [...(task.history ?? []), { at, by: get().me, action: "approved", note: carry ? `${rest} not done, sent to ${formatDayMonth(day)}` : rest > 0 ? `${rest} not done, ended here` : undefined }],
           });
-          notify(task.assigneeId, `${firstName(get().me)} approved ${task.title} ✓`);
-          notifyAssigner(task, `${firstName(get().me)} approved ${firstName(task.assigneeId)}'s ${task.title} ✓`);
+          if (carry) {
+            const next = {
+              ...task,
+              id: newId(),
+              qty: rest,
+              doneQty: undefined,
+              minutes: undefined,
+              title: title(rest),
+              targetMinutes: mins(rest),
+              standardMinutes: task.standardMinutes ? Math.round((task.standardMinutes * rest) / task.qty) : undefined,
+              status: "todo",
+              date: day,
+              createdAt: at,
+              reworkOf: undefined,
+              reviewerId: undefined,
+              feedback: [],
+              reviews: [],
+              approvedAt: undefined,
+              submittedAt: undefined,
+              reminders: 0,
+              resubmits: 0,
+              history: [{ at, by: get().me, action: "assigned", to: task.assigneeId, note: `The ${rest} left from ${task.title}` }],
+            };
+            set((s) => ({ tasks: [next, ...s.tasks] }));
+            notify(task.assigneeId, `${firstName(get().me)} approved ${task.title} ✓ The ${rest} left are yours for ${formatDayMonth(day)}`);
+          } else {
+            notify(task.assigneeId, `${firstName(get().me)} approved ${task.title} ✓`);
+          }
+          notifyAssigner(task, `${firstName(get().me)} approved ${firstName(task.assigneeId)}'s ${task.title} ✓${carry ? ` (${rest} left go to ${formatDayMonth(day)})` : ""}`);
         },
         /** Approve some of a submitted task and send the rest back for rework as a new task. */
         approvePart: (id, count, note) => {

@@ -37,6 +37,7 @@ function TaskContext({ task }) {
   const [note, setNote] = useState('');
   const label = taskReviewLabel(task);
   const mine = task.status === 'in_review' && task.reviewerId === me;
+  const partial = (task.doneQty ?? task.qty) < task.qty;
   return (
     <li className="py-1" data-eod-task={task.id}>
       <div className="flex flex-wrap items-center gap-2">
@@ -44,16 +45,20 @@ function TaskContext({ task }) {
         <Badge tone={TASK_TONE[label]}>{label}</Badge>
         {mine && (
           <>
-            <Button
-              onClick={() =>
-                runAction(() => {
-                  approve(task.id);
-                  showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
-                })
-              }
-            >
-              <Check size={13} /> Approve
-            </Button>
+            {partial ? (
+              <span className="text-xs text-muted">{task.doneQty} of {task.qty} done: approve it under Waiting for your review, where you choose what happens to the rest</span>
+            ) : (
+              <Button
+                onClick={() =>
+                  runAction(() => {
+                    approve(task.id);
+                    showToast({ title: `Approved, ${firstName(task.assigneeId)} notified`, tone: 'success' });
+                  })
+                }
+              >
+                <Check size={13} /> Approve
+              </Button>
+            )}
             <Button tone="ghost" className="border border-line" onClick={() => setPanel((v) => !v)}>
               <MessageSquare size={13} /> Send back
             </Button>

@@ -221,11 +221,13 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
               </button>
             </>
           )}
-          {carried && canChange && !editing && (
+          {canChange && !editing && (
             <>
-              <button aria-label="Edit task" title="Edit for today only" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={startEdit}>
-                <Pencil size={14} />
-              </button>
+              {carried && (
+                <button aria-label="Edit task" title="Edit for today only" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={startEdit}>
+                  <Pencil size={14} />
+                </button>
+              )}
               <button aria-label="Delete task" title="Remove from today" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink" onClick={() => setAsking(true)}>
                 <Trash size={14} />
               </button>

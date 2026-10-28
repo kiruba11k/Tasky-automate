@@ -78,8 +78,15 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
   const hidden = [];
   const edits = carryEdits ?? {};
   buckets.forEach((b) => {
-    const e = b.cTasks ? edits[`asg|${personId}|${date}|${b.id}`] : undefined;
+    const e = edits[`asg|${personId}|${date}|${b.id}`];
     if (!e) return;
+    if (e.hidden && !b.cTasks) {
+      // a row removed from the day that holds no carried-over tasks: the whole row goes (the tasks stay assigned)
+      hidden.push({ id: `asg|${personId}|${date}|${b.id}`, projectId: b.projectId, label: b.k.label, titles: b.tasks.map((x) => x.t.title), qty: b.qty, estMin: b.est });
+      buckets.delete(b.id);
+      return;
+    }
+    if (!b.cTasks) return;
     const all = b.tasks.every((x) => x.carried);
     if (e.hidden) {
       hidden.push({ id: `asg|${personId}|${date}|${b.id}`, projectId: b.projectId, label: b.k.label, titles: b.tasks.filter((x) => x.carried).map((x) => x.t.title), qty: b.cQty, estMin: b.cEst });
