@@ -891,11 +891,11 @@ export function personMetrics(tasks, daily, personId, from, to) {
     dayEntries(daily, personId, d).forEach((e) => {
       if (e.task === CUSTOM_TASK ? !e.custom?.trim() : !e.task) return;
       if (coveredWork.has(`${d}|${e.projectId}|${e.task}`)) return;
-      if (d < today || rowDoneCount(e) > 0) {
-        assigned++;
-        assignedMin += e.estMin ?? 0;
-      }
+      // a row typed into the day table counts once something is achieved: a target someone set for themselves, left empty, is not
+      // work they were given (the task of the same work is what counts)
       if (!(rowDoneCount(e) > 0)) return;
+      assigned++;
+      assignedMin += e.estMin ?? 0;
       submitted++;
       doneMin += e.estMin ?? 0;
       if (e.estMin > 0 && e.actualMin > 0) {
@@ -946,6 +946,20 @@ export function personMetrics(tasks, daily, personId, from, to) {
     timed,
     onTimeCount,
   };
+}
+
+/**
+ * The assigned tasks of a person in [from,to] that `personMetrics` counts as due but not done: tasks of earlier days not sent in yet.
+ * [{ kind: "task", date, projectId, title, status }].
+ */
+export function unfinishedAssigned(tasks, daily, personId, from, to) {
+  const today = todayKey(0);
+  const out = [];
+  tasks.forEach((t) => {
+    if (t.assigneeId !== personId || isSubmitted(t)) return;
+    if (t.date >= from && t.date <= to && t.date < today) out.push({ kind: "task", date: t.date, projectId: t.projectId, title: t.title, status: t.status });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** `Dh` - one metric over the last `count` periods: [{key,label,title,partial,value}]. */

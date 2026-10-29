@@ -1,5 +1,6 @@
 import { ReadMore } from '@/internal/ui/ReadMore';
-import { MIN_TIMED } from '@/internal/lib/domain';
+import { MIN_TIMED, unfinishedAssigned } from '@/internal/lib/domain';
+import { resolvePeriod } from '@/internal/lib/dates';
 import { personStat, effortCompletion, pickStars, pickProject } from '@/internal/lib/spotlightPick';
 import { useMemo, useState } from 'react';
 import { Sparkles, Trophy, Crown } from 'lucide-react';
@@ -33,7 +34,7 @@ function starCard(star) {
 }
 
 /** One star's numbers and their eight-week on-time bars. */
-function PersonDetail({ person, series: weeklySeries }) {
+function PersonDetail({ person, series: weeklySeries, open = [] }) {
   return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -55,6 +56,21 @@ function PersonDetail({ person, series: weeklySeries }) {
             </div>
           ))}
         </div>
+        {open.length > 0 && (
+          <div data-testid="spotlight-open">
+            <p className="text-xs font-semibold text-muted">Counted as not done yet ({open.length})</p>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {open.slice(0, 8).map((o, i) => (
+                <li key={i} className="flex flex-wrap gap-x-2">
+                  <span className="tabular-nums text-muted">{o.date.slice(8, 10)}/{o.date.slice(5, 7)}</span>
+                  <span className="font-medium">{o.title}</span>
+                  <span className="text-muted">{o.status}</span>
+                </li>
+              ))}
+              {open.length > 8 && <li className="text-muted">and {open.length - 8} more</li>}
+            </ul>
+          </div>
+        )}
         <p className="text-xs font-semibold text-muted">Tasks finished on time, last eight weeks</p>
         <div className="flex h-20 items-end gap-1">
           {weeklySeries.map((point) => (
@@ -88,6 +104,7 @@ export function Spotlight() {
     return { resource: topByRole(stats, 'resource'), pm: topByRole(stats, 'pm'), project: project?.p, projectPct: project?.pct };
   }, [projects, stats]);
 
+  const month = resolvePeriod('month', 'current');
   const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
   const cards = [
     {
@@ -149,7 +166,7 @@ export function Spotlight() {
       <div className="space-y-6">
         {people.length > 1 && <p className="text-sm text-muted">Level on score, hours worked and tasks done, so they share the title.</p>}
         {people.map((person) => (
-      <PersonDetail key={person.id} person={person} series={personSeries({ tasks, daily }, person.id, 'week', 'onTime', 8)} />
+      <PersonDetail key={person.id} person={person} series={personSeries({ tasks, daily }, person.id, 'week', 'onTime', 8)} open={unfinishedAssigned(tasks.filter((t) => t.assigneeId === person.id), daily, person.id, month.from, month.to)} />
         ))}
       </div>
     );
