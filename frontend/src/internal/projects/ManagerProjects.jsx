@@ -6,6 +6,7 @@ import { Se as useStore, Te as Button, rt as Card, Kw as PendingPanel, Tr as PRO
 import { approverNames } from '@/internal/lib/constants';
 import { ProjectCard } from './ProjectCard';
 import { ProjectFormModal } from './ProjectFormModal';
+import { SentProposalActions } from './SentProposalActions';
 
 /** Projects page for management: every active project, plus onboarding. */
 export function ManagerProjects() {
@@ -33,6 +34,7 @@ export function ManagerProjects() {
             <ReadMore text={p.description || 'No description'} />
             <p className="mt-1">Once approved you can set targets and assign tasks.</p>
           </div>
+          {p.pmId === me && <SentProposalActions p={p} />}
         </PendingPanel>
       ))}
       {active.map(({ p, color }) => (

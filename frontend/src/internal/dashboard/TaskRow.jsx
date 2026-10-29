@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Send, Star, RotateCcwClock, Repeat } from 'lucide-react';
+import { Send, Star, RotateCcwClock, Repeat, Pencil, Trash2 } from 'lucide-react';
+import { ConfirmModal } from '../kit/ConfirmModal';
 import {
   Se as useStore,
   qe as Badge,
@@ -28,7 +29,14 @@ const QUICK_MINUTES = [15, 30, 45, 60, 90, 120];
 
 /** One of my own tasks in a project card, with the submit / resubmit-for-approval dialog. */
 export function TaskRow({ task }) {
-  const { submitForReview } = useStore();
+  const { submitForReview, editApproval, deleteTask, me } = useStore();
+  // work this person sent for approval themselves (not an assigned task): they can change or withdraw it until it is handled
+  const mySent = task.adhoc && task.assignedById === me && task.status === 'in_review';
+  const [editSent, setEditSent] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sentTitle, setSentTitle] = useState(task.title);
+  const [sentLinks, setSentLinks] = useState(task.links?.length ? task.links : ['']);
+  const [sentNote, setSentNote] = useState(task.feedback?.[0]?.text ?? '');
   const reviewers = useReviewerOptions(task.projectId);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -96,6 +104,16 @@ export function TaskRow({ task }) {
           <span className="text-xs text-muted">
             with {firstName(task.reviewerId)} since {formatTimeOrDateTime(task.submittedAt)}
           </span>
+        )}
+        {mySent && (
+          <>
+            <Button tone="ghost" className="border border-line" onClick={() => setEditSent(true)}>
+              <Pencil size={13} /> Edit
+            </Button>
+            <Button tone="ghost" className="border border-line" aria-label={`Delete ${task.title}`} onClick={() => setConfirmDelete(true)}>
+              <Trash2 size={13} /> Delete
+            </Button>
+          </>
         )}
         {task.status === 'done' && task.approvedAt && (
           <span className="text-xs text-muted">approved {formatTimeOrDateTime(task.approvedAt)}</span>
@@ -199,6 +217,56 @@ export function TaskRow({ task }) {
           </p>
         )}
       </Modal>
+      {mySent && (
+        <>
+          <Modal
+            open={editSent}
+            onClose={() => setEditSent(false)}
+            title="Edit what you sent"
+            description="Changes what the reviewer sees. It stays with them for approval."
+            size="sm"
+            footer={
+              <Button
+                onClick={() => {
+                  if (runAction(() => editApproval(task.id, { title: sentTitle, links: sentLinks, note: sentNote }), setError)) {
+                    setEditSent(false);
+                    showToast({ title: 'Updated', tone: 'success' });
+                  }
+                }}
+              >
+                Save
+              </Button>
+            }
+          >
+            <label className="text-sm font-semibold">
+              What was the task?
+              <input className={cx(inputClass, 'mt-1')} value={sentTitle} onChange={(e) => setSentTitle(e.target.value)} />
+            </label>
+            <div className="mt-3 text-sm font-semibold">
+              Links
+              <div className="mt-1">
+                <LinkInputs value={sentLinks} onChange={setSentLinks} />
+              </div>
+            </div>
+            <label className="mt-3 block text-sm font-semibold">
+              Note <span className="font-normal text-muted">(optional)</span>
+              <input className={cx(inputClass, 'mt-1')} value={sentNote} onChange={(e) => setSentNote(e.target.value)} />
+            </label>
+            {error && (
+              <p role="alert" className="mt-2 text-sm font-semibold text-coral-ink">
+                {error}
+              </p>
+            )}
+          </Modal>
+          <ConfirmModal
+            open={confirmDelete}
+            title="Withdraw this?"
+            message={`"${task.title}" will be removed and will no longer wait for ${firstName(task.reviewerId)}. This cannot be undone.`}
+            onClose={() => setConfirmDelete(false)}
+            onConfirm={() => runAction(() => { deleteTask(task.id); showToast({ title: 'Removed', tone: 'info' }); })}
+          />
+        </>
+      )}
     </li>
   );
 }

@@ -448,6 +448,26 @@ export const useStore = create()(
             throw new Error("Only the person who assigned a task, or an admin, can delete it.");
           set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
           if (task.assigneeId !== me) notify(task.assigneeId, `${firstName(me)} removed the task ${task.title}`);
+          if (task.status === "in_review" && task.reviewerId && ![me, task.assigneeId].includes(task.reviewerId))
+            notify(task.reviewerId, `${firstName(me)} withdrew ${task.title}, it no longer needs your review`);
+        },
+        /** The person who sent work for approval changes its title, links or note while it still waits for the reviewer. */
+        editApproval: (id, { title, links, note }) => {
+          const task = requireTask(id);
+          const me = get().me;
+          if (!task.adhoc || task.assignedById !== me) throw new Error("Only the person who sent it for approval can change it.");
+          if (task.status !== "in_review") throw new Error("It was already handled, so it can no longer be changed.");
+          if (!title?.trim()) throw new Error("Type what the task was.");
+          const cleanLinks = normalizeLinks(links);
+          const at = nowIso();
+          patchTask(id, {
+            title: title.trim(),
+            customName: title.trim(),
+            links: cleanLinks,
+            feedback: note?.trim() ? [{ by: me, text: note.trim(), at }] : [],
+            history: [...(task.history ?? []), { at, by: me, action: "edited", note: "Changed what was sent for approval" }],
+          });
+          if (task.reviewerId && task.reviewerId !== me) notify(task.reviewerId, `${firstName(me)} updated ${title.trim()}, waiting for your approval`);
         },
         assign: (draft) => {
           const me = get().me;

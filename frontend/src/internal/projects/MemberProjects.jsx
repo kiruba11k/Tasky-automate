@@ -6,6 +6,7 @@ import { Se as useStore, Te as Button, rt as Card, Kw as PendingPanel, Tr as PRO
 import { approverNames } from '@/internal/lib/constants';
 import { ProjectCard } from './ProjectCard';
 import { ProjectFormModal } from './ProjectFormModal';
+import { SentProposalActions } from './SentProposalActions';
 
 /** Projects page for team members / project managers: only projects they are part of. */
 export function MemberProjects() {
@@ -34,6 +35,7 @@ export function MemberProjects() {
               <ReadMore text={p.description || 'No description'} />
               <p className="mt-1">Once approved you can set targets and assign tasks.</p>
             </div>
+            {p.pmId === me && <SentProposalActions p={p} />}
           </PendingPanel>
         ) : (
           <ProjectCard key={p.id} p={p} color={color} />
