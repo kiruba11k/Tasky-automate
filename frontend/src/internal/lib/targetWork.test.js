@@ -52,3 +52,21 @@ test('the week table takes typed estimated and taken time, and rows removed from
   const r = Object.values(snap.byType)[0];
   assert.deepEqual([r?.target ?? 0, r?.actual ?? 0], [0, 0]);
 });
+
+import { personMetrics } from './domain.js';
+import { todayKey, addDays } from './dates.js';
+
+test('assigned work only counts once it is due: future tasks and today\'s open ones do not lower completion', () => {
+  const today = todayKey(0);
+  const t = (id, date, o = {}) => ({ id, assigneeId: 'u1', projectId: 'p', typeId: 'l2', qty: 10, targetMinutes: 30, date, status: 'todo', ...o });
+  const tasks = [
+    t('a', addDays(today, -2), { status: 'done', doneQty: 10, minutes: 30, submittedAt: `${addDays(today, -2)}T10:00:00Z` }),
+    t('b', today), // today's, still being worked on
+    t('c', addDays(today, 3)), // planned for later
+  ];
+  const m = personMetrics(tasks, {}, 'u1', addDays(today, -7), addDays(today, 10));
+  assert.equal(m.assigned, 1);
+  assert.equal(m.tasks, 1);
+  const late = personMetrics([...tasks, t('d', addDays(today, -1))], {}, 'u1', addDays(today, -7), addDays(today, 10)); // yesterday's, not done: counts
+  assert.equal(late.assigned, 2);
+});

@@ -856,11 +856,17 @@ export function personMetrics(tasks, daily, personId, from, to) {
   const coveredWork = new Set(); // day, project and kind of work that submitted tasks already count
   const coveredDays = new Set(); // day and project that a done task or a ticked-off table row already counts (plan blocks then add nothing)
   const assignedDays = new Set(); // day and project that already has an assigned task (a worked plan block there is not a new assignment)
+  // Work only counts as assigned once it is due: tasks of earlier days, or any task already sent in. Tasks planned for later days
+  // and the day's own tasks still being worked on do not count against the person yet.
+  const today = todayKey(0);
+  const due = (t) => t.date < today || isSubmitted(t);
   tasks.forEach((t) => {
     if (t.date >= from && t.date <= to) {
       assignedDays.add(`${t.date}|${t.projectId}`);
-      assigned++;
-      assignedMin += t.targetMinutes ?? 0;
+      if (due(t)) {
+        assigned++;
+        assignedMin += t.targetMinutes ?? 0;
+      }
       resubmits += t.resubmits ?? 0;
     }
     if (!isSubmitted(t)) return;
@@ -885,8 +891,10 @@ export function personMetrics(tasks, daily, personId, from, to) {
     dayEntries(daily, personId, d).forEach((e) => {
       if (e.task === CUSTOM_TASK ? !e.custom?.trim() : !e.task) return;
       if (coveredWork.has(`${d}|${e.projectId}|${e.task}`)) return;
-      assigned++;
-      assignedMin += e.estMin ?? 0;
+      if (d < today || rowDoneCount(e) > 0) {
+        assigned++;
+        assignedMin += e.estMin ?? 0;
+      }
       if (!(rowDoneCount(e) > 0)) return;
       submitted++;
       doneMin += e.estMin ?? 0;
