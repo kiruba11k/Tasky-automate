@@ -59,7 +59,38 @@ export function otherTimeRows(rows, byProject) {
   const out = [];
   byProject.forEach((v, pid) => {
     const left = v.actual + v.extra - (onRows.get(pid) ?? 0);
-    if (left >= 5) out.push({ id: `wk-other-time|${pid}`, projectId: pid, synthetic: true, label: "Other time on this project (plan blocks, not on a task row)", actualMin: left, estMin: 0 });
+    if (left >= 5) out.push({ id: `wk-other-time|${pid}`, projectId: pid, synthetic: true, label: "Planned work (no task rows)", actualMin: left, estMin: 0 });
   });
   return out;
+}
+
+/**
+ * The week table's rows with the project's plan time spread over its own task rows: what a project was worked on beyond the time
+ * typed on its rows is shared over them in proportion to their estimates (equally with no estimates), so every row keeps its task
+ * name and the table adds up to the Weekly hours. A project worked on with no task rows at all gets one "Planned work" row.
+ */
+export function spreadPlanTime(rows, byProject) {
+  const out = rows.map((r) => ({ ...r }));
+  const fallback = [];
+  byProject.forEach((v, pid) => {
+    const mine = out.filter((r) => r.projectId === pid);
+    const left = v.actual + v.extra - mine.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
+    if (left < 5) return;
+    if (!mine.length) {
+      fallback.push(...otherTimeRows([], new Map([[pid, v]])));
+      return;
+    }
+    const weights = mine.map((r) => (r.estMin > 0 ? r.estMin : 0));
+    const total = weights.reduce((a, b) => a + b, 0) || mine.length;
+    const w = (i) => (weights[i] || (total === mine.length && !weights.some(Boolean) ? 1 : 0));
+    let given = 0;
+    mine.forEach((r, i) => {
+      const share = Math.floor((left * w(i)) / total);
+      r.actualMin = (r.actualMin ?? 0) + share;
+      given += share;
+    });
+    const biggest = mine.reduce((best, r, i) => (w(i) > w(best) ? i : best), 0);
+    mine[biggest].actualMin += left - given;
+  });
+  return [...out, ...fallback];
 }

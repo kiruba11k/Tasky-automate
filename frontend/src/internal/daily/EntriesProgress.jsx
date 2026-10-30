@@ -8,7 +8,7 @@ import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
 import { copyElementAsImage } from '../lib/copyTableImage';
 import { DurationInput } from './DurationInput';
-import { otherTimeRows, weekProjectTime } from '../lib/weekTime.js';
+import { spreadPlanTime, weekProjectTime } from '../lib/weekTime.js';
 import { DateMenu, DayMarker } from './DateMenu';
 import { DayMover } from './DayMover';
 import { sheetAchievedText, sheetColorOf, sheetTargetText } from './sheetText';
@@ -106,8 +106,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
     kind === 'day'
       ? dayRowsWithAssigned(tasks, daily, personId, date, { projects })
       : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
-  // the week table also lists the time that sits on no task row (plan blocks), so its total matches the Weekly hours
-  const rows = kind === 'week' && !editable ? [...baseRows, ...otherTimeRows(baseRows, weekProjectTime(tasks, daily, personId, monday, projects))] : baseRows;
+  // the plan time that sits on no task row is shared over the project's own rows, so each keeps its task name and the total matches the Weekly hours
+  const rows = kind === 'week' && !editable ? spreadPlanTime(baseRows, weekProjectTime(tasks, daily, personId, monday, projects)) : baseRows;
   // rows taken out of this week's table (restorable while editing)
   const removedRows =
     kind === 'week'

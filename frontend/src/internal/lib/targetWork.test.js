@@ -71,10 +71,19 @@ test('assigned work only counts once it is due: future tasks and today\'s open o
   assert.equal(late.assigned, 2);
 });
 
-import { otherTimeRows } from './weekTime.js';
+import { otherTimeRows, spreadPlanTime } from './weekTime.js';
 test('time on the plan that no task row carries is listed so the week table adds up to the hours', () => {
   const rows = [{ projectId: 'a', actualMin: 60 }, { projectId: 'a', actualMin: 30 }, { projectId: 'b', actualMin: 120 }];
   const byProject = new Map([['a', { planned: 0, actual: 200, extra: 10 }], ['b', { planned: 0, actual: 120, extra: 0 }], ['c', { planned: 0, actual: 45, extra: 0 }]]);
   const extra = otherTimeRows(rows, byProject);
   assert.deepEqual(extra.map((r) => [r.projectId, r.actualMin]), [['a', 120], ['c', 45]]);
+});
+
+test('plan time on no task row is shared over the project\'s rows by estimate, so the rows keep their names', () => {
+  const rows = [{ id: '1', projectId: 'a', actualMin: 60, estMin: 60 }, { id: '2', projectId: 'a', actualMin: 0, estMin: 180 }, { id: '3', projectId: 'b', actualMin: 30, estMin: 0 }];
+  const byProject = new Map([['a', { planned: 0, actual: 300, extra: 0 }], ['b', { planned: 0, actual: 30, extra: 0 }], ['c', { planned: 0, actual: 50, extra: 0 }]]);
+  const out = spreadPlanTime(rows, byProject);
+  assert.deepEqual(out.filter((r) => r.projectId === 'a').map((r) => r.actualMin), [120, 180]); // 240 left: 60 and 180 by estimate
+  assert.equal(out.find((r) => r.id === '3').actualMin, 30);
+  assert.deepEqual(out.filter((r) => r.synthetic).map((r) => [r.projectId, r.actualMin]), [['c', 50]]);
 });
