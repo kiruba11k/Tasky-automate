@@ -5,6 +5,7 @@ import { weekStart } from '../lib/dates.js';
 import { weekRows } from '../lib/entries.js';
 import { weekAssignedRows } from '../lib/assigned.js';
 import { eodStatusText } from '../lib/eodReview.js';
+import { otherTimeRows, weekProjectTime } from '../lib/weekTime.js';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
@@ -33,7 +34,9 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
 
   const rows = weekRows(personId, mon, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, mon, { projects }));
   const estimated = rows.reduce((sum, r) => sum + r.estMin, 0);
-  const taken = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
+  const taken =
+    rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0) +
+    otherTimeRows(rows, weekProjectTime(tasks, daily, personId, mon, projects)).reduce((sum, r) => sum + r.actualMin, 0); // time on the plan that no task row carries
   const submit = () =>
     guarded(() => {
       const at = new Date().toISOString();

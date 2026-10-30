@@ -70,3 +70,11 @@ test('assigned work only counts once it is due: future tasks and today\'s open o
   const late = personMetrics([...tasks, t('d', addDays(today, -1))], {}, 'u1', addDays(today, -7), addDays(today, 10)); // yesterday's, not done: counts
   assert.equal(late.assigned, 2);
 });
+
+import { otherTimeRows } from './weekTime.js';
+test('time on the plan that no task row carries is listed so the week table adds up to the hours', () => {
+  const rows = [{ projectId: 'a', actualMin: 60 }, { projectId: 'a', actualMin: 30 }, { projectId: 'b', actualMin: 120 }];
+  const byProject = new Map([['a', { planned: 0, actual: 200, extra: 10 }], ['b', { planned: 0, actual: 120, extra: 0 }], ['c', { planned: 0, actual: 45, extra: 0 }]]);
+  const extra = otherTimeRows(rows, byProject);
+  assert.deepEqual(extra.map((r) => [r.projectId, r.actualMin]), [['a', 120], ['c', 45]]);
+});

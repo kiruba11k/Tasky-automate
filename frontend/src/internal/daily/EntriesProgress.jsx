@@ -8,6 +8,7 @@ import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
 import { copyElementAsImage } from '../lib/copyTableImage';
 import { DurationInput } from './DurationInput';
+import { otherTimeRows, weekProjectTime } from '../lib/weekTime.js';
 import { DateMenu, DayMarker } from './DateMenu';
 import { DayMover } from './DayMover';
 import { sheetAchievedText, sheetColorOf, sheetTargetText } from './sheetText';
@@ -101,10 +102,12 @@ export function EntriesProgress({ personId, date, kind, editable }) {
   const sheetRef = useRef(null);
   const [copying, setCopying] = useState(false);
   const record = weekly[`${personId}|${monday}`];
-  const rows =
+  const baseRows =
     kind === 'day'
       ? dayRowsWithAssigned(tasks, daily, personId, date, { projects })
       : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
+  // the week table also lists the time that sits on no task row (plan blocks), so its total matches the Weekly hours
+  const rows = kind === 'week' && !editable ? [...baseRows, ...otherTimeRows(baseRows, weekProjectTime(tasks, daily, personId, monday, projects))] : baseRows;
   // rows taken out of this week's table (restorable while editing)
   const removedRows =
     kind === 'week'
@@ -231,8 +234,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                 const mine = rows.filter((r) => r.projectId === pid);
                 const stripe = g % 2 ? 'bg-surface-2/50' : 'bg-surface';
                 return mine.map((r, i) => {
-                  const name = entryName(r, project);
-                  const achieved = sheetAchievedText(r, name, rowDone(r));
+                  const name = r.synthetic ? r.label : entryName(r, project);
+                  const achieved = r.synthetic ? 'Time on the plan' : sheetAchievedText(r, name, rowDone(r));
                   const first = i === 0;
                   const cell = cx(
                     'border-x border-line px-3 py-2 align-middle',
