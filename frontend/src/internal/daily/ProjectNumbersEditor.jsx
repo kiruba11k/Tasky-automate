@@ -3,7 +3,7 @@ import { AUTO_COUNTED_METRICS } from './progressRows';
 import { FIELD_CLASS } from './planHelpers';
 
 /** Per-project metric inputs (responses, calls, meetings...) for the signed-in member. */
-export function ProjectNumbersEditor({ value, onChange }) {
+export function ProjectNumbersEditor({ value = {}, onChange }) {
   const { me, projects } = useStore();
   const mine = projects.filter(
     (p) => p.status === 'active' && (p.pmId === me || p.teamIds.includes(me) || p.admins?.includes(me)),

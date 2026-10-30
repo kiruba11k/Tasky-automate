@@ -23,6 +23,20 @@ export function assignedMinutesByProject(tasks, personId, date, opts = {}) {
 }
 
 /**
+ * The minutes the plan should hold per project: what the Daily update tables say (the estimated time of the day's rows) or what is
+ * assigned, whichever is larger, never both added (the rows usually cover the assigned work).
+ */
+export function wantedMinutesByProject(assigned = {}, entries = []) {
+  const logged = {};
+  entries.forEach((r) => {
+    if (r?.projectId && r.estMin > 0 && (r.task ?? "") !== "") logged[r.projectId] = (logged[r.projectId] ?? 0) + r.estMin;
+  });
+  const out = { ...assigned };
+  Object.entries(logged).forEach(([pid, m]) => (out[pid] = Math.max(out[pid] ?? 0, m)));
+  return out;
+}
+
+/**
  * Top the plan up to the assigned minutes. Returns null when nothing is to be added, else
  * { plan, extra, autoPlanned, added: { [projectId]: minutes } }. New blocks (marked `auto: true`) are laid after the last planned
  * block, around lunch, inside 10:00-19:00; what does not fit before 19:00 becomes Extra hours.

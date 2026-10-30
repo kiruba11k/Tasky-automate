@@ -71,3 +71,10 @@ test("automatic Extra hours are capped at 3h a day", () => {
   assert.equal(r.autoPlanned.p1, 180);
   assert.equal(run({ plan: [{ id: "x", start: "10:00", end: "19:00", projectId: "p9" }], extra: r.extra, autoPlanned: r.autoPlanned, assigned: { p1: 600 } }), null);
 });
+
+import { wantedMinutesByProject } from "./autoPlan.js";
+test("the plan wants the larger of the assigned minutes and the rows' estimates per project, not both", () => {
+  const entries = [{ projectId: "p1", task: "l1", estMin: 40 }, { projectId: "p1", task: "l2", estMin: 20 }, { projectId: "p2", task: "deck", estMin: 90 }, { projectId: "p3", task: "", estMin: 50 }];
+  assert.deepEqual(wantedMinutesByProject({ p1: 45, p2: 30 }, entries), { p1: 60, p2: 90 });
+  assert.deepEqual(wantedMinutesByProject({ p1: 100 }, entries), { p1: 100, p2: 90 });
+});

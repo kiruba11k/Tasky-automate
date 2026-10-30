@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Sunrise, Moon, Lock, Pencil } from 'lucide-react';
+import { Sunrise, Lock, Pencil } from 'lucide-react';
 import {
   oe as cx,
   Se as useStore,
@@ -15,7 +15,7 @@ import {
 import { leaveLabel, leaveOn } from '../lib/leave.js';
 import { emptyDaily } from '../lib/domain.js';
 import { dayCarryEdits, dayRowsWithAssigned } from '../lib/assigned.js';
-import { assignedMinutesByProject, autoPlanBlocks } from '../lib/autoPlan.js';
+import { assignedMinutesByProject, autoPlanBlocks, wantedMinutesByProject } from '../lib/autoPlan.js';
 import { changeProject } from '../lib/changeProject.js';
 import { PROJECT_CHANGED } from './ProjectChanger';
 import { isWeekday, lunchFor, todayKey } from '../lib/dates.js';
@@ -24,7 +24,6 @@ import { MarkLeave } from './MarkLeave';
 import { HoursStats } from './HoursStats';
 import { UpdateCard } from './UpdateCard';
 import { TaskSummary } from './TaskSummary';
-import { TimeTable } from './TimeTable';
 import { NoteLine } from './NoteLine';
 import { CustomRowsEditor } from './CustomRowsEditor';
 import { ProjectNumbersEditor } from './ProjectNumbersEditor';
@@ -76,13 +75,17 @@ export function TasksUpdate() {
   const planLocked = !!record.planAt; // 'Save plan and times' locks the plan until Update is pressed
   const editable = date >= todayKey(0) && isWeekday(date) && !record.eodAt && !(leave && leave.kind !== 'half');
   useEffect(() => {
-    if (!editable || planLocked) return; // a locked plan is never rewritten behind the person's back; the top-up runs again after Update
+    if (!editable) return; // a sent day or a past day is never changed
     const st = useStore.getState();
     const r = st.daily[`${me}|${date}`] ?? emptyDaily();
     const sameExtra = (a, b) => (a ?? []).map((x) => `${x.id}|${x.minutes}`).join() === (b ?? []).map((x) => `${x.id}|${x.minutes}`).join();
     const byStart = (l) => blocksKey([...l].sort((a, b) => a.start.localeCompare(b.start)));
     if (byStart(plan) !== byStart(r.plan ?? []) || !sameExtra(extra, r.extra)) return; // unsaved edits in the builder
-    const assigned = assignedMinutesByProject(st.tasks, me, date, { projects: st.projects, carryEdits: dayCarryEdits(st.daily, me, date) });
+    // the plan follows the day's assigned tasks and the rows typed into the Daily update tables (the larger per project)
+    const assigned = wantedMinutesByProject(
+      assignedMinutesByProject(st.tasks, me, date, { projects: st.projects, carryEdits: dayCarryEdits(st.daily, me, date) }),
+      r.entries ?? [],
+    );
     const names = Object.fromEntries(st.projects.map((p) => [p.id, p.name]));
     const res = autoPlanBlocks({
       plan: r.plan ?? [],
@@ -101,8 +104,8 @@ export function TasksUpdate() {
     syncPlanFromStore();
     const total = Object.values(res.added).reduce((a, b) => a + b, 0);
     const first = Object.keys(res.added).length === 1 ? ` ${names[Object.keys(res.added)[0]] ?? ''}` : '';
-    toast({ title: `Added ${formatMinutes(total)}${first} from tasks assigned to you`, tone: 'success' });
-  }, [tasks, me, date, projects, profiles, editable, planLocked, record.plan, record.extra, record.autoPlanned, record.carryEdits, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
+    toast({ title: `Added ${formatMinutes(total)}${first} to your plan from your tasks`, tone: 'success' });
+  }, [tasks, me, date, projects, profiles, editable, record.plan, record.extra, record.autoPlanned, record.carryEdits, record.entries, plan, extra]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Change the project of one block / extra row (or, with no id, of every block of `from`), also when the day is locked or sent.
@@ -286,25 +289,6 @@ export function TasksUpdate() {
             <Lock size={13} /> Save & lock
           </Button>
         </UpdateCard>
-        <section id="todays-hours" aria-label="Today's hours" className="overflow-hidden rounded-card bg-surface shadow-soft">
-          <div className="flex items-center gap-3 bg-lavender/50 px-5 py-3">
-            <Moon size={18} className="text-accent-ink" />
-            <div className="min-w-0 flex-1">
-              <h2 className="font-bold">Today&apos;s hours</h2>
-              <p className="text-xs text-muted">Filled in from your day plan: blocks, actual time and extra hours</p>
-            </div>
-          </div>
-          <div className="space-y-3 px-5 py-4">
-            <div className="rounded-xl bg-surface-2 px-3 py-2">
-              <HoursStats t={hours} sent={eodSent} />
-            </div>
-            {plan.length || extra.length ? (
-              <TimeTable plan={plan} extra={nonEmptyExtras(extra)} entries={dayRows} sent={eodSent} />
-            ) : (
-              <p className="text-sm text-muted">No plan for this day yet. Add blocks in Plan your day.</p>
-            )}
-          </div>
-        </section>
       </div>
       <WeeklyTargets personId={me} date={date} />
       <WeeklyUpdate personId={me} date={date} />
