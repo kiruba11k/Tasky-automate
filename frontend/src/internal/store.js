@@ -193,7 +193,7 @@ export const useStore = create()(
           status: "todo",
           feedback: [],
           createdAt: at,
-          date: isWeekday(todayKey(0)) ? todayKey(0) : nextWeekday(todayKey(0)),
+          date: /^\d{4}-\d{2}-\d{2}$/.test(draft.date ?? "") ? draft.date : isWeekday(todayKey(0)) ? todayKey(0) : nextWeekday(todayKey(0)), // the day it is for (any working day the assigner picked)
           reminders: 0,
           reviews: [],
           title,
@@ -492,8 +492,8 @@ export const useStore = create()(
             notify(
               assignee,
               list.length === 1
-                ? `${firstName(me)} gave you ${priorityCount ? "a priority task" : "a task"}: ${list[0].title}`
-                : `${firstName(me)} gave you ${list.length} tasks for today${priorityCount ? ` (${priorityCount} priority)` : ""}`,
+                ? `${firstName(me)} gave you ${priorityCount ? "a priority task" : "a task"}: ${list[0].title}${list[0].date !== todayKey(0) ? ` (for ${formatDayMonth(list[0].date)})` : ""}`
+                : `${firstName(me)} gave you ${list.length} tasks${list.every((t) => t.date === todayKey(0)) ? " for today" : ""}${priorityCount ? ` (${priorityCount} priority)` : ""}`,
             );
           });
         },

@@ -1,6 +1,7 @@
 import { mineFirst } from '@/internal/lib/mine';
 import { ReadMore } from '@/internal/ui/ReadMore';
 import { isAdminTier } from '@/internal/lib/constants';
+import { isWeekday, nextWeekday, todayKey } from '@/internal/lib/dates';
 import React, { useState, useEffect } from 'react';
 import { RotateCcwClock, Plus, Gauge, ShoppingBasket, Trash, Send, Star } from 'lucide-react';
 import {
@@ -65,8 +66,24 @@ export function AssignTasks() {
   const [targetMinutes, setTargetMinutes] = useState(60);
   const [manualTarget, setManualTarget] = useState(false);
   const [title, setTitle] = useState('');
+  const [forDate, setForDate] = useState(() => (isWeekday(todayKey(0)) ? todayKey(0) : nextWeekday(todayKey(0)))); // the day a task is for: today, an earlier day or a later one
   const [cart, setCart] = useState([]);
   const customStandards = project?.customStandards ?? [];
+  // custom tasks made on this project before (by anyone), newest first, so the same one can be added again with one click
+  const usedBefore = (() => {
+    const seen = new Set(customStandards.map((c) => c.name.trim().toLowerCase()));
+    const list = [];
+    [...tasks]
+      .filter((t) => t.projectId === project?.id && t.typeId === 'custom' && (t.customName ?? '').trim() && !t.customStandardId)
+      .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
+      .forEach((t) => {
+        const key = t.customName.trim().toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        list.push({ name: t.customName.trim(), unit: /^\d+$/.test(String(t.unit ?? '').trim()) ? 'items' : t.unit || 'items', qty: t.qty, targetMinutes: t.targetMinutes });
+      });
+    return list.slice(0, 12);
+  })();
   // a task type this project switched off (its template hides the outreach ones) is never the selected one
   const availableTypes = projectTaskTypes(project);
   const typeId =
@@ -147,6 +164,8 @@ export function AssignTasks() {
       });
     if (typeId === 'custom' && !customName.trim())
       return toast({ title: 'Name the custom task', tone: 'info', emoji: '⚠️' });
+    if (!forDate || !isWeekday(forDate))
+      return toast({ title: 'Pick a working day (Monday to Friday)', tone: 'info', emoji: '⚠️' });
     setCart((G) => [
       ...G,
       {
@@ -161,6 +180,7 @@ export function AssignTasks() {
         projectId: project.id,
         assigneeId,
         title,
+        date: forDate,
       },
     ]);
     setTitle('');
@@ -369,6 +389,34 @@ export function AssignTasks() {
                   </div>
                 </div>
               )}
+              {usedBefore.length > 0 && (
+                <div className="mt-3" data-testid="used-before">
+                  <p className="mb-1.5 text-[11px] font-bold uppercase text-muted">{project.name} tasks you made before</p>
+                  <div className="flex flex-wrap gap-2">
+                    {usedBefore.map((u) => (
+                      <Button
+                        key={u.name.toLowerCase()}
+                        data-used-before={u.name}
+                        tone={typeId === 'custom' && customName.trim().toLowerCase() === u.name.toLowerCase() ? 'primary' : 'ghost'}
+                        className="border border-line"
+                        onClick={() => {
+                          setTypeId('custom');
+                          setCustomName(u.name);
+                          setCustomUnit(u.unit);
+                          setQty(u.qty);
+                          setTargetMinutes(u.targetMinutes);
+                          setManualTarget(true);
+                        }}
+                      >
+                        {u.name}{' '}
+                        <span className="text-[11px] font-normal opacity-80">
+                          · {u.qty} {u.unit}, {u.targetMinutes} min
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {stdType?.variants && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {stdType.variants.map((G) => (
@@ -406,6 +454,16 @@ export function AssignTasks() {
               )}
             </div>
             <div className="flex flex-wrap items-end gap-4">
+              <label className="w-40 text-sm font-semibold">
+                For day
+                <input
+                  type="date"
+                  aria-label="For day"
+                  className={cn(INPUT_CLASS, 'mt-1')}
+                  value={forDate}
+                  onChange={(G) => setForDate(G.target.value)}
+                />
+              </label>
               <label className="w-28 text-sm font-semibold">
                 Quantity
                 <input
@@ -540,6 +598,7 @@ export function AssignTasks() {
                               <span className="block text-xs text-muted">
                                 {findProject(item.projectId)?.name}
                                 {item.from ? ` · from ${prevLabel}` : ''}
+                                {item.date && item.date !== todayKey(0) ? ` · for ${formatDay(item.date)}` : ''}
                               </span>
                             </span>
                             <button
