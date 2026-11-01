@@ -343,11 +343,6 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                         <>
                           <td className={cell}>
                             {sheetTargetText(r, name)}
-                            {kind === 'week' && r.timeEdited && (
-                              <span className="mr-1 inline-block rounded bg-butter px-1 text-[10px] font-bold text-butter-ink" title="The estimated or taken time was typed over in this week's table, so it no longer follows the daily updates" data-testid="row-edited">
-                                time edited
-                              </span>
-                            )}
                             {kind === 'week' && r.days?.length > 0 && (
                               <span className="mt-0.5 block text-[11px] font-normal text-muted" data-testid="row-days">
                                 {r.days.map((d) => WEEKDAY_SHORT[parseDateKey(d).getDay()]).join(' · ')}
