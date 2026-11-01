@@ -3,7 +3,7 @@ import { CalendarRange, Pencil, Send } from 'lucide-react';
 import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Ye as toast, We as formatMinutes, be as firstName } from '@/internal/min';
 import { weekStart } from '../lib/dates.js';
 import { eodStatusText } from '../lib/eodReview.js';
-import { weekTableRows } from '../lib/weekTime.js';
+import { planTimeOffRows, weekProjectTime, weekTableRows } from '../lib/weekTime.js';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
@@ -33,6 +33,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
   const rows = weekTableRows({ tasks, daily, personId, monday: mon, projects, weekEntries: record?.entries ?? [], overrides: record?.overrides });
   const estimated = rows.reduce((sum, r) => sum + (r.estMin ?? 0), 0);
   const taken = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
+  const offRows = planTimeOffRows(rows, weekProjectTime(tasks, daily, personId, mon, projects)); // plan time with no task row of its own
   const submit = () =>
     guarded(() => {
       const at = new Date().toISOString();
@@ -61,6 +62,11 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">
             Estimated <b className="text-ink">{formatMinutes(estimated)}</b> · taken <b className="text-ink">{formatMinutes(taken)}</b>
+          {offRows >= 5 && (
+              <span className="text-muted" title="Time on your plan blocks that no task row of the days carries. It is in your Weekly hours below, not in the rows.">
+                {' '}· plan time not on a task row <b className="text-ink">{formatMinutes(offRows)}</b>
+              </span>
+            )}
           </span>
           {record?.entriesDoneAt ? (
             <span data-testid="week-done-time">

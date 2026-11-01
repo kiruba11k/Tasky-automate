@@ -55,112 +55,15 @@ export function weekProjectTime(tasks, daily, personId, monday, projects) {
   return byProject;
 }
 
-/**
- * The days Monday to Friday with each logged row's missing time filled from that day's plan, so a row keeps the time of its own day
- * (the estimate and time taken a day's table shows) even where the saved row carries none: per day and project, the time worked
- * (plan actual, time typed, extra hours) beyond what the rows carry goes to the rows without a time, else over all of them by estimate;
- * the planned minutes beyond the rows' estimates go to the rows without an estimate. Returns a new `daily`; saved records are untouched.
- */
-export function fillDayRowTimes(tasks, daily, personId, monday, projects) {
-  const out = { ...daily };
-  for (let i = 0; i < 5; i++) {
-    const date = addDays(monday, i);
-    const key = `${personId}|${date}`;
-    const rec = daily?.[key];
-    if (!rec?.entries?.length) continue;
-    const withAssigned = recordWithAssigned(tasks, daily, personId, date, { projects, carry: false });
-    const times = dayProjectTimes(withAssigned);
-    const entries = rec.entries.map((e) => ({ ...e }));
-    times.forEach((v, pid) => {
-      const mine = entries.filter((e) => e.projectId === pid && (e.task ?? "") !== "");
-      if (!mine.length) return;
-      // time the day's rows already carry: the logged rows' own and what sits on the project's assigned rows
-      const assignedTyped = (withAssigned.entries ?? []).filter((e) => e.assigned && e.projectId === pid).reduce((sum, e) => sum + (e.actualMin ?? 0), 0);
-      const typed = mine.reduce((sum, e) => sum + (e.actualMin ?? 0), 0) + assignedTyped;
-      const left = v.actual + v.extra - typed;
-      const noEst = mine.filter((e) => !(e.estMin > 0));
-      const estLeft = v.planned - mine.reduce((sum, e) => sum + (e.estMin ?? 0), 0);
-      if (noEst.length && estLeft >= 5) {
-        const each = Math.floor(estLeft / noEst.length / 5) * 5;
-        noEst.forEach((e, k) => (e.estMin = k === noEst.length - 1 ? estLeft - each * (noEst.length - 1) : each));
-      }
-      if (left >= 5) {
-        const blank = mine.filter((e) => !(e.actualMin > 0));
-        const receivers = blank.length ? blank : mine;
-        const weights = receivers.map((e) => (e.estMin > 0 ? e.estMin : 0));
-        const useEst = weights.some(Boolean);
-        const w = (k) => (useEst ? weights[k] : 1);
-        const total = receivers.reduce((sum, _e, k) => sum + w(k), 0);
-        let given = 0;
-        receivers.forEach((e, k) => {
-          const share = Math.floor((left * w(k)) / total);
-          e.actualMin = (e.actualMin ?? 0) + share;
-          given += share;
-        });
-        const big = receivers.reduce((best, _e, k) => (w(k) > w(best) ? k : best), 0);
-        receivers[big].actualMin += left - given;
-      }
-    });
-    out[key] = { ...rec, entries };
-  }
-  return out;
+/** Minutes of the week's plan and extra time on projects beyond what the week table's rows carry (never below 0), for a footnote. */
+export function planTimeOffRows(rows, byProject) {
+  const onRows = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
+  let worked = 0;
+  byProject.forEach((v) => (worked += v.actual + v.extra));
+  return Math.max(0, worked - onRows);
 }
 
-/**
- * Rows for the time a project was worked on that no task row of the week table carries: per project the worked time (plan actual
- * and extra) minus the time typed on its rows. [{ id, projectId, synthetic: true, label, actualMin, estMin: 0 }].
- */
-export function otherTimeRows(rows, byProject) {
-  const onRows = new Map();
-  rows.forEach((r) => onRows.set(r.projectId, (onRows.get(r.projectId) ?? 0) + (r.actualMin ?? 0)));
-  const out = [];
-  byProject.forEach((v, pid) => {
-    const left = v.actual + v.extra - (onRows.get(pid) ?? 0);
-    if (left >= 5) out.push({ id: `wk-other-time|${pid}`, projectId: pid, synthetic: true, label: "Planned work (no task rows)", actualMin: left, estMin: 0 });
-  });
-  return out;
-}
-
-/**
- * The week table's rows with the project's plan time spread over its own task rows: what a project was worked on beyond the time
- * typed on its rows is shared over them in proportion to their estimates (equally with no estimates), so every row keeps its task
- * name and the table adds up to the Weekly hours. A project worked on with no task rows at all gets one "Planned work" row.
- */
-export function spreadPlanTime(rows, byProject, isFixed = () => false) {
-  const out = rows.map((r) => ({ ...r }));
-  const fallback = [];
-  byProject.forEach((v, pid) => {
-    const mine = out.filter((r) => r.projectId === pid);
-    const left = v.actual + v.extra - mine.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
-    if (left < 5) return;
-    if (!mine.length) {
-      fallback.push(...otherTimeRows([], new Map([[pid, v]])));
-      return;
-    }
-    // rows whose time was typed over in the week table keep it; the rest share what is left
-    const open = mine.filter((r) => !isFixed(r));
-    if (!open.length) return;
-    const withEst = open.some((r) => r.estMin > 0);
-    const w = (r) => (withEst ? r.estMin || 0 : 1);
-    const total = open.reduce((sum, r) => sum + w(r), 0);
-    let given = 0;
-    open.forEach((r) => {
-      const share = Math.floor((left * w(r)) / total);
-      r.actualMin = (r.actualMin ?? 0) + share;
-      given += share;
-    });
-    const biggest = open.reduce((best, r) => (w(r) > w(best) ? r : best), open[0]);
-    biggest.actualMin += left - given;
-  });
-  return [...out, ...fallback];
-}
-
-/**
- * The rows of a person's Weekly update table: each day's logged rows with their own day's time filled in (`fillDayRowTimes`), added
- * up over the week, times typed over in the week table kept, and a "Planned work" row for a project worked on with no task rows.
- */
+/** The rows of a person's Weekly update table: the day tables' rows added up over the week, exactly as the days have them. */
 export function weekTableRows({ tasks, daily, personId, monday, projects, weekEntries = [], overrides = {} }) {
-  const filled = fillDayRowTimes(tasks, daily, personId, monday, projects);
-  const rows = weekRows(personId, monday, filled, weekEntries, overrides, weekAssignedRows(tasks, filled, personId, monday, { projects }));
-  return spreadPlanTime(rows, weekProjectTime(tasks, daily, personId, monday, projects), () => true); // only adds the no-rows fallback
+  return weekRows(personId, monday, daily, weekEntries, overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
 }

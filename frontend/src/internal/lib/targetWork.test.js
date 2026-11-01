@@ -71,29 +71,8 @@ test('assigned work only counts once it is due: future tasks and today\'s open o
   assert.equal(late.assigned, 2);
 });
 
-import { otherTimeRows, spreadPlanTime } from './weekTime.js';
-test('time on the plan that no task row carries is listed so the week table adds up to the hours', () => {
-  const rows = [{ projectId: 'a', actualMin: 60 }, { projectId: 'a', actualMin: 30 }, { projectId: 'b', actualMin: 120 }];
-  const byProject = new Map([['a', { planned: 0, actual: 200, extra: 10 }], ['b', { planned: 0, actual: 120, extra: 0 }], ['c', { planned: 0, actual: 45, extra: 0 }]]);
-  const extra = otherTimeRows(rows, byProject);
-  assert.deepEqual(extra.map((r) => [r.projectId, r.actualMin]), [['a', 120], ['c', 45]]);
-});
 
-test('plan time on no task row is shared over the project\'s rows by estimate, so the rows keep their names', () => {
-  const rows = [{ id: '1', projectId: 'a', actualMin: 60, estMin: 60 }, { id: '2', projectId: 'a', actualMin: 0, estMin: 180 }, { id: '3', projectId: 'b', actualMin: 30, estMin: 0 }];
-  const byProject = new Map([['a', { planned: 0, actual: 300, extra: 0 }], ['b', { planned: 0, actual: 30, extra: 0 }], ['c', { planned: 0, actual: 50, extra: 0 }]]);
-  const out = spreadPlanTime(rows, byProject);
-  assert.deepEqual(out.filter((r) => r.projectId === 'a').map((r) => r.actualMin), [120, 180]); // 240 left: 60 and 180 by estimate
-  assert.equal(out.find((r) => r.id === '3').actualMin, 30);
-  assert.deepEqual(out.filter((r) => r.synthetic).map((r) => [r.projectId, r.actualMin]), [['c', 50]]);
-});
 
-test('rows whose time was typed over keep it when plan time is spread', () => {
-  const rows = [{ id: '1', projectId: 'a', actualMin: 60, estMin: 60 }, { id: '2', projectId: 'a', actualMin: 60, estMin: 60 }];
-  const byProject = new Map([['a', { planned: 0, actual: 300, extra: 0 }]]);
-  const out = spreadPlanTime(rows, byProject, (r) => r.id === '1');
-  assert.deepEqual(out.map((r) => r.actualMin), [60, 240]); // the typed row stays at 60, the other takes the rest
-});
 
 test('a week row says which days it adds up', () => {
   const row = (task, est) => ({ id: 'r' + Math.random(), projectId: 'p', task, kind: 'milestone', estMin: est, actualMin: est });
@@ -102,15 +81,3 @@ test('a week row says which days it adds up', () => {
   assert.deepEqual(rows.map((r) => [r.task, r.days, r.estMin]), [['std:a', ['2026-10-26', '2026-10-28'], 180], ['std:b', ['2026-10-28'], 30]]);
 });
 
-import { fillDayRowTimes } from './weekTime.js';
-test('a day row with no time takes its own day\'s plan time, and a time typed over in the week table can be reset', () => {
-  const row = (id, est, actual) => ({ id, projectId: 'a', task: 'std:x', kind: 'milestone', estMin: est, actualMin: actual });
-  const daily = {
-    'u|2026-10-29': { eodAt: 'x', plan: [{ id: 'b', start: '10:00', end: '18:00', projectId: 'a', actualMinutes: 480 }], entries: [row('1', 180, undefined), { ...row('2', 0, undefined), task: 'std:y' }] },
-  };
-  const filled = fillDayRowTimes([], daily, 'u', '2026-10-26', []);
-  const r2 = filled['u|2026-10-29'].entries[1];
-  assert.deepEqual([r2.actualMin, r2.estMin], [300, 300]);
-  assert.equal(filled['u|2026-10-29'].entries[0].actualMin, 180);
-  assert.equal(daily['u|2026-10-29'].entries[1].actualMin, undefined); // saved records are untouched
-});
