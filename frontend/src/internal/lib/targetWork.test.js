@@ -94,3 +94,10 @@ test('rows whose time was typed over keep it when plan time is spread', () => {
   const out = spreadPlanTime(rows, byProject, (r) => r.id === '1');
   assert.deepEqual(out.map((r) => r.actualMin), [60, 240]); // the typed row stays at 60, the other takes the rest
 });
+
+test('a week row says which days it adds up', () => {
+  const row = (task, est) => ({ id: 'r' + Math.random(), projectId: 'p', task, kind: 'milestone', estMin: est, actualMin: est });
+  const daily = { 'u|2026-10-26': { entries: [row('std:a', 60)] }, 'u|2026-10-28': { entries: [row('std:a', 120), row('std:b', 30)] } };
+  const rows = weekRows('u', '2026-10-26', daily, [], {});
+  assert.deepEqual(rows.map((r) => [r.task, r.days, r.estMin]), [['std:a', ['2026-10-26', '2026-10-28'], 180], ['std:b', ['2026-10-28'], 30]]);
+});

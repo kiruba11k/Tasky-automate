@@ -262,15 +262,21 @@ export const rowKey = (row) => `${row.projectId}|${row.task}|${(row.custom ?? ""
  * unless `includeHidden`.
  */
 export function weekRows(personId, monday, daily, weekEntries = [], overrides = {}, assignedRows = [], includeHidden = false) {
-  const all = [...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i))), ...assignedRows, ...weekEntries];
+  const all = [
+    ...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i)).map((r) => ({ ...r, __day: addDays(monday, i) }))),
+    ...assignedRows,
+    ...weekEntries,
+  ];
   const merged = new Map();
   all.forEach((row) => {
     const key = rowKey(row);
     const sum = merged.get(key);
+    const { __day: day, ...plain } = row;
     if (!sum) {
-      merged.set(key, { ...row, id: `wk-${key}`, remarks: row.remarks ?? "" });
+      merged.set(key, { ...plain, id: `wk-${key}`, remarks: row.remarks ?? "", days: day ? [day] : [] });
       return;
     }
+    if (day && !sum.days.includes(day)) sum.days.push(day); // the days this row adds up
     sum.qty = row.qty != null || sum.qty != null ? (sum.qty ?? 0) + (row.qty ?? 0) : undefined;
     sum.doneQty = row.doneQty != null || sum.doneQty != null ? (sum.doneQty ?? 0) + (row.doneQty ?? 0) : undefined;
     sum.estMin += row.estMin;

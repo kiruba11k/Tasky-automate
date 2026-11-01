@@ -328,7 +328,14 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                         </>
                       ) : (
                         <>
-                          <td className={cell}>{sheetTargetText(r, name)}</td>
+                          <td className={cell}>
+                            {sheetTargetText(r, name)}
+                            {kind === 'week' && r.days?.length > 0 && (
+                              <span className="mt-0.5 block text-[11px] font-normal text-muted" data-testid="row-days">
+                                {r.days.map((d) => WEEKDAY_SHORT[parseDateKey(d).getDay()]).join(' · ')}
+                              </span>
+                            )}
+                          </td>
                           <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
                           <td className={cell}>{achieved || <span className="text-xs text-muted">Not updated yet</span>}</td>
                           <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.actualMin ? formatMinutes(r.actualMin) : '·'}</td>
