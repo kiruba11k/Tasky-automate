@@ -42,8 +42,12 @@ test('the week table takes typed estimated and taken time, and rows removed from
   const row = { id: 'r', projectId: 'p', task: 'l2', kind: 'number', qty: 10, doneQty: 8, estMin: 60, actualMin: 50 };
   const d = { 'u1|2026-10-27': { entries: [row] } };
   const key = rowKey(row);
-  const typed = weekRows('u1', '2026-10-26', d, [], { [key]: { estMin: 90, actualMin: 75 } })[0];
+  const typed = weekRows('u1', '2026-10-26', d, [], { [key]: { estMin: 90, actualMin: 75, estBase: 60, actualBase: 50 } })[0];
   assert.deepEqual([typed.estMin, typed.actualMin], [90, 75]);
+  // typed over before the days changed (or by an older version, with no base): the row follows the days again
+  const stale = weekRows('u1', '2026-10-26', d, [], { [key]: { estMin: 90, actualMin: 75, estBase: 30, actualBase: 20 } })[0];
+  assert.deepEqual([stale.estMin, stale.actualMin, stale.timeEdited], [60, 50, undefined]);
+  assert.deepEqual([weekRows('u1', '2026-10-26', d, [], { [key]: { estMin: 90 } })[0].estMin], [60]);
   assert.equal(weekRows('u1', '2026-10-26', d, [], { [key]: { hidden: true } }).length, 0);
   const all = weekRows('u1', '2026-10-26', d, [], { [key]: { hidden: true } }, [], true);
   assert.deepEqual([all.length, all[0].hidden], [1, true]);

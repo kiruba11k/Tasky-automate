@@ -101,6 +101,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
   const monday = weekStart(date);
   const sheetRef = useRef(null);
   const [copying, setCopying] = useState(false);
+  const [weekView, setWeekView] = useState('day'); // the week as it was day by day, or added up per task
   const record = weekly[`${personId}|${monday}`];
   const weekTable = useMemo(
     () => (kind === 'week' ? weekTableRows({ tasks, daily, personId, monday, projects, weekEntries: record?.entries ?? [], overrides: record?.overrides }) : []),
@@ -108,6 +109,19 @@ export function EntriesProgress({ personId, date, kind, editable }) {
   );
   // each day's rows carry their own day's time (the plan fills what a table left empty), so the week adds up to the Weekly hours
   const rows = kind === 'day' ? dayRowsWithAssigned(tasks, daily, personId, date, { projects }) : editable ? weekTable.filter((r) => !r.synthetic) : weekTable;
+  const showDay = kind === 'week' && !editable && weekView === 'day';
+  // the week day by day: each day's rows grouped by project, with the times of that day's own tables
+  const dayGroups = useMemo(() => {
+    if (kind !== 'week') return [];
+    return [0, 1, 2, 3, 4]
+      .map((i) => addDays(monday, i))
+      .map((d) => {
+        const list = dayRowsWithAssigned(tasks, daily, personId, d, { projects, carry: false }).filter((r) => r.task || r.assigned);
+        const pids = [...new Set(list.map((r) => r.projectId))];
+        return { d, groups: pids.map((pid) => ({ pid, rows: list.filter((r) => r.projectId === pid) })), rows: list };
+      })
+      .filter((x) => x.rows.length);
+  }, [kind, tasks, daily, personId, monday, projects]);
   // rows taken out of this week's table (restorable while editing)
   const removedRows =
     kind === 'week'
@@ -115,8 +129,18 @@ export function EntriesProgress({ personId, date, kind, editable }) {
       : [];
   const override = (row, patch) => {
     const key = rowKey(row);
+    const extra = {};
+    if ('estMin' in patch || 'actualMin' in patch) {
+      // remember what the days added up to, so a time typed here is dropped once a day changes
+      const plain = weekRows(personId, monday, daily, record?.entries ?? [], {}, weekAssignedRows(tasks, daily, personId, monday, { projects }), true).find((r) => rowKey(r) === key);
+      extra.estBase = plain?.estMin ?? 0;
+      extra.actualBase = plain?.actualMin ?? 0;
+      const held = record?.overrides?.[key];
+      if (!('estMin' in patch) && held?.estMin != null) extra.estMin = row.estMin; // keep the one not being changed as it shows
+      if (!('actualMin' in patch) && held?.actualMin != null) extra.actualMin = row.actualMin;
+    }
     saveWeekly(personId, monday, {
-      overrides: { ...record?.overrides, [key]: { ...record?.overrides?.[key], qty: row.qty, doneQty: row.doneQty, ...patch } },
+      overrides: { ...record?.overrides, [key]: { ...record?.overrides?.[key], qty: row.qty, doneQty: row.doneQty, ...extra, ...patch } },
     });
   };
   const resetTimes = (row) => {
@@ -177,6 +201,21 @@ export function EntriesProgress({ personId, date, kind, editable }) {
             />
           </label>
         )}
+        {kind === 'week' && !editable && (
+          <span className="flex rounded-full bg-surface-2 p-0.5 text-xs font-semibold" role="group" aria-label="Week table view">
+            {[['day', 'By day'], ['task', 'By task']].map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={weekView === v}
+                className={cx('focus-ring rounded-full px-2.5 py-0.5', weekView === v ? 'bg-surface text-accent-ink shadow-soft' : 'text-muted hover:text-ink')}
+                onClick={() => setWeekView(v)}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
+        )}
         {!editable && (
           <button
             type="button"
@@ -219,7 +258,62 @@ export function EntriesProgress({ personId, date, kind, editable }) {
           ))}
         </div>
       )}
-      {(!editable || kind === 'week') && (
+      {showDay && (
+        <div className="overflow-x-auto" data-testid="sheet-week" ref={sheetRef}>
+          <table className="w-full min-w-[860px] border-collapse text-sm">
+            <thead>
+              <tr className="text-white" style={{ background: headerColor }}>
+                {['Date', 'Project', 'Targets', 'Estimated time', 'Targets achieved', 'Actual time taken'].map((h) => (
+                  <th key={h} className={headCell}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dayGroups.flatMap(({ d, groups, rows: dayList }, di) =>
+                groups.flatMap(({ pid, rows: pr }, gi) =>
+                  pr.map((r, ri) => {
+                    const project = projects.find((p) => p.id === pid);
+                    const name = entryName(r, project);
+                    const cell = cx('border-x border-line px-3 py-2 align-middle', ri === 0 ? (gi || di ? 'border-t-[3px]' : 'border-t border-t-line') : 'border-t border-t-line/60');
+                    return (
+                      <tr key={`${d}|${r.id}`} className={di % 2 ? 'bg-surface-2/50' : 'bg-surface'} style={ri === 0 && gi === 0 && di ? { borderTop: `3px solid ${headerColor}99` } : undefined}>
+                        {gi === 0 && ri === 0 && (
+                          <td rowSpan={dayList.length} className="whitespace-nowrap border border-line bg-surface px-3 py-2 text-center align-middle font-medium">
+                            {WEEKDAY_SHORT[parseDateKey(d).getDay()]} {formatDayMonth(d)}
+                            <span className="block text-xs font-normal text-muted">{formatMinutes(dayList.reduce((sum, x) => sum + (x.actualMin ?? 0), 0))}</span>
+                          </td>
+                        )}
+                        {ri === 0 && (
+                          <td rowSpan={pr.length} className={cx(cell, 'text-center font-semibold')} style={{ borderLeft: `4px solid ${project ? projectColor(projects, pid) : '#64748B'}` }}>
+                            {projectLabel(pid, projects)}
+                          </td>
+                        )}
+                        <td className={cell}>{sheetTargetText(r, name)}</td>
+                        <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
+                        <td className={cell}>{sheetAchievedText(r, name, rowDone(r)) || <span className="text-xs text-muted">Not updated yet</span>}</td>
+                        <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.actualMin ? formatMinutes(r.actualMin) : '·'}</td>
+                      </tr>
+                    );
+                  }),
+                ),
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="bg-surface-2/60 font-semibold">
+                <td colSpan={3} className="border border-line px-3 py-2 text-right">
+                  Week total
+                </td>
+                <td className="border border-line px-3 py-2 text-center tabular-nums">{formatMinutes(dayGroups.reduce((t, x) => t + x.rows.reduce((a, r) => a + (r.estMin ?? 0), 0), 0))}</td>
+                <td className="border border-line px-3 py-2" />
+                <td className="border border-line px-3 py-2 text-center tabular-nums">{formatMinutes(dayGroups.reduce((t, x) => t + x.rows.reduce((a, r) => a + (r.actualMin ?? 0), 0), 0))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+      {(!editable || kind === 'week') && !showDay && (
         <div className="overflow-x-auto" data-testid={`sheet-${kind}`} ref={sheetRef}>
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>

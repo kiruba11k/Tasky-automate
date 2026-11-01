@@ -296,9 +296,13 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (typed?.status) sum.status = typed.status;
     if (typed?.actualText != null) sum.actualText = typed.actualText;
     if (typed?.targetText != null) sum.targetText = typed.targetText;
-    if (typed?.estMin != null) sum.estMin = typed.estMin;
-    if (typed?.actualMin != null) sum.actualMin = typed.actualMin;
-    if (typed?.estMin != null || typed?.actualMin != null) sum.timeEdited = true; // times typed over in the week table
+    // a time typed over in the week table holds only while the days still add up to what they did when it was typed (`estBase`,
+    // `actualBase`); once a day changes, the row follows the days again
+    const estHolds = typed?.estMin != null && typed.estBase === sum.estMin;
+    const actualHolds = typed?.actualMin != null && typed.actualBase === (sum.actualMin ?? 0);
+    if (estHolds) sum.estMin = typed.estMin;
+    if (actualHolds) sum.actualMin = typed.actualMin;
+    if (estHolds || actualHolds) sum.timeEdited = true;
     if (typed?.hidden) sum.hidden = true; // removed from this week's table (the daily updates keep it)
   });
   return [...merged.values()].filter((r) => includeHidden || !r.hidden);
