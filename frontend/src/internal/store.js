@@ -1,6 +1,6 @@
 // The tracker store. Its data lives on the server and is kept in step by sync.js.
 import { create } from "zustand";
-import { nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel, formatDayMonth } from "./lib/dates.js";
+import { addDays, nextWeekday, todayKey, isWeekday, weekStart, clockToMinutes, nowIso, lunchFor, clockLabel, formatDayMonth } from "./lib/dates.js";
 import { moveRows as moveRowsBetween, moveTargetProblem, rescheduleNote } from "./lib/moveRows.js";
 import { PEOPLE, TASK_TYPES, isAdminTier, isLeadership, isApprover, approverNames, roleOf } from "./lib/constants.js";
 import {
@@ -685,6 +685,7 @@ export const useStore = create()(
           }
           // Sending the end of week asks each project's manager to approve the week's work on it (same rules as the end of day).
           let sends = [];
+          let copies = null; // who is told about the whole week besides the project managers who approve it
           if (patch.eowAt && patch.eowAt !== get().weekly[key]?.eowAt && personId === get().me) {
             const rows = weekRows(personId, monday, get().daily, record.entries ?? [], record.overrides, weekAssignedRows(get().tasks, get().daily, personId, monday, { projects: get().projects }));
             const work = weekProjectWork(rows);
@@ -695,8 +696,18 @@ export const useStore = create()(
             if (Object.keys(merged).length) record.eowReviews = merged;
             else delete record.eowReviews;
             sends = built.sends;
+            // the founders, and everyone who gave this person tasks that week, are told the week was sent
+            const weekEnd = addDays(monday, 6); const lastDay = addDays(monday, 4);
+            const givers = get().tasks.filter((t) => t.assigneeId === personId && t.assignedById && t.date >= monday && t.date <= weekEnd).map((t) => t.assignedById);
+            const founders = PEOPLE.filter((p) => roleOf(p.id) === "founder").map((p) => p.id);
+            const told = new Set(sends.map((x) => x.reviewerId));
+            copies = {
+              to: [...new Set([...founders, ...givers])].filter((id) => id !== personId && !told.has(id)),
+              text: `${firstName(personId)} sent the end of week (${formatDayMonth(monday)} to ${formatDayMonth(lastDay)}): ${rows.length} task${rows.length === 1 ? "" : "s"}, ${formatMinutes(rows.reduce((sum, r) => sum + (r.actualMin ?? r.estMin ?? 0), 0))}`,
+            };
           }
           set((s) => ({ weekly: { ...s.weekly, [key]: record } }));
+          if (copies) copies.to.forEach((id) => notify(id, copies.text, "eod"));
           for (const send of sends) {
             const name = get().projects.find((p) => p.id === send.projectId)?.name ?? "a project";
             notify(send.reviewerId, `${firstName(personId)} sent end of week for ${name} (${sendSummary(send.rows, send.minutes)}), waiting for your approval`, "eod");
