@@ -298,6 +298,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (typed?.targetText != null) sum.targetText = typed.targetText;
     if (typed?.estMin != null) sum.estMin = typed.estMin;
     if (typed?.actualMin != null) sum.actualMin = typed.actualMin;
+    if (typed?.estMin != null || typed?.actualMin != null) sum.timeEdited = true; // times typed over in the week table
     if (typed?.hidden) sum.hidden = true; // removed from this week's table (the daily updates keep it)
   });
   return [...merged.values()].filter((r) => includeHidden || !r.hidden);

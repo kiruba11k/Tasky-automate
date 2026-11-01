@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { CalendarRange, Pencil, Send } from 'lucide-react';
 import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Ye as toast, We as formatMinutes, be as firstName } from '@/internal/min';
 import { weekStart } from '../lib/dates.js';
-import { weekRows, rowKey } from '../lib/entries.js';
-import { weekAssignedRows } from '../lib/assigned.js';
 import { eodStatusText } from '../lib/eodReview.js';
-import { spreadPlanTime, weekProjectTime } from '../lib/weekTime.js';
+import { weekTableRows } from '../lib/weekTime.js';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
@@ -32,12 +30,9 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
     return () => window.removeEventListener(EDIT_WEEK, open);
   }, [readOnly]);
 
-  const rows = weekRows(personId, mon, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, mon, { projects }));
-  const estimated = rows.reduce((sum, r) => sum + r.estMin, 0);
-  const taken = spreadPlanTime(rows, weekProjectTime(tasks, daily, personId, mon, projects), (r) => record?.overrides?.[rowKey(r)]?.actualMin != null).reduce(
-    (sum, r) => sum + (r.actualMin ?? 0),
-    0,
-  ); // the time on the plan that no task row carries is shared over the rows, as in the table
+  const rows = weekTableRows({ tasks, daily, personId, monday: mon, projects, weekEntries: record?.entries ?? [], overrides: record?.overrides });
+  const estimated = rows.reduce((sum, r) => sum + (r.estMin ?? 0), 0);
+  const taken = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
   const submit = () =>
     guarded(() => {
       const at = new Date().toISOString();

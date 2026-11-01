@@ -101,3 +101,16 @@ test('a week row says which days it adds up', () => {
   const rows = weekRows('u', '2026-10-26', daily, [], {});
   assert.deepEqual(rows.map((r) => [r.task, r.days, r.estMin]), [['std:a', ['2026-10-26', '2026-10-28'], 180], ['std:b', ['2026-10-28'], 30]]);
 });
+
+import { fillDayRowTimes } from './weekTime.js';
+test('a day row with no time takes its own day\'s plan time, and a time typed over in the week table can be reset', () => {
+  const row = (id, est, actual) => ({ id, projectId: 'a', task: 'std:x', kind: 'milestone', estMin: est, actualMin: actual });
+  const daily = {
+    'u|2026-10-29': { eodAt: 'x', plan: [{ id: 'b', start: '10:00', end: '18:00', projectId: 'a', actualMinutes: 480 }], entries: [row('1', 180, undefined), { ...row('2', 0, undefined), task: 'std:y' }] },
+  };
+  const filled = fillDayRowTimes([], daily, 'u', '2026-10-26', []);
+  const r2 = filled['u|2026-10-29'].entries[1];
+  assert.deepEqual([r2.actualMin, r2.estMin], [300, 300]);
+  assert.equal(filled['u|2026-10-29'].entries[0].actualMin, 180);
+  assert.equal(daily['u|2026-10-29'].entries[1].actualMin, undefined); // saved records are untouched
+});

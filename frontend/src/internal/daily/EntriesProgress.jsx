@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Image as ImageIcon, Pencil, Trash } from 'lucide-react';
 import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes, Ye as toast, lt as guarded } from '@/internal/min';
 import { addDays, formatDayMonth, parseDateKey, weekStart, WEEKDAY_SHORT } from '../lib/dates.js';
@@ -8,7 +8,7 @@ import { EDIT_DAY_TASKS } from './EntriesLog';
 import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
 import { copyElementAsImage } from '../lib/copyTableImage';
 import { DurationInput } from './DurationInput';
-import { spreadPlanTime, weekProjectTime } from '../lib/weekTime.js';
+import { weekTableRows } from '../lib/weekTime.js';
 import { DateMenu, DayMarker } from './DateMenu';
 import { DayMover } from './DayMover';
 import { sheetAchievedText, sheetColorOf, sheetTargetText } from './sheetText';
@@ -102,15 +102,12 @@ export function EntriesProgress({ personId, date, kind, editable }) {
   const sheetRef = useRef(null);
   const [copying, setCopying] = useState(false);
   const record = weekly[`${personId}|${monday}`];
-  const baseRows =
-    kind === 'day'
-      ? dayRowsWithAssigned(tasks, daily, personId, date, { projects })
-      : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
-  // the plan time that sits on no task row is shared over the project's own rows, so each keeps its task name and the total matches the Weekly hours
-  // (shown the same while editing, so the times you see are the ones you edit; a time typed over in the table is kept as typed)
-  const typedOver = (r) => record?.overrides?.[rowKey(r)]?.actualMin != null;
-  const spread = kind === 'week' ? spreadPlanTime(baseRows, weekProjectTime(tasks, daily, personId, monday, projects), typedOver) : baseRows;
-  const rows = editable ? spread.filter((r) => !r.synthetic) : spread;
+  const weekTable = useMemo(
+    () => (kind === 'week' ? weekTableRows({ tasks, daily, personId, monday, projects, weekEntries: record?.entries ?? [], overrides: record?.overrides }) : []),
+    [kind, tasks, daily, personId, monday, projects, record?.entries, record?.overrides],
+  );
+  // each day's rows carry their own day's time (the plan fills what a table left empty), so the week adds up to the Weekly hours
+  const rows = kind === 'day' ? dayRowsWithAssigned(tasks, daily, personId, date, { projects }) : editable ? weekTable.filter((r) => !r.synthetic) : weekTable;
   // rows taken out of this week's table (restorable while editing)
   const removedRows =
     kind === 'week'
@@ -121,6 +118,11 @@ export function EntriesProgress({ personId, date, kind, editable }) {
     saveWeekly(personId, monday, {
       overrides: { ...record?.overrides, [key]: { ...record?.overrides?.[key], qty: row.qty, doneQty: row.doneQty, ...patch } },
     });
+  };
+  const resetTimes = (row) => {
+    const key = rowKey(row);
+    const { estMin: _e, actualMin: _a, ...rest } = record?.overrides?.[key] ?? {}; // eslint-disable-line no-unused-vars
+    saveWeekly(personId, monday, { overrides: { ...record?.overrides, [key]: rest } });
   };
   const withTarget = rows.filter((r) => rowTarget(r) > 0);
   const projectIds = [...new Set(rows.map((r) => r.projectId))];
@@ -315,6 +317,17 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                             <DurationInput label={`${name} time taken`} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
                           </td>
                           <td className={cx(cell, 'text-center')}>
+                            {r.timeEdited && (
+                              <button
+                                type="button"
+                                aria-label={`Reset times of ${name}`}
+                                title="Back to the times of your daily updates"
+                                className="focus-ring mb-1 block w-full rounded-md border border-line px-1 py-0.5 text-[10px] font-semibold text-accent-ink hover:bg-surface-2"
+                                onClick={() => resetTimes(r)}
+                              >
+                                Reset times
+                              </button>
+                            )}
                             <button
                               type="button"
                               aria-label={`Delete ${name}`}
@@ -330,6 +343,11 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                         <>
                           <td className={cell}>
                             {sheetTargetText(r, name)}
+                            {kind === 'week' && r.timeEdited && (
+                              <span className="mr-1 inline-block rounded bg-butter px-1 text-[10px] font-bold text-butter-ink" title="The estimated or taken time was typed over in this week's table, so it no longer follows the daily updates" data-testid="row-edited">
+                                time edited
+                              </span>
+                            )}
                             {kind === 'week' && r.days?.length > 0 && (
                               <span className="mt-0.5 block text-[11px] font-normal text-muted" data-testid="row-days">
                                 {r.days.map((d) => WEEKDAY_SHORT[parseDateKey(d).getDay()]).join(' · ')}
