@@ -25,6 +25,7 @@ const milestone = (p, name, o = {}) => ({
 });
 const week = (p, daily, tasks = []) => projectPeriodCounts(p, tasks, daily, { kind: "week", key: WEEK, end: addDays(WEEK, 4) });
 const month = (p, daily, tasks = []) => projectPeriodCounts(p, tasks, daily, { kind: "month", key: todayKey(0).slice(0, 7) });
+const monthOfDay = (p, daily) => projectPeriodCounts(p, [], daily, { kind: "month", key: DAY.slice(0, 7) }); // the month of the day under test (the previous month near a month end)
 // a weekday of this project week that is not after today, so the work is real
 const DAY = todayKey(0) >= day(1) ? day(1) : day(0);
 
@@ -47,7 +48,7 @@ test("yesterday's two Completed milestone rows give Workflows built 1 and Bugs f
   const w = week(p, daily);
   assert.deepEqual([w.counts.workflows, w.counts.bugs, w.counts.releases ?? 0], [1, 1, 0]);
   assert.deepEqual(w.auto, { workflows: 1, bugs: 1 });
-  assert.deepEqual([month(p, daily).counts.workflows, month(p, daily).counts.bugs], [1, 1]);
+  assert.deepEqual([monthOfDay(p, daily).counts.workflows, monthOfDay(p, daily).counts.bugs], [1, 1]);
   // it counts as soon as it is saved, before the day is sent
   delete daily[`${ANN}|${DAY}`].eodAt;
   assert.equal(week(p, daily).counts.workflows, 1);

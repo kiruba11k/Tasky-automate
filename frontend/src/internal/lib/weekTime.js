@@ -69,7 +69,7 @@ export function otherTimeRows(rows, byProject) {
  * typed on its rows is shared over them in proportion to their estimates (equally with no estimates), so every row keeps its task
  * name and the table adds up to the Weekly hours. A project worked on with no task rows at all gets one "Planned work" row.
  */
-export function spreadPlanTime(rows, byProject) {
+export function spreadPlanTime(rows, byProject, isFixed = () => false) {
   const out = rows.map((r) => ({ ...r }));
   const fallback = [];
   byProject.forEach((v, pid) => {
@@ -80,17 +80,20 @@ export function spreadPlanTime(rows, byProject) {
       fallback.push(...otherTimeRows([], new Map([[pid, v]])));
       return;
     }
-    const weights = mine.map((r) => (r.estMin > 0 ? r.estMin : 0));
-    const total = weights.reduce((a, b) => a + b, 0) || mine.length;
-    const w = (i) => (weights[i] || (total === mine.length && !weights.some(Boolean) ? 1 : 0));
+    // rows whose time was typed over in the week table keep it; the rest share what is left
+    const open = mine.filter((r) => !isFixed(r));
+    if (!open.length) return;
+    const withEst = open.some((r) => r.estMin > 0);
+    const w = (r) => (withEst ? r.estMin || 0 : 1);
+    const total = open.reduce((sum, r) => sum + w(r), 0);
     let given = 0;
-    mine.forEach((r, i) => {
-      const share = Math.floor((left * w(i)) / total);
+    open.forEach((r) => {
+      const share = Math.floor((left * w(r)) / total);
       r.actualMin = (r.actualMin ?? 0) + share;
       given += share;
     });
-    const biggest = mine.reduce((best, r, i) => (w(i) > w(best) ? i : best), 0);
-    mine[biggest].actualMin += left - given;
+    const biggest = open.reduce((best, r) => (w(r) > w(best) ? r : best), open[0]);
+    biggest.actualMin += left - given;
   });
   return [...out, ...fallback];
 }

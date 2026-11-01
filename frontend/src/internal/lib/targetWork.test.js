@@ -87,3 +87,10 @@ test('plan time on no task row is shared over the project\'s rows by estimate, s
   assert.equal(out.find((r) => r.id === '3').actualMin, 30);
   assert.deepEqual(out.filter((r) => r.synthetic).map((r) => [r.projectId, r.actualMin]), [['c', 50]]);
 });
+
+test('rows whose time was typed over keep it when plan time is spread', () => {
+  const rows = [{ id: '1', projectId: 'a', actualMin: 60, estMin: 60 }, { id: '2', projectId: 'a', actualMin: 60, estMin: 60 }];
+  const byProject = new Map([['a', { planned: 0, actual: 300, extra: 0 }]]);
+  const out = spreadPlanTime(rows, byProject, (r) => r.id === '1');
+  assert.deepEqual(out.map((r) => r.actualMin), [60, 240]); // the typed row stays at 60, the other takes the rest
+});

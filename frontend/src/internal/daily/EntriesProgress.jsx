@@ -107,7 +107,10 @@ export function EntriesProgress({ personId, date, kind, editable }) {
       ? dayRowsWithAssigned(tasks, daily, personId, date, { projects })
       : weekRows(personId, monday, daily, record?.entries ?? [], record?.overrides, weekAssignedRows(tasks, daily, personId, monday, { projects }));
   // the plan time that sits on no task row is shared over the project's own rows, so each keeps its task name and the total matches the Weekly hours
-  const rows = kind === 'week' && !editable ? spreadPlanTime(baseRows, weekProjectTime(tasks, daily, personId, monday, projects)) : baseRows;
+  // (shown the same while editing, so the times you see are the ones you edit; a time typed over in the table is kept as typed)
+  const typedOver = (r) => record?.overrides?.[rowKey(r)]?.actualMin != null;
+  const spread = kind === 'week' ? spreadPlanTime(baseRows, weekProjectTime(tasks, daily, personId, monday, projects), typedOver) : baseRows;
+  const rows = editable ? spread.filter((r) => !r.synthetic) : spread;
   // rows taken out of this week's table (restorable while editing)
   const removedRows =
     kind === 'week'
