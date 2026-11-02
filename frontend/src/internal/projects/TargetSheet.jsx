@@ -8,7 +8,7 @@ import { sheetColorOf } from '../daily/sheetText';
  * A fixed set of targets (or the numbers against them) as a spreadsheet: coloured header, a grid of rows and columns, and a
  * "Copy as image" button, the same look as the day and week update tables. `rows` is an array of arrays of cell text.
  */
-export function TargetSheet({ title, heading, columns, rows, filename = 'weekly-targets.png', testId = 'target-sheet', group = false }) {
+export function TargetSheet({ title, heading, columns, rows, filename = 'weekly-targets.png', testId = 'target-sheet', group = 0 }) {
   const me = useStore((s) => s.me);
   const profile = useStore((s) => s.profiles[s.me]);
   const ref = useRef(null);
@@ -55,24 +55,28 @@ export function TargetSheet({ title, heading, columns, rows, filename = 'weekly-
           </thead>
           <tbody>
             {rows.map((r, i) => {
-              // with `group`, the first column is merged down over the consecutive rows that share it (one cell per project)
-              const first = !group || i === 0 || rows[i - 1][0] !== r[0];
-              const span = group ? rows.slice(i).findIndex((x) => x[0] !== r[0]) : -1;
+              // with `group` (a number of leading columns), each of those is merged down over the consecutive rows that share it
+              // and everything before it (the date, then the project)
+              const prefix = (row, j) => row.slice(0, j + 1).join('\u0001');
               return (
                 <tr key={i} className={i % 2 ? 'bg-surface-2/40' : 'bg-surface'}>
-                  {r.map((c, j) =>
-                    group && j === 0 ? (
-                      first && (
-                        <td key={j} rowSpan={span < 0 ? rows.length - i : span} className={`${cell} bg-surface text-center align-middle font-semibold`}>
+                  {r.map((c, j) => {
+                    if (j < group) {
+                      if (i > 0 && prefix(rows[i - 1], j) === prefix(r, j)) return null;
+                      let span = 1;
+                      while (i + span < rows.length && prefix(rows[i + span], j) === prefix(r, j)) span++;
+                      return (
+                        <td key={j} rowSpan={span} className={`${cell} bg-surface text-center align-middle font-semibold`}>
                           {c}
                         </td>
-                      )
-                    ) : (
+                      );
+                    }
+                    return (
                       <td key={j} className={`${cell} ${j === 0 ? 'font-medium' : 'text-center tabular-nums'}`}>
                         {c}
                       </td>
-                    ),
-                  )}
+                    );
+                  })}
                 </tr>
               );
             })}

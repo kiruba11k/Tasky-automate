@@ -124,6 +124,17 @@ export function currentWeekStart(weeks = 0) {
 }
 
 /** `yt` - "5 Mar" style label. */
+/** "2nd Nov": the day with its ordinal and the short month. */
+export function formatOrdinalDay(key) {
+  const d = parseDateKey(key);
+  const n = d.getDate();
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th');
+  return `${n}${suffix} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+/** "2nd Nov to 6th Nov". */
+export const formatOrdinalRange = (start, end) => `${formatOrdinalDay(start)} to ${formatOrdinalDay(end)}`;
+
 export function formatDayMonth(key) {
   const d = parseDateKey(key);
   return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;

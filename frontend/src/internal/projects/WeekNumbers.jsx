@@ -12,7 +12,7 @@ import {
 import { ProgressBar } from '../ui/ProgressBar';
 import { weekTargetFor } from '@/internal/lib/domain';
 import { matchedTargetWork, withDerivedTarget } from '@/internal/lib/entries';
-import { addDays, formatDayMonth, todayKey } from '@/internal/lib/dates';
+import { addDays, formatDayMonth, formatOrdinalRange, todayKey } from '@/internal/lib/dates';
 import { TargetSheet } from './TargetSheet';
 import { TABLE_INPUT_CLASS, MILESTONE_STATUSES, sortedWeeks, targetKind } from './targetKinds';
 
@@ -50,6 +50,7 @@ function WeekNumbersTable({ p, canEdit }) {
   const actuals = (week && p.weekActuals?.[week.start]) || {};
   const rawRows = (week && p.weekText?.[week.start]) || [];
   const lockedAt = week ? p.weekDoneAt?.[week.start] : undefined;
+  const dateText = week ? formatOrdinalRange(week.start, week.end) : '';
   const [draft, setDraft] = useState(null);
   useEffect(() => {
     setDraft(null);
@@ -147,18 +148,19 @@ function WeekNumbersTable({ p, canEdit }) {
         <TargetSheet
           title="This week's numbers"
           heading={week ? `${formatDayMonth(week.start)} to ${formatDayMonth(week.end)}` : "This week's numbers"}
-          columns={['Target', 'Goal', 'Achieved', '%']}
+          columns={['Date', 'Target', 'Goal', 'Achieved', '%']}
+          group={1}
           rows={[
             ...metrics.map((m) => {
               const goal = goals[m.id] ?? 0;
               const value = +current.m[m.id] || 0;
-              return [m.label, String(goal), String(value), goal ? `${Math.round((value / goal) * 100)}%` : '·'];
+              return [dateText, m.label, String(goal), String(value), goal ? `${Math.round((value / goal) * 100)}%` : '·'];
             }),
             ...current.rows.map((r) => {
               const kind = targetKind(r);
               return kind === 'number'
-                ? [r.label, String(r.targetNum ?? 0), String(r.actualNum ?? 0), r.targetNum ? `${Math.round(((r.actualNum ?? 0) / r.targetNum) * 100)}%` : '·']
-                : [r.label, r.target || '·', kind === 'milestone' ? (r.status ?? 'Not started') : r.actual || '·', '·'];
+                ? [dateText, r.label, String(r.targetNum ?? 0), String(r.actualNum ?? 0), r.targetNum ? `${Math.round(((r.actualNum ?? 0) / r.targetNum) * 100)}%` : '·']
+                : [dateText, r.label, r.target || '·', kind === 'milestone' ? (r.status ?? 'Not started') : r.actual || '·', '·'];
             }),
           ]}
           filename={`${p.name}-week-numbers.png`}

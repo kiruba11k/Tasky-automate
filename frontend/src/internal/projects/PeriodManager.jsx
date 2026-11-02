@@ -11,7 +11,7 @@ import {
 } from '@/internal/min';
 import { Modal } from '../kit/Modal';
 import { weekTargetFor } from '@/internal/lib/domain';
-import { MONTH_SHORT, addDays, formatDayMonth, parseDateKey, todayKey, weekStart } from '@/internal/lib/dates';
+import { MONTH_SHORT, addDays, formatDayMonth, formatOrdinalRange, parseDateKey, todayKey, weekStart } from '@/internal/lib/dates';
 import { PeriodPlan } from './PeriodPlan';
 import { sortedWeeks } from './targetKinds';
 
@@ -259,6 +259,7 @@ export function PeriodManager({ p, period = 'week' }) {
             api={api}
             period={period}
             ws={current.start}
+            range={formatOrdinalRange(current.start, current.end)}
             title={period === 'week' ? `${titleOf(index, current)} (${rangeOf(current)})` : titleOf(index, current)}
             prevTitle={index > 0 ? titleOf(index - 1, list[index - 1]) : undefined}
             prev={list[index - 1]?.start}

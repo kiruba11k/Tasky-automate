@@ -1,7 +1,7 @@
 import { Target } from 'lucide-react';
 import { Se as useStore, rt as Card, tc as tracksPeriod, We as formatMinutes } from '@/internal/min';
-import { projectWeekStart, savedWeekPlan, weekTargetFor } from '../lib/domain.js';
-import { addDays, formatDayMonth, weekStart } from '../lib/dates.js';
+import { projectWeekStart, projectWeeks, savedWeekPlan, weekTargetFor } from '../lib/domain.js';
+import { addDays, formatDayMonth, formatOrdinalRange, weekStart } from '../lib/dates.js';
 import { weekRows } from '../lib/entries.js';
 import { entryName, projectLabel } from './entryHelpers';
 import { OTHER_PREFIX, groupBlocks } from './planBlocks';
@@ -11,16 +11,18 @@ import { TargetSheet } from '../projects/TargetSheet';
 /** The rows of one project's targets for the week holding `date`: [project, target, type, goal], from its saved weekly plan. */
 export function weeklyTargetRows(project, date) {
   const start = projectWeekStart(project, date);
+  const weekOfProject = projectWeeks(project).find((w) => w.start === start);
+  const range = formatOrdinalRange(start, weekOfProject?.end ?? addDays(start, 4)); // the project's own week, "2nd Nov to 6th Nov"
   const off = project.weekOff?.[start] ?? [];
   const goals = weekTargetFor(project, date) ?? {};
   const numbers = (project.metrics ?? [])
     .filter((m) => tracksPeriod(m, 'week') && !off.includes(m.id) && (goals[m.id] ?? 0) > 0)
-    .map((m) => [project.name, m.label, 'Number', String(goals[m.id])]);
+    .map((m) => [range, project.name, m.label, 'Number', String(goals[m.id])]);
   const custom = (project.weekText?.[start] ?? [])
     .filter((r) => r.label?.trim())
     .map((r) => {
       const kind = targetKind(r);
-      return [project.name, r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
+      return [range, project.name, r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
     });
   return savedWeekPlan(project, date) || custom.length ? [...numbers, ...custom] : [];
 }
@@ -51,7 +53,8 @@ export function ownWorkRows(personId, date, daily, weekly, projects = []) {
     });
     (day.extra ?? []).forEach((x) => !projects.some((p) => p.id === x.projectId) && add(x.work || 'Other work', x.minutes));
   }
-  return [...rows, ...[...planned].map(([name, minutes]) => [name, name, 'Planned time', formatMinutes(minutes)])];
+  const range = formatOrdinalRange(monday, addDays(monday, 4));
+  return [...rows, ...[...planned].map(([name, minutes]) => [name, name, 'Planned time', formatMinutes(minutes)])].map((r) => [range, ...r]);
 }
 
 /** "Weekly targets" on the Tasks update page: the fixed weekly targets of every project the person is on, as one sheet with Copy as image. */
@@ -74,9 +77,9 @@ export function WeeklyTargets({ personId, date }) {
       <TargetSheet
         title="Weekly targets"
         heading={`Week of ${formatDayMonth(date)}`}
-        columns={['Project', 'Target', 'Type', 'Goal']}
+        columns={['Date', 'Project', 'Target', 'Type', 'Goal']}
         rows={rows}
-        group
+        group={2}
         filename="weekly-targets.png"
         testId="weekly-targets-sheet"
       />

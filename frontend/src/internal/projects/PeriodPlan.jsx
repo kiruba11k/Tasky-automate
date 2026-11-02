@@ -11,7 +11,7 @@ import {
 import { TargetSheet } from './TargetSheet';
 
 /** The targets table of one week / month: project numbers plus custom Number / Milestone / Text targets. */
-export function PeriodPlan({ p, api, period, ws, title, prevTitle, prev, onSave }) {
+export function PeriodPlan({ p, api, period, ws, range, title, prevTitle, prev, onSave }) {
   const metrics = p.metrics.filter((m) => tracksPeriod(m, period));
   const saved = api.planned(ws);
   const plan = api.plan(ws);
@@ -105,12 +105,13 @@ export function PeriodPlan({ p, api, period, ws, title, prevTitle, prev, onSave 
         <TargetSheet
           title={`${title} targets`}
           heading={title}
-          columns={['Target', 'Type', 'Goal']}
+          columns={['Date', 'Target', 'Type', 'Goal']}
+          group={1}
           rows={[
-            ...shown.map((m) => [m.label, 'Number', String(plan[m.id] ?? 0)]),
+            ...shown.map((m) => [range ?? title, m.label, 'Number', String(plan[m.id] ?? 0)]),
             ...rows.map((r) => {
               const kind = targetKind(r);
-              return [r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
+              return [range ?? title, r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
             }),
           ]}
           filename={`${p.name}-${title}-targets.png`}
