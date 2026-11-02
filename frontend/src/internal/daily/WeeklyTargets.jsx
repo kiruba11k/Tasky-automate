@@ -38,7 +38,7 @@ export function ownWorkRows(personId, date, daily, weekly, projects = []) {
     .filter((r) => String(r.projectId).startsWith(OTHER_PREFIX) && (r.qty > 0 || r.targetText?.trim()))
     .map((r) => {
       const kind = r.kind ?? 'number';
-      return [projectLabel(r.projectId, []), entryName(r), TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.qty) : r.targetText.trim()];
+      return [projectLabel(r.projectId, []), entryName(r), TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.qty) : (r.targetText ?? '').trim() || '·'];
     });
   // time planned in "Plan your day" for work that is no project (typed names, custom blocks, extra hours), added up over the week
   const planned = new Map();
