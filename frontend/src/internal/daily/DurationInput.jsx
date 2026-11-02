@@ -3,88 +3,102 @@ import { oe as cx } from '@/internal/min';
 import { parseDuration } from './parseDuration';
 
 const MAX_MINUTES = 720;
-const toParts = (minutes) =>
-  minutes != null ? { h: String(Math.floor(minutes / 60)), m: String(minutes % 60) } : { h: '', m: '' };
+/** 90 -> "1h 30m", 120 -> "2h", 45 -> "45m", undefined -> "". */
+const fmt = (m) => (m == null ? '' : m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`);
 
-const INPUT_CLASS =
-  '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none w-9 bg-transparent py-1 text-right text-sm tabular-nums text-ink outline-none placeholder:text-muted/60 disabled:text-muted';
+const BOX =
+  'focus-ring w-24 rounded-xl border border-line bg-surface px-2 py-1 text-center text-sm tabular-nums text-ink placeholder:text-muted/60 disabled:bg-surface-2 disabled:text-muted';
 
-/** Hours and minutes boxes for a duration in minutes (empty = undefined). `placeholder` like "1h 30m" shows as the ghost value. */
-export function DurationInput({ value, onChange, placeholder, label, className, disabled }) {
-  const [parts, setParts] = useState(() => toParts(value));
+/**
+ * One box for a duration in minutes (empty = undefined). Type it in one go: "1h 30", "1h30m", "90" (minutes), "1.5" (hours),
+ * "1:30". It selects its text when focused, so typing replaces it; Enter or the down arrow moves to the same column of the next row,
+ * the up arrow to the previous row. `column` names the column (boxes with the same name are stepped through together) and `copyFrom`
+ * (minutes) is what the "=" key puts in, for "same as the estimate".
+ */
+export function DurationInput({ value, onChange, placeholder, label, className, disabled, column, copyFrom }) {
+  const [text, setText] = useState(fmt(value));
   const focused = useRef(false);
+  const ref = useRef(null);
+  const latest = useRef(value);
+  latest.current = value;
 
   useEffect(() => {
-    if (!focused.current) setParts(toParts(value));
+    if (!focused.current) setText(fmt(value));
   }, [value]);
 
-  const hint = placeholder != null && placeholder !== '...' ? parseDuration(placeholder) : null;
-  const ghost = hint != null && Number.isFinite(hint) ? toParts(hint) : { h: '0', m: '0' };
+  const ghost = placeholder != null && placeholder !== '...' ? placeholder : '';
 
-  const update = (next) => {
-    setParts(next);
-    if (next.h.trim() === '' && next.m.trim() === '') {
-      onChange(undefined);
+  const commit = () => {
+    const t = text.trim();
+    if (t === '') {
+      if (value != null) onChange(undefined);
+      setText('');
       return;
     }
-    const total = Math.max(0, Math.round(+next.h || 0)) * 60 + Math.max(0, Math.round(+next.m || 0));
-    onChange(Math.min(MAX_MINUTES, total));
+    const m = parseDuration(t);
+    if (m == null || !Number.isFinite(m)) {
+      setText(fmt(value)); // not understood: back to what it was
+      return;
+    }
+    const minutes = Math.min(MAX_MINUTES, Math.max(0, m));
+    if (minutes !== value) onChange(minutes);
+    setText(fmt(minutes));
+    // the page may refuse the value (a plan block cannot be under 5 minutes): show what it kept
+    setTimeout(() => {
+      if (!focused.current) setText(fmt(latest.current));
+    }, 0);
+  };
+
+  const step = (dir) => {
+    const name = column ?? label;
+    const all = [...document.querySelectorAll('input[data-dur]')].filter((el) => !el.disabled && el.getAttribute('data-dur') === name);
+    const at = all.indexOf(ref.current);
+    const next = all[at + dir];
+    if (next) next.focus();
   };
 
   return (
-    <span
-      role="group"
+    <input
+      ref={ref}
+      type="text"
+      inputMode="text"
+      autoComplete="off"
       aria-label={label}
-      title="Hours and minutes"
-      className={cx(
-        'inline-flex shrink-0 items-center rounded-xl border border-line bg-surface px-1.5 focus-within:ring-2 focus-within:ring-accent/40',
-        disabled && 'bg-surface-2',
-        className,
-        '!w-auto',
-      )}
-    >
-      <input
-        aria-label={`${label} hours`}
-        type="number"
-        min={0}
-        max={12}
-        inputMode="numeric"
-        disabled={disabled}
-        className={INPUT_CLASS}
-        placeholder={ghost.h}
-        value={parts.h}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-        }}
-        onChange={(e) => update({ ...parts, h: e.target.value })}
-      />
-      <span className="px-0.5 text-xs font-semibold text-muted">h</span>
-      <input
-        aria-label={`${label} minutes`}
-        type="number"
-        min={0}
-        max={59}
-        step={5}
-        inputMode="numeric"
-        disabled={disabled}
-        className={INPUT_CLASS}
-        placeholder={ghost.m}
-        value={parts.m}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          const minutes = +parts.m || 0;
-          if (minutes > 59) setParts({ h: String((+parts.h || 0) + Math.floor(minutes / 60)), m: String(minutes % 60) });
-        }}
-        onChange={(e) => update({ ...parts, m: e.target.value })}
-      />
-      <span className="pl-0.5 pr-1 text-xs font-semibold text-muted">m</span>
-    </span>
+      data-dur={column ?? label}
+      title="Type it in one go: 1h 30, 90 (minutes), 1.5 (hours) or 1:30. Enter or the arrows move to the next row."
+      disabled={disabled}
+      className={cx(BOX, className)}
+      placeholder={ghost}
+      value={text}
+      onFocus={(e) => {
+        focused.current = true;
+        e.target.select();
+      }}
+      onBlur={() => {
+        focused.current = false;
+        commit();
+      }}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          commit();
+          step(1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          commit();
+          step(-1);
+        } else if (e.key === '=' && copyFrom > 0) {
+          e.preventDefault();
+          setText(fmt(copyFrom));
+          if (copyFrom !== value) onChange(copyFrom);
+          e.target.select();
+        } else if (e.key === 'Escape') {
+          setText(fmt(value));
+          e.target.blur();
+        }
+      }}
+    />
   );
 }
 

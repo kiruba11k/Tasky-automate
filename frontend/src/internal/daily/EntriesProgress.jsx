@@ -384,7 +384,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                             )}
                           </td>
                           <td className={cx(cell, 'text-center')}>
-                            <DurationInput label={`${name} estimated time`} placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
+                            <DurationInput label={`${name} estimated time`} column="week-est" placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
                           </td>
                           <td className={cell}>
                             {kindOf(r) === 'number' ? (
@@ -408,7 +408,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                             )}
                           </td>
                           <td className={cx(cell, 'text-center')}>
-                            <DurationInput label={`${name} time taken`} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
+                            <DurationInput label={`${name} time taken`} column="week-taken" copyFrom={r.estMin} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
                           </td>
                           <td className={cx(cell, 'text-center')}>
                             {r.timeEdited && (
@@ -513,11 +513,11 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                           <span className="flex flex-wrap items-center gap-2 text-xs text-muted" data-edit-times={r.id}>
                             <span className="flex items-center gap-1">
                               Estimated
-                              <DurationInput label={`${name} estimated time`} placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
+                              <DurationInput label={`${name} estimated time`} column="week-est" placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
                             </span>
                             <span className="flex items-center gap-1">
                               Taken
-                              <DurationInput label={`${name} time taken`} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
+                              <DurationInput label={`${name} time taken`} column="week-taken" copyFrom={r.estMin} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
                             </span>
                             <button
                               type="button"
