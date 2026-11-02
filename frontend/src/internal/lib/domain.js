@@ -686,18 +686,21 @@ export function projectEodStatus(project, state, day = todayKey(0)) {
 export function dayRecordWithTaskTime(tasks, daily, personId, date) {
   const record = daily?.[`${personId}|${date}`];
   const rows = dayEntries(daily, personId, date);
+  const asgAll = dayAsg(daily, personId, date);
   const taskMin = new Map();
   (tasks ?? []).forEach((t) => {
-    if (t.assigneeId === personId && t.minutes > 0 && isSubmitted(t) && workDate(t) === date) taskMin.set(t.projectId, (taskMin.get(t.projectId) ?? 0) + t.minutes);
+    if (t.assigneeId !== personId || !(t.minutes > 0) || !isSubmitted(t) || workDate(t) !== date) return;
+    // a row of assigned tasks the person typed a time on keeps that time: the tasks' own time is not added for it
+    if (asgAll[`asg|${personId}|${date}|${t.projectId}|${taskBreakdownKey(t).key}`]?.actualMin > 0) return;
+    taskMin.set(t.projectId, (taskMin.get(t.projectId) ?? 0) + t.minutes);
   });
   const typed = new Map();
   rows.forEach((e) => {
     if (e.actualMin > 0) typed.set(e.projectId, (typed.get(e.projectId) ?? 0) + e.actualMin);
   });
-  const asgRows = Object.entries(dayAsg(daily, personId, date))
+  const asgRows = Object.entries(asgAll)
     .filter(([, v]) => v?.projectId && v.actualMin > 0)
     .map(([id, v]) => ({ id, projectId: v.projectId, actualMin: v.actualMin })); // time typed on assigned rows
-  asgRows.forEach((e) => typed.set(e.projectId, (typed.get(e.projectId) ?? 0) + e.actualMin));
   const extra = [...asgRows];
   taskMin.forEach((m, projectId) => {
     const more = m - (typed.get(projectId) ?? 0);

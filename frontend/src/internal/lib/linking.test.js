@@ -342,13 +342,14 @@ test('time and notes typed on an assigned row are kept with the row and counted 
   const withTyped = assignedDay([t], ME, day, { ...OPTS, asg }).rows[0];
   assert.deepEqual([withTyped.actualMin, withTyped.typedMin, withTyped.remarks], [45, 45, 'went fine']);
   assert.equal(probe.id.startsWith(`asg|${ME}|${day}|${P}`), true);
-  // the hours see the typed time, and it is the larger of typed and submitted time per project, never the sum
+  // the hours see the typed time; a time typed on an assigned row stays as typed, whatever the submitted task carries
   const daily = { [`${ME}|${day}`]: { asg } };
   assert.equal(dayLoggedMinutes([t], daily, ME, day), 45);
   const sent = task({ typeId: 'prospect', qty: 30, status: 'done', doneQty: 30, minutes: 80 });
-  assert.equal(dayLoggedMinutes([sent], daily, ME, day), 80);
+  assert.equal(dayLoggedMinutes([sent], daily, ME, day), 45);
   const rows = dayRowsWithAssigned([sent], daily, ME, day, OPTS);
-  assert.equal(rows.reduce((s, r) => s + (r.actualMin ?? 0), 0), 80);
+  assert.equal(rows.reduce((s, r) => s + (r.actualMin ?? 0), 0), 45);
+  assert.equal(dayLoggedMinutes([sent], {}, ME, day), 80); // with nothing typed, the task's time counts
 });
 
 test('a few minutes over a long task is still on time (10% grace)', async () => {

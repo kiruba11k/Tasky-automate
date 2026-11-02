@@ -67,12 +67,6 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
     loggedBy.set(id, cur);
     if (row.actualMin > 0) loggedMin.set(row.projectId, (loggedMin.get(row.projectId) ?? 0) + row.actualMin);
   });
-  Object.values(asg ?? {}).forEach((v) => {
-    if (v?.projectId && v.actualMin > 0) loggedMin.set(v.projectId, (loggedMin.get(v.projectId) ?? 0) + v.actualMin); // time typed on an assigned row
-  });
-  // time on submitted tasks per project: only what the typed time does not reach yet is added, so the project's day is the larger of the two
-  const projectMinutes = new Map();
-  buckets.forEach((b) => projectMinutes.set(b.projectId, (projectMinutes.get(b.projectId) ?? 0) + b.minutes));
   const rows = [];
   const covers = new Map();
   const hidden = [];
@@ -101,19 +95,26 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
     if (e.desc) b.desc = e.desc;
     b.edited = all && (e.qty != null || e.estMin != null || !!e.desc);
   });
+  // time on submitted tasks per project, for the rows the person typed no time on: only what the logged rows' time does not reach is
+  // added (the larger of the two, never the sum). A row with a time typed on it keeps exactly that time.
+  const projectMinutes = new Map();
+  buckets.forEach((b) => {
+    if (!(asg?.[`asg|${personId}|${date}|${b.id}`]?.actualMin > 0)) projectMinutes.set(b.projectId, (projectMinutes.get(b.projectId) ?? 0) + b.minutes);
+  });
   [...buckets.values()]
     .sort((a, b) => a.k.order - b.k.order || a.k.label.localeCompare(b.k.label))
     .forEach((b) => {
       const l = loggedBy.get(b.id);
+      const rowId = `asg|${personId}|${date}|${b.id}`;
+      const typed = asg?.[rowId];
+      const typedMin = typed?.actualMin > 0 ? typed.actualMin : undefined;
       let actualMin;
-      if (projectMinutes.has(b.projectId)) {
+      // time on submitted tasks fills a row only when the person typed no time on it: what they typed stays as typed
+      if (!typedMin && projectMinutes.has(b.projectId)) {
         const extra = Math.max(0, projectMinutes.get(b.projectId) - (loggedMin.get(b.projectId) ?? 0));
         projectMinutes.delete(b.projectId);
         if (extra > 0) actualMin = extra;
       }
-      const rowId = `asg|${personId}|${date}|${b.id}`;
-      const typed = asg?.[rowId];
-      const typedMin = typed?.actualMin > 0 ? typed.actualMin : undefined;
       const typedDone = typed?.doneQty > 0 ? typed.doneQty : undefined; // a number typed on the row; the approved number wins when it is larger
       const estMin = Math.max(0, b.est - (l?.est ?? 0));
       const loggedTotal = typedMin || actualMin ? (typedMin ?? 0) + (actualMin ?? 0) : undefined;

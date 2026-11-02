@@ -44,3 +44,12 @@ test('a row removed from the day (even one that is not carried over) leaves the 
   assert.deepEqual(hidden.hidden.map((h) => [h.id, h.qty]), [[id, 10]]);
   assert.equal(assignedDay([t], ME, D, { projects: [], today: D, carryEdits: {} }).rows.length, 1);
 });
+
+test('a time typed on an assigned row stays as typed, whatever time the submitted tasks carry', () => {
+  const sent = task({ status: 'in_review', doneQty: 10, minutes: 204, submittedAt: `${D}T09:00:00.000Z` });
+  const rowId = `asg|${ME}|${D}|p|l2`;
+  const open = assignedDay([sent], ME, D, { projects: [], today: D }).rows[0];
+  assert.equal(open.actualMin, 204); // nothing typed: the tasks' time shows
+  const typed = assignedDay([sent], ME, D, { projects: [], today: D, asg: { [rowId]: { projectId: 'p', actualMin: 60 } } }).rows[0];
+  assert.deepEqual([typed.actualMin, typed.typedMin], [60, 60]);
+});
