@@ -15,7 +15,6 @@ import {
   Mn as toMinutes,
 } from '@/internal/min';
 import { computeStandardMinutes, emptyDaily } from '../lib/domain.js';
-import { splitEstimates } from '../lib/estimateSplit.js';
 import { assignedDay } from '../lib/assigned.js';
 import { eodStatusText, reopenedProjects } from '../lib/eodReview.js';
 import { DurationInput } from './DurationInput';
@@ -382,13 +381,6 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       }))
       .filter((g) => g.project || g.pid.startsWith(OTHER));
   }, [blocks, extras, shown, projects, added, assignedPids]);
-
-  // While the targets are editable, each project's planned time is shared out over its rows that were not typed by hand.
-  useEffect(() => {
-    if (!targetsEditable) return;
-    const split = splitEstimates(rows, groups);
-    if (split !== rows) setRows(split);
-  }, [rows, groups, targetsEditable]);
 
   const removeGroup = (pid, name) => {
     if (shown.some((r) => r.projectId === pid && (r.task || r.desc)) && !window.confirm(`Remove ${name} and its tasks from this day?`)) return;
