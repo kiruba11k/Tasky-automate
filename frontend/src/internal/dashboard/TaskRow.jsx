@@ -37,7 +37,7 @@ export function TaskRow({ task }) {
   const [sentTitle, setSentTitle] = useState(task.title);
   const [sentLinks, setSentLinks] = useState(task.links?.length ? task.links : ['']);
   const [sentNote, setSentNote] = useState(task.feedback?.[0]?.text ?? '');
-  const reviewers = useReviewerOptions(task.projectId);
+  const reviewers = useReviewerOptions(task.projectId, task);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [doneQty, setDoneQty] = useState(task.doneQty ?? task.qty);

@@ -2,11 +2,11 @@
 // with the numbers from the row, so the person does not fill the same thing in again on each task. Pure helpers, no store.
 const PENDING = ["todo", "in_progress", "changes"];
 
-/** Who reviews a task the person sends in: the project's manager, else whoever assigned it. Never the person themself. */
+/** Who reviews a task the person sends in: whoever assigned it, else the project's manager. Never the person themself. */
 export function reviewerFor(task, project, me) {
+  if (task.assignedById && task.assignedById !== me && !task.adhoc) return task.assignedById;
   const pm = project?.pmId;
-  if (pm && pm !== me) return pm;
-  return task.assignedById && task.assignedById !== me ? task.assignedById : null;
+  return pm && pm !== me ? pm : null;
 }
 
 /**

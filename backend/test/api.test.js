@@ -1004,6 +1004,17 @@ describe('tracker documents', () => {
     assert.equal(docs.find((d) => d.key === 't1').data.status, 'review');
   });
 
+  test('a resource\'s done task can go to whoever assigned it, as well as to the project manager', async () => {
+    await put(fay, 'project', 'prv2', { id: 'prv2', name: 'Assigner project', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann, ids.bo] });
+    const task = { id: 'rv2', title: 'x', projectId: 'prv2', assigneeId: ids.ann, assignedById: ids.bo, status: 'todo', history: [] };
+    assert.equal((await put(fay, 'task', 'rv2', task)).ok, true);
+    assert.equal((await put(ann, 'task', 'rv2', { ...task, status: 'in_review', reviewerId: ids.bo })).ok, true, 'the person who assigned it');
+    assert.equal((await put(bo, 'task', 'rv2', { ...task, status: 'done', reviewerId: ids.bo })).ok, true, 'and they approve it');
+    const other = { ...task, id: 'rv3' };
+    assert.equal((await put(fay, 'task', 'rv3', other)).ok, true);
+    assert.equal((await put(ann, 'task', 'rv3', { ...other, status: 'in_review', reviewerId: ids.admin || ids.fay })).ok, false, 'not just anyone');
+  });
+
   test('a resource\'s task is approved by the project manager of its project, and only by its reviewer', async () => {
     await put(fay, 'project', 'prv', { id: 'prv', name: 'Review project', status: 'active', pmId: ids.pm, admins: [], teamIds: [ids.ann] });
     const task = { id: 'rv1', title: 'x', projectId: 'prv', assigneeId: ids.ann, assignedById: ids.pm, status: 'todo', history: [] };

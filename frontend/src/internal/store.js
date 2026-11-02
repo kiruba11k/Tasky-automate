@@ -281,11 +281,12 @@ export const useStore = create()(
           if (!(doneQty > 0)) throw new Error("Enter how many you completed.");
           if (!(minutes > 0)) throw new Error("Enter the minutes you took.");
           if (!reviewerId) throw new Error("Choose who should review it.");
-          // A resource's work is always approved by the project manager of its project.
+          // A resource's work goes to the person who assigned the task, or else to the project manager of its project.
           if (roleOf(task.assigneeId) === "resource") {
             const pmId = get().projects.find((p) => p.id === task.projectId)?.pmId;
-            if (!pmId) throw new Error("This project has no project manager to review it.");
-            reviewerId = pmId;
+            const assigner = !task.adhoc && task.assignedById && task.assignedById !== task.assigneeId ? task.assignedById : null;
+            if (!pmId && !assigner) throw new Error("This project has no project manager to review it.");
+            if (reviewerId !== assigner) reviewerId = pmId ?? assigner;
           }
           const isResubmit =
             task.status === "changes" ||

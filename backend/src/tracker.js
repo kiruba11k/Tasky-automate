@@ -366,7 +366,9 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
           const assignee = (await live()).find((x) => x.id === data.assigneeId);
           if (assignee && trackerRole(assignee) === 'resource') {
             const project = (await find('project', data.projectId))?.data;
-            if (!project || data.reviewerId !== project.pmId) return false;
+            // a resource's work goes to the project's manager, or to the person who assigned the task
+            const assigner = !t.adhoc && t.assignedById && t.assignedById !== data.assigneeId ? t.assignedById : null;
+            if (!project || (data.reviewerId !== project.pmId && data.reviewerId !== assigner)) return false;
           }
         }
         return lead(u) || [t.assigneeId, t.assignedById, t.reviewerId, ...(t.history || []).map((h) => h.to)].some(mine);

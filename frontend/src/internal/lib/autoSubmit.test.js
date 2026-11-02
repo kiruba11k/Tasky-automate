@@ -5,10 +5,10 @@ import { planSubmissions, reviewerFor } from './autoSubmit.js';
 const projects = [{ id: 'p', pmId: 'pm' }, { id: 'q', pmId: 'me' }];
 const task = (id, o = {}) => ({ id, assigneeId: 'me', assignedById: 'boss', projectId: 'p', qty: 10, targetMinutes: 30, status: 'todo', ...o });
 
-test('a done number on a row sends its open task for approval to the project manager', () => {
+test('a done number on a row sends its open task for approval to whoever assigned it', () => {
   const tasks = [task('a')];
   const rows = [{ typedDone: 8, actualMin: 25, taskIds: ['a'] }];
-  assert.deepEqual(planSubmissions({ rows, tasks, projects, me: 'me' }), [{ taskId: 'a', doneQty: 8, minutes: 25, reviewerId: 'pm' }]);
+  assert.deepEqual(planSubmissions({ rows, tasks, projects, me: 'me' }), [{ taskId: 'a', doneQty: 8, minutes: 25, reviewerId: 'boss' }]); // whoever assigned it
 });
 
 test('the number and the time are shared over the row\'s tasks, extra to the last, sent tasks left alone', () => {
@@ -22,6 +22,8 @@ test('nothing typed, nothing sent; the reviewer is never the person', () => {
   assert.deepEqual(planSubmissions({ rows: [{ taskIds: ['a'], actualMin: 30 }], tasks: [task('a')], projects, me: 'me' }), []);
   assert.equal(reviewerFor(task('a', { projectId: 'q' }), projects[1], 'me'), 'boss');
   assert.equal(reviewerFor(task('a', { assignedById: 'me' }), projects[1], 'me'), null);
+  assert.equal(reviewerFor(task('a', { assignedById: 'me' }), projects[0], 'me'), 'pm'); // self-assigned: the project manager
+  assert.equal(reviewerFor(task('a', { adhoc: true }), projects[0], 'me'), 'pm');
 });
 
 test('what tasks already sent in account for is not sent again', () => {
