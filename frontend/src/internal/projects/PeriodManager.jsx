@@ -106,6 +106,7 @@ export function PeriodManager({ p, period = 'week' }) {
     period === 'month'
       ? `${MONTH_SHORT[parseDateKey(item.start).getMonth()]} ${parseDateKey(item.start).getFullYear()}`
       : `Week ${i + 1}`;
+  const rangeOf = (item) => `${formatDayMonth(item.start)} to ${formatDayMonth(item.end)}`;
   const today = todayKey(0);
   const initial = list.find((x) => x.start <= today && today <= x.end)?.start ?? list[list.length - 1]?.start ?? null;
   const [selected, setSelected] = useState(initial);
@@ -194,6 +195,7 @@ export function PeriodManager({ p, period = 'week' }) {
               />
             )}
             <span className="relative">{titleOf(i, item)}</span>
+            {period === 'week' && <span className="relative text-[10px] font-medium opacity-80">{rangeOf(item)}</span>}
             {item.start <= today && today <= item.end && (
               <span className="relative rounded-full bg-white/80 px-1.5 text-[9px] text-ink">now</span>
             )}
@@ -257,7 +259,7 @@ export function PeriodManager({ p, period = 'week' }) {
             api={api}
             period={period}
             ws={current.start}
-            title={titleOf(index, current)}
+            title={period === 'week' ? `${titleOf(index, current)} (${rangeOf(current)})` : titleOf(index, current)}
             prevTitle={index > 0 ? titleOf(index - 1, list[index - 1]) : undefined}
             prev={list[index - 1]?.start}
             onSave={(numbers, rows, off) => attempt(() => api.save(current.start, numbers, rows, off))}
