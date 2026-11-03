@@ -57,7 +57,7 @@ export function weekProjectTime(tasks, daily, personId, monday, projects) {
 
 /** Minutes of the week's plan and extra time on projects beyond what the week table's rows carry (never below 0), for a footnote. */
 export function planTimeOffRows(rows, byProject) {
-  const onRows = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
+  const onRows = rows.reduce((sum, r) => sum + (r.time ?? (r.actualMin > 0 ? r.actualMin : (r.estMin ?? 0))), 0);
   let worked = 0;
   byProject.forEach((v) => (worked += v.actual + v.extra));
   return Math.max(0, worked - onRows);

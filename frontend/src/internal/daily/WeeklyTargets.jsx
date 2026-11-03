@@ -7,6 +7,7 @@ import { entryName, projectLabel } from './entryHelpers';
 import { OTHER_PREFIX, groupBlocks } from './planBlocks';
 import { TARGET_KINDS, targetKind } from '../projects/targetKinds';
 import { TargetSheet } from '../projects/TargetSheet';
+import { MyWeekTargets } from './MyWeekTargets';
 
 /** The rows of one project's targets for the week holding `date`: [project, target, type, goal], from its saved weekly plan. */
 export function weeklyTargetRows(project, date) {
@@ -63,8 +64,15 @@ export function WeeklyTargets({ personId, date }) {
   const daily = useStore((s) => s.daily);
   const weekly = useStore((s) => s.weekly);
   const mine = projects.filter((p) => p.status === 'active' && (p.pmId === personId || p.teamIds?.includes(personId) || p.admins?.includes(personId)));
-  const rows = [...mine.flatMap((p) => weeklyTargetRows(p, date)), ...ownWorkRows(personId, date, daily, weekly, projects)];
-  if (!rows.length) return null;
+  const monday = weekStart(date);
+  const range = formatOrdinalRange(monday, addDays(monday, 4));
+  // the targets the person added to the week for a project (the rest of their own work is in ownWorkRows)
+  const mineRows = ((weekly[`${personId}|${monday}`]?.entries ?? []).filter((e) => e.task && !String(e.projectId).startsWith(OTHER_PREFIX))).map((e) => {
+    const kind = e.kind ?? 'number';
+    const p = projects.find((x) => x.id === e.projectId);
+    return [range, p?.name ?? e.projectId, entryName(e, p), TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(e.qty ?? 0) : (e.targetText ?? '').trim() || '·'];
+  });
+  const rows = [...mine.flatMap((p) => weeklyTargetRows(p, date)), ...mineRows, ...ownWorkRows(personId, date, daily, weekly, projects)];
   return (
     <div data-testid="weekly-targets">
     <Card className="!p-0">
@@ -72,8 +80,9 @@ export function WeeklyTargets({ personId, date }) {
         <h2 className="flex items-center gap-2 text-base font-bold">
           <Target size={17} className="text-accent-ink" /> Weekly targets
         </h2>
-        <p className="text-xs text-muted">The targets fixed for your projects this week, plus the company work you set yourself, all in one table.</p>
+        <p className="text-xs text-muted">The targets fixed for your projects this week, plus the ones you set yourself, all in one table.</p>
       </div>
+      {rows.length > 0 && (
       <TargetSheet
         title="Weekly targets"
         heading={`Week of ${formatDayMonth(date)}`}
@@ -83,6 +92,8 @@ export function WeeklyTargets({ personId, date }) {
         filename="weekly-targets.png"
         testId="weekly-targets-sheet"
       />
+      )}
+      <MyWeekTargets personId={personId} mon={monday} />
     </Card>
     </div>
   );

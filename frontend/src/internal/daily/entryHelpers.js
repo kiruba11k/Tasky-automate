@@ -77,3 +77,9 @@ export const rowTarget = (row) =>
 export function savedEntries(kind, personId, date, daily, weekly) {
   return (kind === 'day' ? daily[`${personId}|${date}`] : weekly[`${personId}|${weekStart(date)}`])?.entries ?? [];
 }
+
+/** The time of a row: the time taken when there is one, else the estimate (the tables show one "Time" column). */
+export const rowTime = (row) => row?.time ?? (row?.actualMin > 0 ? row.actualMin : (row?.estMin ?? 0));
+
+/** What typing a "Time" does to a row: it is both the estimate and the time taken, so every total and report follows it. */
+export const timePatch = (minutes) => ({ estMin: minutes ?? 0, actualMin: minutes ?? undefined, estManual: minutes != null, estAuto: false });

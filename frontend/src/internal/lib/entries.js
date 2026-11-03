@@ -251,6 +251,9 @@ export function plannedWeekTargets(project, weekly, projectWeekStartKey) {
   return out;
 }
 
+/** A row's time: the time taken when there is one, else the estimate. */
+const timeOf = (row) => (row?.actualMin > 0 ? row.actualMin : (row?.estMin ?? 0));
+
 /** Identity of a row across days: the same project, task, custom name and kind of target add up in the week's table. */
 export const rowKey = (row) => `${row.projectId}|${row.task}|${(row.custom ?? "").trim().toLowerCase()}|${row.kind ?? "number"}`;
 
@@ -273,9 +276,10 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     const sum = merged.get(key);
     const { __day: day, ...plain } = row;
     if (!sum) {
-      merged.set(key, { ...plain, id: `wk-${key}`, remarks: row.remarks ?? "", days: day ? [day] : [] });
+      merged.set(key, { ...plain, id: `wk-${key}`, remarks: row.remarks ?? "", days: day ? [day] : [], time: timeOf(row) });
       return;
     }
+    sum.time += timeOf(row); // the row's Time adds up over its days
     if (day && !sum.days.includes(day)) sum.days.push(day); // the days this row adds up
     sum.qty = row.qty != null || sum.qty != null ? (sum.qty ?? 0) + (row.qty ?? 0) : undefined;
     sum.doneQty = row.doneQty != null || sum.doneQty != null ? (sum.doneQty ?? 0) + (row.doneQty ?? 0) : undefined;
@@ -302,7 +306,10 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     const actualHolds = typed?.actualMin != null && typed.actualBase === (sum.actualMin ?? 0);
     if (estHolds) sum.estMin = typed.estMin;
     if (actualHolds) sum.actualMin = typed.actualMin;
-    if (estHolds || actualHolds) sum.timeEdited = true;
+    if (estHolds || actualHolds) {
+      sum.timeEdited = true;
+      sum.time = actualHolds ? typed.actualMin : typed.estMin; // a Time typed over in the week table
+    }
     if (typed?.hidden) sum.hidden = true; // removed from this week's table (the daily updates keep it)
   });
   return [...merged.values()].filter((r) => includeHidden || !r.hidden);

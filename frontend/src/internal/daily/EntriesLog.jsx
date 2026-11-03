@@ -38,7 +38,9 @@ import {
   parseQty,
   projectLabel,
   MY_PREFIX,
+  rowTime,
   taskChoices,
+  timePatch,
 } from './entryHelpers';
 
 /** Window event: "open the day's tasks for editing" (sent by the Edit button on the day's progress card). */
@@ -160,16 +162,11 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
       </td>
       <td className="px-2 py-2">
         {editing ? (
-          <DurationInput label="Estimated time" column="est" placeholder="..." value={draft.estMin} onChange={(m) => setDraft((d) => ({ ...d, estMin: m ?? 0 }))} />
+          <DurationInput label="Time" column="time" placeholder="..." value={draft.estMin} onChange={(m) => setDraft((d) => ({ ...d, estMin: m ?? 0 }))} />
+        ) : locked ? (
+          <span className="tabular-nums">{formatMinutes(r.actualMin ?? r.estMin ?? 0)}</span>
         ) : (
-          <span className="tabular-nums">{formatMinutes(r.estMin)}</span>
-        )}
-      </td>
-      <td className="px-2 py-2">
-        {locked ? (
-          <span className="tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</span>
-        ) : (
-          <DurationInput label="Actual time" column="taken" copyFrom={r.estMin} placeholder={r.estMin > 0 ? formatMinutes(r.estMin) : '...'} value={r.actualMin} onChange={(m) => onType({ actualMin: m ?? undefined })} />
+          <DurationInput label="Time" column="time" placeholder={r.estMin > 0 ? formatMinutes(r.estMin) : '...'} value={r.actualMin} onChange={(m) => onType({ actualMin: m ?? undefined })} />
         )}
       </td>
       <td className="px-2 py-2">
@@ -470,7 +467,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
     const next = { ...row, ...patch };
     if (next.estManual) return patch;
     const std = standardFor(next, next.qty);
-    return std ? { ...patch, estMin: std, estAuto: true } : patch;
+    return std ? { ...patch, estMin: std, actualMin: std, estAuto: true } : patch; // the standard time is the row's Time
   };
   const fillFromPrevious = (pid, from) => {
     const source = (daily[`${personId}|${from}`]?.entries ?? []).filter((r) => r.projectId === pid);
@@ -537,7 +534,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       : 'Fill in the actuals and lock them first'
     : 'Lock your targets first';
 
-  const totals = [...shown, ...assignedNow.rows].reduce((t, r) => ({ est: t.est + (r.estMin ?? 0), act: t.act + (r.actualMin ?? 0) }), { est: 0, act: 0 });
+  const totals = [...shown, ...assignedNow.rows].reduce((t, r) => ({ est: t.est + (r.assigned ? (r.actualMin ?? r.estMin ?? 0) : rowTime(r)), act: t.act + (r.actualMin ?? 0) }), { est: 0, act: 0 });
   const plannedTotal = groups.reduce((sum, g) => sum + g.planned, 0);
 
   return (
@@ -622,8 +619,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
           const choices = taskChoices(project, taskMenu);
           const mine = shown.filter((r) => r.projectId === pid);
           const assignedMine = assignedNow.rows.filter((r) => r.projectId === pid);
-          const est = [...mine, ...assignedMine].reduce((s, r) => s + (r.estMin ?? 0), 0);
-          const act = [...mine, ...assignedMine].reduce((s, r) => s + (r.actualMin ?? 0), 0);
+          const est = [...mine, ...assignedMine].reduce((s, r) => s + (r.assigned ? (r.actualMin ?? r.estMin ?? 0) : rowTime(r)), 0); // the table's Time total
           return (
             <section
               key={pid}
@@ -753,8 +749,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       <th className="w-40 px-2 py-2">
                         Actual <span className="font-normal normal-case">(today)</span>
                       </th>
-                      <th className="w-28 px-2 py-2">Estimated</th>
-                      <th className="w-28 px-2 py-2">Time taken</th>
+                      <th className="w-28 px-2 py-2">Time</th>
                       <th className="min-w-[11rem] px-2 py-2">
                         Notes <span className="font-normal normal-case">(optional)</span>
                       </th>
@@ -764,7 +759,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                   <tbody>
                     {mine.length === 0 && assignedMine.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-3 py-3 text-xs text-muted">
+                        <td colSpan={7} className="px-3 py-3 text-xs text-muted">
                           No tasks yet.
                         </td>
                       </tr>
@@ -885,30 +880,16 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            {tableEditable ? (
+                            {tableEditable || !tableReadOnly ? (
                               <DurationInput
-                                label="Estimated time"
-                                column="est"
+                                label="Time"
+                                column="time"
                                 placeholder="1h"
-                                value={r.estMin || undefined}
-                                onChange={(m) => update(r.id, { estMin: m ?? 0, estManual: m != null, estAuto: false })}
+                                value={rowTime(r) || undefined}
+                                onChange={(m) => update(r.id, timePatch(m))}
                               />
                             ) : (
-                              <span className="tabular-nums">{formatMinutes(r.estMin)}</span>
-                            )}
-                          </td>
-                          <td className="px-2 py-2">
-                            {tableReadOnly ? (
-                              <span className="tabular-nums">{r.actualMin != null ? formatMinutes(r.actualMin) : '·'}</span>
-                            ) : (
-                              <DurationInput
-                                label="Actual time"
-                                column="taken"
-                                copyFrom={r.estMin}
-                                placeholder="..."
-                                value={r.actualMin}
-                                onChange={(m) => update(r.id, { actualMin: m ?? undefined })}
-                              />
+                              <span className="tabular-nums">{formatMinutes(rowTime(r))}</span>
                             )}
                           </td>
                           <td className="px-2 py-2">
@@ -998,26 +979,9 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                       <td className="px-2 py-2 text-right text-muted" colSpan={3}>
                         Total
                       </td>
-                      <td className="px-2 py-2 tabular-nums" data-testid="est-total">
+                      <td className="px-2 py-2 tabular-nums" data-testid="time-total">
                         {formatMinutes(est)}
                         {planned > 0 && est > planned && <span className="ml-1 text-coral-ink">over plan</span>}
-                      </td>
-                      <td className="px-2 py-2 tabular-nums" data-testid="act-total">
-                        {formatMinutes(act)}
-                        {!tableReadOnly && [...mine, ...assignedMine].some((r) => r.estMin > 0 && !((r.assigned ? r.typedMin : r.actualMin) > 0)) && (
-                          <button
-                            type="button"
-                            data-testid="fill-from-estimates"
-                            title="Put each row's estimate in its Time taken (rows that already have a time are left as they are)"
-                            className="focus-ring mt-0.5 block text-[10px] font-semibold text-accent-ink hover:underline"
-                            onClick={() => {
-                              setRows((list) => list.map((r) => (r.projectId === pid && r.estMin > 0 && !(r.actualMin > 0) ? { ...r, actualMin: r.estMin } : r)));
-                              assignedMine.forEach((r) => r.estMin > 0 && !(r.typedMin > 0) && typeOnAssigned(r, { actualMin: r.estMin }));
-                            }}
-                          >
-                            Same as estimates
-                          </button>
-                        )}
                       </td>
                       <td colSpan={2} />
                     </tr>

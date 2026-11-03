@@ -19,7 +19,7 @@ import { weekRows } from '../lib/entries.js';
 import { assignedDay, weekAssignedRows } from '../lib/assigned.js';
 import { assignedContext, eodReviewerOf, groupByProject, pendingForReviewer, sendSummary, taskReviewLabel } from '../lib/eodReview.js';
 import { todayKey } from '../lib/dates.js';
-import { entryName, rowDone, rowTarget } from '../daily/entryHelpers';
+import { entryName, rowDone, rowTarget, rowTime } from '../daily/entryHelpers';
 import { formatClock } from '../daily/dateHelpers';
 
 const KIND_LABEL = { number: 'Number', milestone: 'Milestone', text: 'Text' };
@@ -104,7 +104,7 @@ function EodItem({ item, project }) {
     : [...item.rows, ...assignedRows];
   const [panel, setPanel] = useState(false);
   const [note, setNote] = useState('');
-  const minutes = shownRows.reduce((s, r) => s + (r.actualMin ?? r.estMin ?? 0), 0);
+  const minutes = shownRows.reduce((s, r) => s + rowTime(r), 0);
   return (
     <li className="px-4 py-3" data-eod={`${item.key}:${item.projectId}`}>
       <div className="flex flex-wrap items-center gap-3">
@@ -139,7 +139,7 @@ function EodItem({ item, project }) {
                 <th className="py-1 pr-2">Task</th>
                 <th className="py-1 pr-2">Target</th>
                 <th className="py-1 pr-2">Done</th>
-                <th className="py-1 pr-2">Est. / took</th>
+                <th className="py-1 pr-2">Time</th>
                 <th className="py-1 pr-2">Notes</th>
                 <th className="py-1">Kind</th>
               </tr>
@@ -153,7 +153,7 @@ function EodItem({ item, project }) {
                     <td className="py-1 pr-2 tabular-nums">{kind === 'text' || kind === 'milestone' ? r.targetText || (kind === 'milestone' ? 'Milestone' : '·') : rowTarget(r) || '·'}</td>
                     <td className="py-1 pr-2 tabular-nums">{kind === 'text' ? r.actualText || '·' : kind === 'milestone' ? r.status ?? 'Not started' : rowDone(r)}</td>
                     <td className="py-1 pr-2 tabular-nums">
-                      {formatMinutes(r.estMin ?? 0)} / {r.actualMin != null ? formatMinutes(r.actualMin) : '·'}
+                      {formatMinutes(rowTime(r))}
                     </td>
                     <td className="py-1 pr-2">{r.remarks || '·'}</td>
                     <td className="py-1">{KIND_LABEL[kind]}{kind === 'milestone' ? '' : r.status ? ` · ${r.status}` : ''}</td>

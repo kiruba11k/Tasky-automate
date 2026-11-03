@@ -5,7 +5,7 @@ import { addDays, formatDayMonth, parseDateKey, weekStart, WEEKDAY_SHORT } from 
 import { rowKey, weekRows } from '../lib/entries.js';
 import { dayRowsWithAssigned, weekAssignedRows } from '../lib/assigned.js';
 import { EDIT_DAY_TASKS } from './EntriesLog';
-import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget } from './entryHelpers';
+import { ROW_STATUSES, entryName, projectLabel, rowDone, rowTarget, rowTime } from './entryHelpers';
 import { copyElementAsImage } from '../lib/copyTableImage';
 import { DurationInput } from './DurationInput';
 import { weekTableRows } from '../lib/weekTime.js';
@@ -263,7 +263,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="text-white" style={{ background: headerColor }}>
-                {['Date', 'Project', 'Targets', 'Estimated time', 'Targets achieved', 'Actual time taken'].map((h) => (
+                {['Date', 'Project', 'Targets', 'Time', 'Targets achieved'].map((h) => (
                   <th key={h} className={headCell}>
                     {h}
                   </th>
@@ -282,7 +282,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                         {gi === 0 && ri === 0 && (
                           <td rowSpan={dayList.length} className="whitespace-nowrap border border-line bg-surface px-3 py-2 text-center align-middle font-medium">
                             {WEEKDAY_SHORT[parseDateKey(d).getDay()]} {formatDayMonth(d)}
-                            <span className="block text-xs font-normal text-muted">{formatMinutes(dayList.reduce((sum, x) => sum + (x.actualMin ?? 0), 0))}</span>
+                            <span className="block text-xs font-normal text-muted">{formatMinutes(dayList.reduce((sum, x) => sum + rowTime(x), 0))}</span>
                           </td>
                         )}
                         {ri === 0 && (
@@ -291,9 +291,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                           </td>
                         )}
                         <td className={cell}>{sheetTargetText(r, name)}</td>
-                        <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
+                        <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{rowTime(r) ? formatMinutes(rowTime(r)) : '·'}</td>
                         <td className={cell}>{sheetAchievedText(r, name, rowDone(r)) || <span className="text-xs text-muted">Not updated yet</span>}</td>
-                        <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.actualMin ? formatMinutes(r.actualMin) : '·'}</td>
                       </tr>
                     );
                   }),
@@ -305,9 +304,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                 <td colSpan={3} className="border border-line px-3 py-2 text-right">
                   Week total
                 </td>
-                <td className="border border-line px-3 py-2 text-center tabular-nums">{formatMinutes(dayGroups.reduce((t, x) => t + x.rows.reduce((a, r) => a + (r.estMin ?? 0), 0), 0))}</td>
+                <td className="border border-line px-3 py-2 text-center tabular-nums">{formatMinutes(dayGroups.reduce((t, x) => t + x.rows.reduce((a, r) => a + rowTime(r), 0), 0))}</td>
                 <td className="border border-line px-3 py-2" />
-                <td className="border border-line px-3 py-2 text-center tabular-nums">{formatMinutes(dayGroups.reduce((t, x) => t + x.rows.reduce((a, r) => a + (r.actualMin ?? 0), 0), 0))}</td>
               </tr>
             </tfoot>
           </table>
@@ -321,9 +319,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                 <th className={headCell}>Date</th>
                 <th className={headCell}>Project</th>
                 <th className={cx(headCell, 'w-[32%]')}>Targets</th>
-                <th className={headCell}>Estimated time</th>
+                <th className={headCell}>Time</th>
                 <th className={cx(headCell, 'w-[32%]')}>Targets achieved</th>
-                <th className={headCell}>Actual time taken</th>
                 {editable && <th className={cx(headCell, 'w-10')} aria-label="Remove" />}
               </tr>
             </thead>
@@ -384,7 +381,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                             )}
                           </td>
                           <td className={cx(cell, 'text-center')}>
-                            <DurationInput label={`${name} estimated time`} column="week-est" placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
+                            <DurationInput label={`${name} time`} column="week-time" placeholder="..." value={rowTime(r) || undefined} onChange={(m) => override(r, { estMin: m ?? 0, actualMin: m ?? 0 })} />
                           </td>
                           <td className={cell}>
                             {kindOf(r) === 'number' ? (
@@ -406,9 +403,6 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                             ) : (
                               <TextBox label={`${name} actual`} value={r.actualText ?? ''} placeholder="What got done" onSave={(t) => override(r, { actualText: t })} />
                             )}
-                          </td>
-                          <td className={cx(cell, 'text-center')}>
-                            <DurationInput label={`${name} time taken`} column="week-taken" copyFrom={r.estMin} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
                           </td>
                           <td className={cx(cell, 'text-center')}>
                             {r.timeEdited && (
@@ -443,9 +437,8 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                               </span>
                             )}
                           </td>
-                          <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.estMin ? formatMinutes(r.estMin) : '·'}</td>
+                          <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{rowTime(r) ? formatMinutes(rowTime(r)) : '·'}</td>
                           <td className={cell}>{achieved || <span className="text-xs text-muted">Not updated yet</span>}</td>
-                          <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{r.actualMin ? formatMinutes(r.actualMin) : '·'}</td>
                         </>
                       )}
                     </tr>
@@ -508,27 +501,6 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                               </button>
                             )}
                           />
-                        )}
-                        {editable && kind === 'week' && (
-                          <span className="flex flex-wrap items-center gap-2 text-xs text-muted" data-edit-times={r.id}>
-                            <span className="flex items-center gap-1">
-                              Estimated
-                              <DurationInput label={`${name} estimated time`} column="week-est" placeholder="..." value={r.estMin || undefined} onChange={(m) => override(r, { estMin: m ?? 0 })} />
-                            </span>
-                            <span className="flex items-center gap-1">
-                              Taken
-                              <DurationInput label={`${name} time taken`} column="week-taken" copyFrom={r.estMin} placeholder="..." value={r.actualMin || undefined} onChange={(m) => override(r, { actualMin: m ?? 0 })} />
-                            </span>
-                            <button
-                              type="button"
-                              aria-label={`Delete ${name}`}
-                              title="Remove from this week's table (your daily updates keep it)"
-                              className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink"
-                              onClick={() => override(r, { hidden: true })}
-                            >
-                              <Trash size={14} />
-                            </button>
-                          </span>
                         )}
                         {editable && kindOf === 'milestone' ? (
                           <select

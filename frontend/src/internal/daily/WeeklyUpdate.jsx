@@ -4,13 +4,13 @@ import { Se as useStore, rt as Card, Te as Button, qe as Badge, lt as guarded, Y
 import { weekStart } from '../lib/dates.js';
 import { eodStatusText } from '../lib/eodReview.js';
 import { planTimeOffRows, weekProjectTime, weekTableRows } from '../lib/weekTime.js';
+import { rowTime } from './entryHelpers';
 import { AddToWeek } from './AddToWeek';
 import { EDIT_WEEK, EntriesProgress } from './EntriesProgress';
 import { formatClock, formatDayClock, formatWeekRange } from './dateHelpers';
 
 /**
- * "Weekly update" card: the week's rows added up from the daily updates (plus anything added to the week), with estimated and
- * taken time, an Edit mode to type over the numbers, and "Submit end of week". `readOnly` is the manager's view.
+ * "Weekly update" card: the week's rows added up from the daily updates (plus anything added to the week), with one Time column, an Edit mode to type over the numbers, and "Submit end of week". `readOnly` is the manager's view.
  */
 export function WeeklyUpdate({ personId, date, readOnly }) {
   const { daily, weekly, tasks, projects, saveWeekly } = useStore();
@@ -31,8 +31,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
   }, [readOnly]);
 
   const rows = weekTableRows({ tasks, daily, personId, monday: mon, projects, weekEntries: record?.entries ?? [], overrides: record?.overrides });
-  const estimated = rows.reduce((sum, r) => sum + (r.estMin ?? 0), 0);
-  const taken = rows.reduce((sum, r) => sum + (r.actualMin ?? 0), 0);
+  const taken = rows.reduce((sum, r) => sum + rowTime(r), 0); // the week table's Time total
   const offRows = planTimeOffRows(rows, weekProjectTime(tasks, daily, personId, mon, projects)); // plan time with no task row of its own
   const submit = () =>
     guarded(() => {
@@ -61,7 +60,7 @@ export function WeeklyUpdate({ personId, date, readOnly }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">
-            Estimated <b className="text-ink">{formatMinutes(estimated)}</b> · taken <b className="text-ink">{formatMinutes(taken)}</b>
+            Time <b className="text-ink">{formatMinutes(taken)}</b>
           {offRows >= 5 && (
               <span className="text-muted" title="Time on your plan blocks that no task row of the days carries. It is in your Weekly hours below, not in the rows.">
                 {' '}· plan time not on a task row <b className="text-ink">{formatMinutes(offRows)}</b>
