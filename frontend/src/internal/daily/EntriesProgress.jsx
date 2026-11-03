@@ -288,11 +288,12 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                         {ri === 0 && (
                           <td rowSpan={pr.length} className={cx(cell, 'text-center font-semibold')} style={{ borderLeft: `4px solid ${project ? projectColor(projects, pid) : '#64748B'}` }}>
                             {projectLabel(pid, projects)}
+                            <span className="block text-xs font-normal tabular-nums text-muted" data-testid="project-hours">{formatMinutes(pr.reduce((sum, x) => sum + rowTime(x), 0))}</span>
                           </td>
                         )}
                         <td className={cell}>{sheetTargetText(r, name)}</td>
                         <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{rowTime(r) ? formatMinutes(rowTime(r)) : '·'}</td>
-                        <td className={cell}>{sheetAchievedText(r, name, rowDone(r)) || <span className="text-xs text-muted">Not updated yet</span>}</td>
+                        <td className={cell}>{sheetAchievedText(r, name, rowDone(r))}</td>
                       </tr>
                     );
                   }),
@@ -366,6 +367,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                           style={{ borderLeft: `4px solid ${project ? projectColor(projects, pid) : '#64748B'}` }}
                         >
                           {projectLabel(pid, projects)}
+                          <span className="block text-xs font-normal tabular-nums text-muted" data-testid="project-hours">{formatMinutes(mine.reduce((sum, x) => sum + rowTime(x), 0))}</span>
                         </td>
                       )}
                       {editable ? (
@@ -438,7 +440,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                             )}
                           </td>
                           <td className={cx(cell, 'whitespace-nowrap text-center tabular-nums')}>{rowTime(r) ? formatMinutes(rowTime(r)) : '·'}</td>
-                          <td className={cell}>{achieved || <span className="text-xs text-muted">Not updated yet</span>}</td>
+                          <td className={cell}>{achieved}</td>
                         </>
                       )}
                     </tr>
@@ -548,7 +550,7 @@ export function EntriesProgress({ personId, date, kind, editable }) {
                           ) : (
                             <p>
                               <span className="font-semibold text-muted">Done: </span>
-                              {r.actualText || <span className="text-muted">Not updated yet</span>}
+                              {r.actualText}
                             </p>
                           )}
                         </div>

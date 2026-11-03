@@ -8,21 +8,23 @@ const KINDS = [
 ];
 
 /** Picker for what kind of target a task row has: a number, a milestone (status) or free text. */
-export function EntryKindSelect({ value, onChange, disabled }) {
+export function EntryKindSelect({ value, onChange, disabled, compact }) {
   const kind = KINDS.find((k) => k.id === value) ?? KINDS[0];
   const Icon = kind.icon;
   return (
     <span
+      title={compact ? `Type: ${kind.label}` : undefined}
       className={cx(
         'relative flex items-center gap-2 rounded-lg border border-line bg-surface py-1 pl-1 pr-2',
+        compact && 'inline-flex w-fit gap-0 py-0.5 pr-1',
         disabled && 'border-transparent bg-transparent',
       )}
     >
       <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-md', kind.tone)}>
         <Icon size={13} />
       </span>
-      <span className="flex-1 text-sm">{kind.label}</span>
-      {!disabled && <ChevronDown size={14} className="text-muted" />}
+      {!compact && <span className="flex-1 text-sm">{kind.label}</span>}
+      {!disabled && !compact && <ChevronDown size={14} className="text-muted" />}
       {!disabled && (
         <select
           aria-label="Type"

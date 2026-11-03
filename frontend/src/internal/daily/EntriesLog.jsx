@@ -120,9 +120,6 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
         )}
       </td>
       <td className="px-2 py-2">
-        <EntryKindSelect value="number" disabled />
-      </td>
-      <td className="px-2 py-2">
         {editing ? (
           <input aria-label="Target" type="number" min={0} className={cx(FIELD, 'w-24')} value={draft.qty} onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))} />
         ) : (
@@ -742,7 +739,6 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                   <thead>
                     <tr className="bg-surface-2/40 text-left text-[11px] font-semibold uppercase tracking-wide text-muted">
                       <th className="w-48 px-3 py-2">Task</th>
-                      <th className="w-36 px-2 py-2">Type</th>
                       <th className="w-40 px-2 py-2">
                         Target <span className="font-normal normal-case">(today)</span>
                       </th>
@@ -759,7 +755,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                   <tbody>
                     {mine.length === 0 && assignedMine.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-3 py-3 text-xs text-muted">
+                        <td colSpan={6} className="px-3 py-3 text-xs text-muted">
                           No tasks yet.
                         </td>
                       </tr>
@@ -785,6 +781,9 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                                   ))}
                                   <option value={CUSTOM_TASK}>Custom...</option>
                                 </select>
+                                <span className="mt-1 block">
+                                  <EntryKindSelect compact value={kind} onChange={(k) => update(r.id, { kind: k })} />
+                                </span>
                                 {r.task === CUSTOM_TASK && (
                                   <input
                                     aria-label="Custom task name"
@@ -807,9 +806,6 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                                 Covers the task {assignerText(assignedNow.covers.get(r.id))}
                               </span>
                             )}
-                          </td>
-                          <td className="px-2 py-2">
-                            <EntryKindSelect value={kind} disabled={!tableEditable} onChange={(k) => update(r.id, { kind: k })} />
                           </td>
                           <td className="px-2 py-2">
                             {kind === 'number' ? (
@@ -976,7 +972,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                           </button>
                         )}
                       </td>
-                      <td className="px-2 py-2 text-right text-muted" colSpan={3}>
+                      <td className="px-2 py-2 text-right text-muted" colSpan={2}>
                         Total
                       </td>
                       <td className="px-2 py-2 tabular-nums" data-testid="time-total">

@@ -105,13 +105,13 @@ export function PeriodPlan({ p, api, period, ws, range, title, prevTitle, prev, 
         <TargetSheet
           title={`${title} targets`}
           heading={title}
-          columns={['Date', 'Target', 'Type', 'Goal']}
+          columns={['Date', 'Target', 'Goal']}
           group={1}
           rows={[
-            ...shown.map((m) => [range ?? title, m.label, 'Number', String(plan[m.id] ?? 0)]),
+            ...shown.map((m) => [range ?? title, m.label, String(plan[m.id] ?? 0)]),
             ...rows.map((r) => {
               const kind = targetKind(r);
-              return [range ?? title, r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
+              return [range ?? title, r.label, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
             }),
           ]}
           filename={`${p.name}-${title}-targets.png`}

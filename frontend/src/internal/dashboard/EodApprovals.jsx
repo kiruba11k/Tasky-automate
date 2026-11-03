@@ -22,7 +22,6 @@ import { todayKey } from '../lib/dates.js';
 import { entryName, rowDone, rowTarget, rowTime } from '../daily/entryHelpers';
 import { formatClock } from '../daily/dateHelpers';
 
-const KIND_LABEL = { number: 'Number', milestone: 'Milestone', text: 'Text' };
 
 const TASK_TONE = { approved: 'mint', 'awaiting approval': 'butter', 'changes asked': 'coral', 'in progress': 'sky', 'to do': 'grey' };
 
@@ -141,7 +140,6 @@ function EodItem({ item, project }) {
                 <th className="py-1 pr-2">Done</th>
                 <th className="py-1 pr-2">Time</th>
                 <th className="py-1 pr-2">Notes</th>
-                <th className="py-1">Kind</th>
               </tr>
             </thead>
             <tbody>
@@ -156,7 +154,7 @@ function EodItem({ item, project }) {
                       {formatMinutes(rowTime(r))}
                     </td>
                     <td className="py-1 pr-2">{r.remarks || '·'}</td>
-                    <td className="py-1">{KIND_LABEL[kind]}{kind === 'milestone' ? '' : r.status ? ` · ${r.status}` : ''}</td>
+                    
                   </tr>
                 );
               })}

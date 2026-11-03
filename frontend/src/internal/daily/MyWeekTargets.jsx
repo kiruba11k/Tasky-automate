@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Pencil, Plus, Trash2, Check, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, Check, X, Copy } from 'lucide-react';
 import { oe as cx, Se as useStore, Te as Button, Ye as toast } from '@/internal/min';
-import { CUSTOM_TASK, entryName, newEntryId, projectLabel } from './entryHelpers';
+import { CUSTOM_TASK, entryName, newEntryId, projectLabel, rowTime } from './entryHelpers';
+import { DurationInput } from './DurationInput';
+import { addDays } from '../lib/dates.js';
+import { We as formatMinutes } from '@/internal/min';
 
 const FIELD = 'focus-ring rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink';
 const KINDS = [
@@ -25,15 +28,26 @@ export function MyWeekTargets({ personId, mon }) {
   const entries = (record?.entries ?? []).filter((e) => e.task);
   const mine = projects.filter((p) => p.status === 'active' && (p.pmId === personId || p.teamIds?.includes(personId) || p.admins?.includes(personId)));
   const options = mine.length ? mine : projects.filter((p) => p.status === 'active');
-  const [adding, setAdding] = useState({ projectId: options[0]?.id ?? OTHER, work: '', name: '', kind: 'number', goal: '' });
+  const [adding, setAdding] = useState({ projectId: options[0]?.id ?? OTHER, work: '', name: '', kind: 'number', goal: '', time: undefined });
   const [editId, setEditId] = useState(null);
   const [draft, setDraft] = useState({});
 
   const save = (next) => saveWeekly(personId, mon, { entries: next });
-  const rowFrom = (base, { name, kind, goal }) => {
+  const rowFrom = (base, { name, kind, goal, time }) => {
     const number = kind === 'number';
     const qty = number ? Math.max(0, Math.round(+goal || 0)) : undefined;
-    return { ...base, task: CUSTOM_TASK, custom: name.trim(), kind, qty, doneQty: number ? base.doneQty : undefined, targetText: number ? undefined : goal.trim(), desc: base.desc ?? '', estMin: base.estMin ?? 0, remarks: base.remarks ?? '', achieved: base.achieved ?? '' };
+    return { ...base, task: CUSTOM_TASK, custom: name.trim(), kind, qty, doneQty: number ? base.doneQty : undefined, targetText: number ? undefined : goal.trim(), desc: base.desc ?? '', estMin: time ?? 0, actualMin: time, remarks: base.remarks ?? '', achieved: base.achieved ?? '' };
+  };
+
+  // last week's own targets copied into this week with nothing achieved yet; ones already here (same project, name and type) are kept as they are
+  const fillFromPrevious = () => {
+    const prev = (weekly[`${personId}|${addDays(mon, -7)}`]?.entries ?? []).filter((e) => e.task);
+    if (!prev.length) return toast({ title: 'No targets last week to copy', tone: 'info' });
+    const same = (a, b) => a.projectId === b.projectId && (a.custom ?? a.task).trim().toLowerCase() === (b.custom ?? b.task).trim().toLowerCase() && (a.kind ?? 'number') === (b.kind ?? 'number');
+    const fresh = prev.filter((e) => !(record?.entries ?? []).some((x) => same(x, e)));
+    if (!fresh.length) return toast({ title: 'Last week\'s targets are already here', tone: 'info' });
+    save([...(record?.entries ?? []), ...fresh.map((e) => ({ ...e, id: newEntryId(), doneQty: undefined, actualText: undefined, status: e.kind === 'milestone' ? 'Not started' : undefined }))]);
+    toast({ title: `${fresh.length} target${fresh.length === 1 ? '' : 's'} copied from last week`, tone: 'success' });
   };
 
   const add = () => {
@@ -43,12 +57,12 @@ export function MyWeekTargets({ personId, mon }) {
     if (adding.kind === 'number' && !(+adding.goal > 0)) return toast({ title: 'Type the goal number', tone: 'info' });
     const projectId = adding.projectId === OTHER ? `other:${adding.work.trim()}` : adding.projectId;
     save([...(record?.entries ?? []), rowFrom({ id: newEntryId(), projectId }, adding)]);
-    setAdding({ ...adding, name: '', goal: '' });
+    setAdding({ ...adding, name: '', goal: '', time: undefined });
     toast({ title: 'Target added to the week', tone: 'success' });
   };
   const startEdit = (e) => {
     setEditId(e.id);
-    setDraft({ name: entryName(e, projects.find((p) => p.id === e.projectId)), kind: e.kind ?? 'number', goal: goalOf(e) });
+    setDraft({ name: entryName(e, projects.find((p) => p.id === e.projectId)), kind: e.kind ?? 'number', goal: goalOf(e), time: rowTime(e) || undefined });
   };
   const saveEdit = (e) => {
     if (!draft.name.trim()) return toast({ title: 'Type the target', tone: 'info' });
@@ -113,8 +127,17 @@ export function MyWeekTargets({ personId, mon }) {
             onKeyDown={(e) => e.key === 'Enter' && add()}
           />
         </label>
+        <label className="text-xs font-semibold text-muted">
+          Time
+          <span className="mt-1 block">
+            <DurationInput label="Target time" column="target-time" placeholder="..." value={adding.time} onChange={(m) => setAdding({ ...adding, time: m })} />
+          </span>
+        </label>
         <Button onClick={add}>
           <Plus size={14} /> Add target
+        </Button>
+        <Button tone="ghost" className="border border-line" onClick={fillFromPrevious} title="Copy last week's targets into this week (what is already here is kept)">
+          <Copy size={13} /> Fill from last week
         </Button>
       </div>
       {entries.length === 0 ? (
@@ -145,6 +168,7 @@ export function MyWeekTargets({ personId, mon }) {
                       onChange={(x) => setDraft({ ...draft, goal: x.target.value })}
                       onKeyDown={(x) => x.key === 'Enter' && saveEdit(e)}
                     />
+ <DurationInput label="Edit target time" column="edit-target-time" placeholder="..." value={draft.time} onChange={(m) => setDraft({ ...draft, time: m })} />
                     <button type="button" aria-label="Save target" className="focus-ring rounded-lg p-1.5 text-accent-ink hover:bg-surface-2" onClick={() => saveEdit(e)}>
                       <Check size={15} />
                     </button>
@@ -158,6 +182,7 @@ export function MyWeekTargets({ personId, mon }) {
                     <span className="min-w-[10rem] flex-1 font-medium">{entryName(e, project)}</span>
                     <span className="text-xs text-muted">{KINDS.find(([v]) => v === (e.kind ?? 'number'))?.[1]}</span>
                     <span className="min-w-[4rem] tabular-nums">{goalOf(e) || '·'}</span>
+                    <span className="min-w-[3.5rem] text-xs tabular-nums text-muted">{rowTime(e) > 0 ? formatMinutes(rowTime(e)) : ''}</span>
                     <button type="button" aria-label={`Edit ${entryName(e, project)}`} title="Edit" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-accent-ink" onClick={() => startEdit(e)}>
                       <Pencil size={14} />
                     </button>

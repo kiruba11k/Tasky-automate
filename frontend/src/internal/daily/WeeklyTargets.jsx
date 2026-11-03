@@ -5,7 +5,7 @@ import { addDays, formatDayMonth, formatOrdinalRange, weekStart } from '../lib/d
 import { weekRows } from '../lib/entries.js';
 import { entryName, projectLabel } from './entryHelpers';
 import { OTHER_PREFIX, groupBlocks } from './planBlocks';
-import { TARGET_KINDS, targetKind } from '../projects/targetKinds';
+import { targetKind } from '../projects/targetKinds';
 import { TargetSheet } from '../projects/TargetSheet';
 import { MyWeekTargets } from './MyWeekTargets';
 
@@ -18,12 +18,12 @@ export function weeklyTargetRows(project, date) {
   const goals = weekTargetFor(project, date) ?? {};
   const numbers = (project.metrics ?? [])
     .filter((m) => tracksPeriod(m, 'week') && !off.includes(m.id) && (goals[m.id] ?? 0) > 0)
-    .map((m) => [range, project.name, m.label, 'Number', String(goals[m.id])]);
+    .map((m) => [range, project.name, m.label, String(goals[m.id]), '']);
   const custom = (project.weekText?.[start] ?? [])
     .filter((r) => r.label?.trim())
     .map((r) => {
       const kind = targetKind(r);
-      return [range, project.name, r.label, TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·'];
+      return [range, project.name, r.label, kind === 'number' ? String(r.targetNum ?? 0) : r.target || '·', ''];
     });
   return savedWeekPlan(project, date) || custom.length ? [...numbers, ...custom] : [];
 }
@@ -39,7 +39,7 @@ export function ownWorkRows(personId, date, daily, weekly, projects = []) {
     .filter((r) => String(r.projectId).startsWith(OTHER_PREFIX) && (r.qty > 0 || r.targetText?.trim()))
     .map((r) => {
       const kind = r.kind ?? 'number';
-      return [projectLabel(r.projectId, []), entryName(r), TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(r.qty) : (r.targetText ?? '').trim() || '·'];
+      return [projectLabel(r.projectId, []), entryName(r), kind === 'number' ? String(r.qty) : (r.targetText ?? '').trim() || '·', r.estMin > 0 ? formatMinutes(r.estMin) : ''];
     });
   // time planned in "Plan your day" for work that is no project (typed names, custom blocks, extra hours), added up over the week
   const planned = new Map();
@@ -55,7 +55,7 @@ export function ownWorkRows(personId, date, daily, weekly, projects = []) {
     (day.extra ?? []).forEach((x) => !projects.some((p) => p.id === x.projectId) && add(x.work || 'Other work', x.minutes));
   }
   const range = formatOrdinalRange(monday, addDays(monday, 4));
-  return [...rows, ...[...planned].map(([name, minutes]) => [name, name, 'Planned time', formatMinutes(minutes)])].map((r) => [range, ...r]);
+  return [...rows, ...[...planned].map(([name, minutes]) => [name, name, '', formatMinutes(minutes)])].map((r) => [range, ...r]);
 }
 
 /** "Weekly targets" on the Tasks update page: the fixed weekly targets of every project the person is on, as one sheet with Copy as image. */
@@ -70,7 +70,7 @@ export function WeeklyTargets({ personId, date }) {
   const mineRows = ((weekly[`${personId}|${monday}`]?.entries ?? []).filter((e) => e.task && !String(e.projectId).startsWith(OTHER_PREFIX))).map((e) => {
     const kind = e.kind ?? 'number';
     const p = projects.find((x) => x.id === e.projectId);
-    return [range, p?.name ?? e.projectId, entryName(e, p), TARGET_KINDS.find((k) => k.id === kind)?.label ?? kind, kind === 'number' ? String(e.qty ?? 0) : (e.targetText ?? '').trim() || '·'];
+    return [range, p?.name ?? e.projectId, entryName(e, p), kind === 'number' ? String(e.qty ?? 0) : (e.targetText ?? '').trim() || '·', e.estMin > 0 ? formatMinutes(e.estMin) : ''];
   });
   const rows = [...mine.flatMap((p) => weeklyTargetRows(p, date)), ...mineRows, ...ownWorkRows(personId, date, daily, weekly, projects)];
   return (
@@ -86,7 +86,7 @@ export function WeeklyTargets({ personId, date }) {
       <TargetSheet
         title="Weekly targets"
         heading={`Week of ${formatDayMonth(date)}`}
-        columns={['Date', 'Project', 'Target', 'Type', 'Goal']}
+        columns={['Date', 'Project', 'Target', 'Goal', 'Time']}
         rows={rows}
         group={2}
         filename="weekly-targets.png"
