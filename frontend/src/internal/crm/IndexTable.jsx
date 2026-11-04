@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Download, Save, X } from 'lucide-react';
 import { Te as Button, be as firstName, oe as cx } from '@/internal/min';
 import { FIELD, OwnerSelect } from './forms.jsx';
-import { applyFilters, sortRows, toCsv, loadViews, saveViews, withView } from './tableLogic.js';
+import { applyFilters, sortRows, toCsv, loadViews, saveViews, withView, loadHidden, saveHidden, visibleColumns } from './tableLogic.js';
 import { saveRecord } from './crmStore.js';
 import { toast } from '../kit/toast.js';
 
@@ -17,7 +17,9 @@ const BLANK = { q: '', owner: '', active: {} };
  * `columns`: [{ key, label, get(row), render?(row), sort?(row) }]; `filters`: [{ key, label, kind: 'select'|'number'|'date', get(row) }];
  * `bulk`: [{ key, label, options: [{ value, label }] }] properties that can be set on all ticked rows.
  */
-export function IndexTable({ type, rows, columns, filters = [], bulk = [], to, searchText, empty }) {
+export function IndexTable({ type, rows, columns: allColumns, filters = [], bulk = [], to, searchText, empty }) {
+  const [hidden, setHidden] = useState(() => loadHidden(type));
+  const columns = useMemo(() => visibleColumns(allColumns, hidden), [allColumns, hidden]);
   const [state, setState] = useState(BLANK);
   const [sort, setSort] = useState({ key: columns[0].key, dir: 1 });
   const [picked, setPicked] = useState(() => new Set());
@@ -88,6 +90,17 @@ export function IndexTable({ type, rows, columns, filters = [], bulk = [], to, s
         {dirty && <button type="button" className="focus-ring rounded-full border border-line px-2 py-0.5 text-xs font-semibold" onClick={() => setState(BLANK)}>Clear</button>}
         <button type="button" className="focus-ring flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs font-semibold" onClick={saveView}><Save size={11} /> Save view</button>
         <button type="button" className="focus-ring flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs font-semibold" onClick={exportCsv}><Download size={11} /> Export {ticked.length ? 'selected' : 'all'}</button>
+        <details className="relative">
+          <summary className="focus-ring cursor-pointer list-none rounded-full border border-line px-2 py-0.5 text-xs font-semibold">Columns</summary>
+          <div className="absolute z-20 mt-1 w-44 space-y-1 rounded-xl border border-line bg-surface p-2 shadow-lift" data-testid="column-picker">
+            {allColumns.map((c) => (
+              <label key={c.key} className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={!hidden.includes(c.key)} onChange={(e) => { const next = e.target.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]; setHidden(next); saveHidden(type, next); }} />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </details>
         <span className="text-xs text-muted">{shown.length} of {rows.length}</span>
       </div>
       {views.length > 0 && (

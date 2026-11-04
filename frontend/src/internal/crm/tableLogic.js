@@ -33,6 +33,14 @@ const csvCell = (v) => {
 /** CSV text for `rows` using each column's visible value. */
 export const toCsv = (rows, columns) => [columns.map((c) => csvCell(c.label)).join(','), ...rows.map((r) => columns.map((c) => csvCell(c.get(r))).join(','))].join('\n');
 
+/** The columns a person has hidden on one table, kept per type in this browser. */
+export const loadHidden = (type, storage = globalThis.localStorage) => {
+  try { const v = JSON.parse(storage.getItem(`crm-cols:${type}`) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+};
+export const saveHidden = (type, hidden, storage = globalThis.localStorage) => { try { storage.setItem(`crm-cols:${type}`, JSON.stringify(hidden)); } catch { /* private window */ } };
+/** The columns to show: everything not hidden, never fewer than one. */
+export const visibleColumns = (columns, hidden) => { const v = columns.filter((c) => !hidden.includes(c.key)); return v.length ? v : columns.slice(0, 1); };
+
 /** Saved views of one table: [{ name, state }], kept per type in this browser. */
 export const loadViews = (type, storage = globalThis.localStorage) => {
   try { const v = JSON.parse(storage.getItem(`crm-views:${type}`) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }

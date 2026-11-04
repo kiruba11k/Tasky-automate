@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyFilters, sortRows, toCsv, loadViews, saveViews, withView } from './tableLogic.js';
+import { visibleColumns, loadHidden, saveHidden, applyFilters, sortRows, toCsv, loadViews, saveViews, withView } from './tableLogic.js';
 
 const rows = [
   { id: 1, name: 'Acme', ownerId: 'a', amount: 100, stage: 'proposal', closeDate: '2026-11-10' },
@@ -40,4 +40,13 @@ test('saved views round-trip and replace by name', () => {
   assert.deepEqual(loadViews('deal', mem), []);
   saveViews('deal', withView(withView([], 'Big', { q: 'a' }), 'Big', { q: 'b' }), mem);
   assert.deepEqual(loadViews('deal', mem), [{ name: 'Big', state: { q: 'b' } }]);
+});
+
+test('hidden columns are remembered and at least one column stays', () => {
+  const cols = [{ key: 'a' }, { key: 'b' }];
+  assert.deepEqual(visibleColumns(cols, ['b']).map((c) => c.key), ['a']);
+  assert.deepEqual(visibleColumns(cols, ['a', 'b']).map((c) => c.key), ['a']);
+  const mem = { s: {}, getItem(k) { return this.s[k] ?? null; }, setItem(k, v) { this.s[k] = v; } };
+  saveHidden('deal', ['b'], mem);
+  assert.deepEqual(loadHidden('deal', mem), ['b']);
 });
