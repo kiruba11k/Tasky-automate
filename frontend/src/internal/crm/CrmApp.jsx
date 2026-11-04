@@ -1,3 +1,4 @@
+import './crm.css';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { oe as cx } from '@/internal/min';
 import { ActivitiesPage, CompaniesPage, ContactsPage, DataPage, DealsPage, ForecastPage, HomePage, MyActionsPage, RecordPage, ReportsPage, GoalsPage, SettingsPage } from './pages.jsx';
@@ -11,8 +12,8 @@ export const CRM_NAV = [
 
 export function CrmApp() {
   return (
-    <div className="grid gap-4 md:grid-cols-[12.5rem_1fr]" data-testid="crm">
-      <nav aria-label="CRM" className="space-y-3 md:sticky md:top-4 md:h-fit">
+    <div className="crm-layout" data-testid="crm">
+      <nav aria-label="CRM" className="crm-nav space-y-3">
         {CRM_NAV.map(([group, items]) => (
           <div key={group}>
             <p className="px-2 text-[11px] font-bold uppercase tracking-wider text-muted">{group}</p>

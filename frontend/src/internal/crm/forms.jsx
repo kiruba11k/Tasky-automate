@@ -43,7 +43,7 @@ export function RecordForm({ type, initial = {}, onClose, onSaved }) {
   const title = `${initial.id ? 'Edit' : 'New'} ${type}`;
   return (
     <Modal open onClose={onClose} title={title} size="md">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="crm-form">
         <Label text={type === 'deal' ? 'Deal name' : 'Name'}><input aria-label="Name" className={FIELD} value={d.name ?? ''} onChange={(e) => set({ name: e.target.value })} /></Label>
         <Label text="Owner"><OwnerSelect value={d.ownerId} onChange={(v) => set({ ownerId: v })} /></Label>
         {type === 'company' && (<>
@@ -90,9 +90,9 @@ export function RecordForm({ type, initial = {}, onClose, onSaved }) {
             </select>
           </Label>
           {!['won', 'lost'].includes(d.stage) && (
-            <fieldset className="rounded-xl border border-line p-3 sm:col-span-2">
+            <fieldset className="rounded-xl border border-line p-3 crm-span2">
               <legend className="px-1 text-xs font-semibold text-muted">Next action (required while the deal is open)</legend>
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <div className="crm-row3">
                 <input aria-label="Next action" className={FIELD} placeholder="e.g. Call to confirm budget" value={d.nextAction?.title ?? ''} onChange={(e) => set({ nextAction: { ...d.nextAction, title: e.target.value } })} />
                 <select aria-label="Action type" className={FIELD} value={d.nextAction?.type ?? 'call'} onChange={(e) => set({ nextAction: { ...d.nextAction, type: e.target.value } })}>
                   {ACTIVITY_TYPES.filter((t) => !['stage', 'note'].includes(t)).map((t) => <option key={t} value={t}>{t}</option>)}
@@ -143,7 +143,7 @@ export function CompleteActionModal({ deal, onClose }) {
       <div className="mt-3 space-y-3">
         <Label text="Note"><input aria-label="Note" className={FIELD} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was said or agreed" /></Label>
         {asksNext && (
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <div className="crm-row2">
             <Label text="Next action"><input aria-label="Next step" className={FIELD} value={next.title} placeholder={outcome.next?.title ?? 'What happens next?'} onChange={(e) => setNext((n) => ({ ...n, title: e.target.value }))} /></Label>
             <Label text="Due"><input aria-label="Next step due" type="date" className={FIELD} value={next.due} onChange={(e) => setNext((n) => ({ ...n, due: e.target.value }))} /></Label>
           </div>

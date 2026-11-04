@@ -76,9 +76,9 @@ export function IndexTable({ type, rows, columns: allColumns, filters = [], bulk
         ) : (
           <span key={f.key} className="flex items-center gap-1 text-xs text-muted">
             {f.label}
-            <input aria-label={`${f.label} ${f.kind === 'number' ? 'min' : 'from'}`} type={f.kind === 'number' ? 'number' : 'date'} className={cx(small, f.kind === 'number' ? 'w-24' : '')} value={state.active[f.key]?.[f.kind === 'number' ? 'min' : 'from'] ?? ''} onChange={(e) => setRange(f.key, f.kind === 'number' ? 'min' : 'from', e.target.value)} />
+            <input aria-label={`${f.label} ${f.kind === 'number' ? 'min' : 'from'}`} type={f.kind === 'number' ? 'number' : 'date'} className={cx(small, f.kind === 'number' ? 'crm-num' : 'crm-date')} value={state.active[f.key]?.[f.kind === 'number' ? 'min' : 'from'] ?? ''} onChange={(e) => setRange(f.key, f.kind === 'number' ? 'min' : 'from', e.target.value)} />
             to
-            <input aria-label={`${f.label} ${f.kind === 'number' ? 'max' : 'to'}`} type={f.kind === 'number' ? 'number' : 'date'} className={cx(small, f.kind === 'number' ? 'w-24' : '')} value={state.active[f.key]?.[f.kind === 'number' ? 'max' : 'to'] ?? ''} onChange={(e) => setRange(f.key, f.kind === 'number' ? 'max' : 'to', e.target.value)} />
+            <input aria-label={`${f.label} ${f.kind === 'number' ? 'max' : 'to'}`} type={f.kind === 'number' ? 'number' : 'date'} className={cx(small, f.kind === 'number' ? 'crm-num' : 'crm-date')} value={state.active[f.key]?.[f.kind === 'number' ? 'max' : 'to'] ?? ''} onChange={(e) => setRange(f.key, f.kind === 'number' ? 'max' : 'to', e.target.value)} />
           </span>
         ))}
         {listNames.length > 0 && (
@@ -129,7 +129,7 @@ export function IndexTable({ type, rows, columns: allColumns, filters = [], bulk
         </div>
       )}
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full">
+        <table className="crm-table w-full">
           <thead className="bg-surface-2">
             <tr>
               <th className={th}><input type="checkbox" aria-label="Select all" checked={shown.length > 0 && ticked.length === shown.length} onChange={(e) => setPicked(e.target.checked ? new Set(shown.map((r) => r.id)) : new Set())} /></th>

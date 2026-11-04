@@ -22,7 +22,7 @@ export const PageHead = ({ title, children }) => (
   </div>
 );
 export const RiskBadge = ({ risk }) => (
-  <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-bold', RISK_CLASS[risk.level])} title={risk.reasons.join('. ')}>
+  <span className={cx('crm-risk rounded-full px-2 py-0.5 text-[11px] font-bold', RISK_CLASS[risk.level])} title={risk.reasons.join('. ')}>
     {risk.level === 'low' ? 'On track' : `${risk.level} risk`}
   </span>
 );
@@ -133,7 +133,7 @@ export function DealsPage() {
       {view === 'table' ? (
         <IndexTable type="deal" rows={deals} columns={cols} to={(r) => `/crm/deal/${r.id}`} empty="No deals yet." filters={[{ key: 'stage', label: 'Stage', kind: 'select', get: (r) => r.stage, show: (v) => stageOf(v)?.label }, { key: 'source', label: 'Source', kind: 'select', get: (r) => r.source }, { key: 'industry', label: 'Industry', kind: 'select', get: (r) => companies.find((c) => c.id === r.companyId)?.industry }, { key: 'risk', label: 'Health', kind: 'select', get: (r) => dealRisk(r, today).level }, { key: 'amount', label: 'Value', kind: 'number', get: (r) => r.amount }, { key: 'close', label: 'Close', kind: 'date', get: (r) => r.closeDate }]} bulk={[{ key: 'stage', label: 'Stage', options: STAGES.map((st) => ({ value: st.id, label: st.label })) }]} />
       ) : (
-        <div className="grid gap-3 overflow-x-auto md:grid-cols-6" data-testid="deal-board">
+        <div className="crm-board" data-testid="deal-board">
           {STAGES.map((s) => {
             const list = deals.filter((d) => d.stage === s.id && d.status !== 'nurture');
             return (
@@ -141,7 +141,7 @@ export function DealsPage() {
                 key={s.id}
                 aria-label={s.label}
                 data-stage={s.id}
-                className="min-w-[14rem] rounded-xl bg-surface-2 p-2"
+                className="min-w-0 rounded-xl bg-surface-2 p-2"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -259,7 +259,7 @@ export function RecordPage() {
   };
   const remove = () => { if (window.confirm(`Delete ${rec.name}?`)) { removeRecord(type, id); nav(`/crm/${type === 'company' ? 'companies' : type === 'contact' ? 'contacts' : 'deals'}`); } };
   return (
-    <div className="grid gap-4 lg:grid-cols-[18rem_1fr_17rem]" data-testid="record-page">
+    <div className="crm-record" data-testid="record-page">
       <Card className="h-fit space-y-3">
         <div>
           <p className="text-lg font-extrabold">{rec.name}</p>
@@ -354,11 +354,11 @@ export function MyActionsPage() {
   return (
     <>
       <PageHead title="My Actions" />
-      <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-5">
+      <div className="crm-stats crm-stats5">
         <Stat label="Overdue" value={q.overdue.length} /><Stat label="Due today" value={q.today.length} /><Stat label="Upcoming" value={q.upcoming.length} />
         <Stat label="At-risk deals" value={q.atRisk.length} /><Stat label="Nurture revisits" value={q.nurture.length} />
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="crm-two">
         <Queue title="Overdue" tone="text-coral-ink" deals={q.overdue}>{action}</Queue>
         <Queue title="Due today" deals={q.today}>{action}</Queue>
         <Queue title="Upcoming actions" deals={q.upcoming}>{action}</Queue>
@@ -382,13 +382,13 @@ export function HomePage() {
   return (
     <>
       <PageHead title="CRM Home" />
-      <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4" data-testid="crm-stats">
+      <div className="crm-stats crm-stats4" data-testid="crm-stats">
         <Stat label="Open deals" value={s.openCount} /><Stat label="Pipeline value" value={money(s.pipeline)} />
         <Stat label="Weighted forecast" value={money(s.weighted)} /><Stat label="Closing this month" value={s.closingThisMonth} />
         <Stat label="New leads (7 days)" value={newLeads} /><Stat label="Win rate" value={s.winRate == null ? 'n/a' : `${s.winRate}%`} />
         <Stat label="At-risk deals" value={risky.length} /><Stat label="No next action" value={s.noNextAction} />
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="crm-two">
         <Card className="space-y-2">
           <p className="text-sm font-bold">At-risk deals, worst first</p>
           {risky.slice(0, 8).map(({ deal, risk }) => (
@@ -564,11 +564,11 @@ export function SettingsPage() {
     saveRecord('config', cfg);
     toast({ title: 'Settings saved.' });
   };
-  const num = 'w-24';
+  const num = 'crm-num';
   return (
     <>
       <PageHead title="Settings">{!admin && <span className="text-xs text-muted">Only managers and project managers can change these.</span>}</PageHead>
-      <div className="grid gap-3 md:grid-cols-2" data-testid="crm-settings">
+      <div className="crm-two" data-testid="crm-settings">
         <Card className="space-y-2">
           <p className="text-sm font-bold">Stage probability (chance a deal closes)</p>
           {OPEN_STAGES.map((s) => (
@@ -628,7 +628,7 @@ export function DataPage() {
   return (
     <>
       <PageHead title="Data management" />
-      <div className="grid gap-3 md:grid-cols-2"><Block title="Duplicate contacts (same email)" groups={dupContacts} type="contact" /><Block title="Duplicate companies (same domain or name)" groups={dupCompanies} type="company" /></div>
+      <div className="crm-two"><Block title="Duplicate contacts (same email)" groups={dupContacts} type="contact" /><Block title="Duplicate companies (same domain or name)" groups={dupCompanies} type="company" /></div>
     </>
   );
 }
