@@ -201,7 +201,22 @@ export function ActivitiesPage() {
   );
 }
 
-const LinkedList = ({ title, items }) => (
+/** Pick an existing record to link to this one. */
+function AddLink({ label, options, onAdd }) {
+  const [v, setV] = useState('');
+  if (!options.length) return null;
+  return (
+    <div className="mt-1.5 flex gap-1">
+      <select aria-label={label} className={cx(FIELD, 'min-w-0 flex-1 !py-1 text-xs')} value={v} onChange={(e) => setV(e.target.value)}>
+        <option value="">{label}...</option>
+        {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+      </select>
+      <button type="button" className="focus-ring rounded-lg border border-line px-2 text-xs font-semibold hover:bg-surface-2 disabled:opacity-40" disabled={!v} onClick={() => { onAdd(v); setV(''); }}>Add</button>
+    </div>
+  );
+}
+
+const LinkedList = ({ title, items, add, onRemove }) => (
   <div>
     <p className="mb-1 text-xs font-bold text-muted">{title} ({items.length})</p>
     <div className="space-y-1.5">
@@ -211,6 +226,8 @@ const LinkedList = ({ title, items }) => (
         </Link>
       ))}
       {!items.length && <p className="text-xs text-muted">None linked.</p>}
+      {onRemove && items.length > 0 && <div className="flex flex-wrap gap-1">{items.map((i) => <button key={i.id} type="button" aria-label={`Unlink ${i.name}`} className="focus-ring rounded-full border border-line px-2 py-0.5 text-[11px] text-muted hover:bg-surface-2" onClick={() => onRemove(i.id)}>Unlink {i.name}</button>)}</div>}
+      {add}
     </div>
   </div>
 );
@@ -285,12 +302,23 @@ export function RecordPage() {
         <Timeline items={mine} />
       </div>
       <div className="space-y-3">
-        {type === 'company' && <LinkedList title="Contacts" items={contacts.filter((c) => c.companyId === id).map((c) => ({ id: c.id, name: c.name, sub: c.title, to: `/crm/contact/${c.id}` }))} />}
-        {type === 'company' && <LinkedList title="Deals" items={deals.filter((d) => d.companyId === id).map((d) => ({ id: d.id, name: d.name, sub: `${money(d.amount)} · ${stageOf(d.stage)?.label}`, to: `/crm/deal/${d.id}` }))} />}
-        {type === 'contact' && <LinkedList title="Company" items={company ? [{ id: company.id, name: company.name, sub: company.industry, to: `/crm/company/${company.id}` }] : []} />}
-        {type === 'contact' && <LinkedList title="Deals" items={deals.filter((d) => d.contactIds?.includes(id)).map((d) => ({ id: d.id, name: d.name, sub: `${money(d.amount)} · ${stageOf(d.stage)?.label}`, to: `/crm/deal/${d.id}` }))} />}
-        {type === 'deal' && <LinkedList title="Company" items={company ? [{ id: company.id, name: company.name, sub: company.industry, to: `/crm/company/${company.id}` }] : []} />}
-        {type === 'deal' && <LinkedList title="Buying contacts" items={(rec.contactIds ?? []).map((cid) => contacts.find((c) => c.id === cid)).filter(Boolean).map((c) => ({ id: c.id, name: c.name, sub: c.title, to: `/crm/contact/${c.id}` }))} />}
+        {type === 'company' && <LinkedList title="Contacts" items={contacts.filter((c) => c.companyId === id).map((c) => ({ id: c.id, name: c.name, sub: c.title, to: `/crm/contact/${c.id}` }))}
+          onRemove={(cid) => saveRecord('contact', { ...contacts.find((c) => c.id === cid), companyId: undefined })}
+          add={<AddLink label="Add contact" options={contacts.filter((c) => c.companyId !== id)} onAdd={(cid) => saveRecord('contact', { ...contacts.find((c) => c.id === cid), companyId: id })} />} />}
+        {type === 'company' && <LinkedList title="Deals" items={deals.filter((d) => d.companyId === id).map((d) => ({ id: d.id, name: d.name, sub: `${money(d.amount)} · ${stageOf(d.stage)?.label}`, to: `/crm/deal/${d.id}` }))}
+          add={<AddLink label="Add deal" options={deals.filter((d) => d.companyId !== id)} onAdd={(did) => saveRecord('deal', { ...deals.find((d) => d.id === did), companyId: id })} />} />}
+        {type === 'contact' && <LinkedList title="Company" items={company ? [{ id: company.id, name: company.name, sub: company.industry, to: `/crm/company/${company.id}` }] : []}
+          onRemove={() => saveRecord('contact', { ...rec, companyId: undefined })}
+          add={<AddLink label="Set company" options={companies.filter((c) => c.id !== rec.companyId)} onAdd={(cid) => saveRecord('contact', { ...rec, companyId: cid })} />} />}
+        {type === 'contact' && <LinkedList title="Deals" items={deals.filter((d) => d.contactIds?.includes(id)).map((d) => ({ id: d.id, name: d.name, sub: `${money(d.amount)} · ${stageOf(d.stage)?.label}`, to: `/crm/deal/${d.id}` }))}
+          onRemove={(did) => { const d = deals.find((x) => x.id === did); saveRecord('deal', { ...d, contactIds: d.contactIds.filter((c) => c !== id) }); }}
+          add={<AddLink label="Add to deal" options={deals.filter((d) => !d.contactIds?.includes(id))} onAdd={(did) => { const d = deals.find((x) => x.id === did); saveRecord('deal', { ...d, contactIds: [...(d.contactIds ?? []), id] }); }} />} />}
+        {type === 'deal' && <LinkedList title="Company" items={company ? [{ id: company.id, name: company.name, sub: company.industry, to: `/crm/company/${company.id}` }] : []}
+          onRemove={() => saveRecord('deal', { ...rec, companyId: undefined })}
+          add={<AddLink label="Set company" options={companies.filter((c) => c.id !== rec.companyId)} onAdd={(cid) => saveRecord('deal', { ...rec, companyId: cid })} />} />}
+        {type === 'deal' && <LinkedList title="Buying contacts" items={(rec.contactIds ?? []).map((cid) => contacts.find((c) => c.id === cid)).filter(Boolean).map((c) => ({ id: c.id, name: c.name, sub: c.title, to: `/crm/contact/${c.id}` }))}
+          onRemove={(cid) => saveRecord('deal', { ...rec, contactIds: rec.contactIds.filter((c) => c !== cid) })}
+          add={<AddLink label="Add contact" options={contacts.filter((c) => !rec.contactIds?.includes(c.id))} onAdd={(cid) => saveRecord('deal', { ...rec, contactIds: [...(rec.contactIds ?? []), cid] })} />} />}
       </div>
       {converting && <RecordForm type="deal" initial={{ name: `${company?.name ?? rec.name} deal`, companyId: rec.companyId, contactIds: [id] }} onClose={() => setConverting(false)} onSaved={(d) => nav(`/crm/deal/${d.id}`)} />}
       {editing && <RecordForm type={type} initial={rec} onClose={() => setEditing(false)} />}
