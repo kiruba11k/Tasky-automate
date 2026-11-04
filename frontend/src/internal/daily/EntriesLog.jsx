@@ -42,6 +42,7 @@ import {
   taskChoices,
   timePatch,
 } from './entryHelpers';
+import { isFindingWork } from './sheetText';
 
 /** Window event: "open the day's tasks for editing" (sent by the Edit button on the day's progress card). */
 export const EDIT_DAY_TASKS = 'ls-edit-day-tasks';
@@ -175,7 +176,7 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
             <span className="text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
           </span>
         )}
-        {locked ? (
+        {!isFindingWork(entryName(r, project)) ? null : locked ? (
           r.foundQty != null && <span className="block text-[10px] text-muted">{r.foundQty} found</span>
         ) : (
           <FoundInput row={{ ...r, doneQty: r.typedDone }} onChange={(patch) => onType(patch)} />
@@ -874,7 +875,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                                     onChange={(e) => update(r.id, { doneQty: parseQty(e.target.value) })}
                                   />
                                 )}
-                                {tableReadOnly ? (
+                                {!isFindingWork(entryName(r, project)) ? null : tableReadOnly ? (
                                   r.foundQty != null && <span className="block text-[10px] text-muted">{r.foundQty} found</span>
                                 ) : (
                                   <FoundInput row={r} onChange={(patch) => update(r.id, patch)} />
