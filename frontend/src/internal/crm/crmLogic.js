@@ -10,6 +10,18 @@ export const STAGES = [
   { id: 'won', label: 'Closed won', prob: 1 },
   { id: 'lost', label: 'Closed lost', prob: 0 },
 ];
+const DEFAULT_PROB = Object.fromEntries(STAGES.map((s) => [s.id, s.prob]));
+/** The settings a new CRM starts with: stage probabilities, days before a deal counts as stalled in each stage, and days of silence before a deal counts as quiet. */
+export const DEFAULT_CONFIG = { prob: { qualified: 0.1, meeting: 0.25, proposal: 0.5, negotiation: 0.75 }, stall: { qualified: 21, meeting: 14, proposal: 14, negotiation: 21 }, quietDays: 14 };
+let quiet = DEFAULT_CONFIG.quietDays;
+export const STALL_DAYS = { ...DEFAULT_CONFIG.stall };
+/** Applies the shared settings (or the defaults when there are none) to the stage probabilities and risk limits. */
+export function applyConfig(cfg) {
+  const c = { prob: { ...DEFAULT_CONFIG.prob, ...cfg?.prob }, stall: { ...DEFAULT_CONFIG.stall, ...cfg?.stall }, quietDays: cfg?.quietDays ?? DEFAULT_CONFIG.quietDays };
+  STAGES.forEach((s) => { if (s.id in c.prob) s.prob = c.prob[s.id]; else s.prob = DEFAULT_PROB[s.id]; });
+  Object.assign(STALL_DAYS, c.stall);
+  quiet = c.quietDays;
+}
 export const OPEN_STAGES = STAGES.filter((s) => s.prob > 0 && s.prob < 1);
 export const LIFECYCLE = [
   { id: 'prospect', label: 'Prospect' },
@@ -32,8 +44,6 @@ export const outcomeOf = (id) => OUTCOMES.find((o) => o.id === id);
 export const stageOf = (id) => STAGES.find((s) => s.id === id);
 export const isOpenDeal = (deal) => deal.status !== 'nurture' && !['won', 'lost'].includes(deal.stage);
 
-/** Days a deal can sit in a stage before it counts as stalled. */
-export const STALL_DAYS = { qualified: 21, meeting: 14, proposal: 14, negotiation: 21 };
 
 /** Why a deal cannot be saved as it is, or null. An open deal needs an owner and a meaningful next action with a date. */
 export function dealProblem(deal) {
@@ -53,7 +63,7 @@ const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Da
  * How risky an open deal is, with a reason for every flag: { level: 'high'|'medium'|'low', reasons: [..], score }.
  * Signals: no next action, next action overdue, close date passed, close date pushed repeatedly, quiet for a while; a bigger deal weighs more.
  */
-export function dealRisk(deal, today, quietDays = 14) {
+export function dealRisk(deal, today, quietDays = quiet) {
   if (!isOpenDeal(deal)) return { level: 'low', reasons: [], score: 0 };
   const reasons = [];
   let score = 0;

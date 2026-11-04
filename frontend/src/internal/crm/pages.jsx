@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListChecks, ArrowRightLeft, Check } from 'lucide-react';
 import { Qe as PEOPLE, be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
-import { STAGES, OPEN_STAGES, moveStage, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
+import { STAGES, OPEN_STAGES, moveStage, DEFAULT_CONFIG, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
 import { useCrm, saveRecord, removeRecord, logActivity, money, nowIso } from './crmStore.js';
 import { stageConversion, closeDateReport, closedByMonth, outcomeReport, goalProgress, GOAL_METRICS } from './reports.js';
 import { IndexTable } from './IndexTable.jsx';
 import { RecordForm, CompleteActionModal, OwnerSelect, FIELD } from './forms.jsx';
+import { useStore } from '../store.js';
 import { isAdminTier } from '../lib/constants.js';
 import { toast } from '../kit/toast.js';
 
@@ -544,6 +545,56 @@ export function ForecastPage() {
           </tbody>
         </table>
       </div>
+    </>
+  );
+}
+
+/** Settings: the stage probabilities behind the forecast and the limits behind the risk flags. Managers and PMs change them; everyone sees them. */
+export function SettingsPage() {
+  const { me } = useCrm();
+  const stored = useStore((s) => s.crmConfigs.find((c) => c.id === 'main'));
+  const admin = isAdminTier(PEOPLE.find((p) => p.id === me)?.role);
+  const base = { prob: { ...DEFAULT_CONFIG.prob, ...stored?.prob }, stall: { ...DEFAULT_CONFIG.stall, ...stored?.stall }, quietDays: stored?.quietDays ?? DEFAULT_CONFIG.quietDays };
+  const [d, setD] = useState(base);
+  const set = (group, id, v) => setD((x) => ({ ...x, [group]: { ...x[group], [id]: v } }));
+  const save = () => {
+    const cfg = { id: 'main', prob: Object.fromEntries(Object.entries(d.prob).map(([k, v]) => [k, Number(v) / (v > 1 ? 100 : 1)])), stall: Object.fromEntries(Object.entries(d.stall).map(([k, v]) => [k, Number(v)])), quietDays: Number(d.quietDays) };
+    if (!Object.values(cfg.prob).every((v) => v >= 0.01 && v <= 0.99)) return toast({ title: 'Probabilities must be between 1% and 99%.' });
+    if (![...Object.values(cfg.stall), cfg.quietDays].every((v) => v >= 1 && v <= 365)) return toast({ title: 'Days must be between 1 and 365.' });
+    saveRecord('config', cfg);
+    toast({ title: 'Settings saved.' });
+  };
+  const num = 'w-24';
+  return (
+    <>
+      <PageHead title="Settings">{!admin && <span className="text-xs text-muted">Only managers and project managers can change these.</span>}</PageHead>
+      <div className="grid gap-3 md:grid-cols-2" data-testid="crm-settings">
+        <Card className="space-y-2">
+          <p className="text-sm font-bold">Stage probability (chance a deal closes)</p>
+          {OPEN_STAGES.map((s) => (
+            <label key={s.id} className="flex items-center justify-between gap-2 text-sm">{s.label}
+              <span className="flex items-center gap-1"><input aria-label={`${s.label} probability`} type="number" min={1} max={99} disabled={!admin} className={cx(FIELD, num)} value={Math.round((d.prob[s.id] > 1 ? d.prob[s.id] / 100 : d.prob[s.id]) * 100)} onChange={(e) => set('prob', s.id, Number(e.target.value) / 100)} />%</span>
+            </label>
+          ))}
+        </Card>
+        <Card className="space-y-2">
+          <p className="text-sm font-bold">Risk limits (days)</p>
+          {OPEN_STAGES.map((s) => (
+            <label key={s.id} className="flex items-center justify-between gap-2 text-sm">Stalled in {s.label} after
+              <input aria-label={`${s.label} stall days`} type="number" min={1} max={365} disabled={!admin} className={cx(FIELD, num)} value={d.stall[s.id]} onChange={(e) => set('stall', s.id, e.target.value)} />
+            </label>
+          ))}
+          <label className="flex items-center justify-between gap-2 text-sm">Quiet after no activity for
+            <input aria-label="Quiet days" type="number" min={1} max={365} disabled={!admin} className={cx(FIELD, num)} value={d.quietDays} onChange={(e) => setD((x) => ({ ...x, quietDays: e.target.value }))} />
+          </label>
+        </Card>
+      </div>
+      {admin && (
+        <div className="mt-3 flex gap-2">
+          <Button onClick={save} data-testid="crm-settings-save">Save settings</Button>
+          <Button tone="ghost" className="border border-line" onClick={() => setD({ prob: { ...DEFAULT_CONFIG.prob }, stall: { ...DEFAULT_CONFIG.stall }, quietDays: DEFAULT_CONFIG.quietDays })}>Reset to defaults</Button>
+        </div>
+      )}
     </>
   );
 }

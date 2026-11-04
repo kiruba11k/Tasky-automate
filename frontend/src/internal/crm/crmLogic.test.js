@@ -89,3 +89,15 @@ test('a deal stuck in one stage is flagged with the days it has sat there', () =
   assert.equal(stuck.level, 'medium');
   assert.equal(dealRisk(deal({ stageSince: '2026-11-01T00:00:00Z' }), today).level, 'low');
 });
+
+import { applyConfig, DEFAULT_CONFIG, stageOf as stageLookup } from './crmLogic.js';
+test('shared settings change the forecast and the stall limit, and reset to defaults', () => {
+  applyConfig({ prob: { proposal: 0.9 }, stall: { proposal: 5 }, quietDays: 3 });
+  assert.equal(stageLookup('proposal').prob, 0.9);
+  assert.equal(pipelineStats([deal({ amount: 1000 })], '2026-11').weighted, 900);
+  assert.ok(dealRisk(deal({ stageSince: '2026-10-25T00:00:00Z', lastActivityAt: '2026-11-03T00:00:00Z' }), today).reasons.some((r) => /Stalled/.test(r)));
+  assert.ok(dealRisk(deal({ lastActivityAt: '2026-10-30T00:00:00Z' }), today).reasons.some((r) => /No activity/.test(r)));
+  applyConfig(undefined);
+  assert.equal(stageLookup('proposal').prob, DEFAULT_CONFIG.prob.proposal);
+  assert.equal(dealRisk(deal({ lastActivityAt: '2026-10-30T00:00:00Z' }), today).level, 'low');
+});

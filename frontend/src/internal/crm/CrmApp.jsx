@@ -1,12 +1,12 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { oe as cx } from '@/internal/min';
-import { ActivitiesPage, CompaniesPage, ContactsPage, DataPage, DealsPage, ForecastPage, HomePage, MyActionsPage, RecordPage, ReportsPage, GoalsPage } from './pages.jsx';
+import { ActivitiesPage, CompaniesPage, ContactsPage, DataPage, DealsPage, ForecastPage, HomePage, MyActionsPage, RecordPage, ReportsPage, GoalsPage, SettingsPage } from './pages.jsx';
 
 /** Navigation grouped by what people do: their workspace, the sales view, and data upkeep. */
 export const CRM_NAV = [
   ['Workspace', [['/crm', 'CRM Home', true], ['/crm/actions', 'My Actions'], ['/crm/contacts', 'Contacts'], ['/crm/companies', 'Companies'], ['/crm/leads', 'Leads / Prospects'], ['/crm/deals', 'Deals'], ['/crm/activities', 'Activities & Meetings']]],
   ['Sales', [['/crm/forecast', 'Pipeline & Forecast'], ['/crm/goals', 'Sales Goals'], ['/crm/reports', 'Reports & Dashboards']]],
-  ['Admin', [['/crm/data', 'Data management']]],
+  ['Admin', [['/crm/data', 'Data management'], ['/crm/settings', 'Settings']]],
 ];
 
 export function CrmApp() {
@@ -36,6 +36,7 @@ export function CrmApp() {
           <Route path="forecast" element={<ForecastPage />} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="data" element={<DataPage />} />
           <Route path=":type/:id" element={<RecordPage />} />
           <Route path="*" element={<Navigate to="/crm" replace />} />

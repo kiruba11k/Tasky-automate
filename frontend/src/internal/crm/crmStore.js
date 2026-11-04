@@ -1,9 +1,9 @@
 import { useStore } from '../store.js';
 import { newId } from '../lib/domain.js';
-import { lifecycleAfterDeal } from './crmLogic.js';
+import { lifecycleAfterDeal, applyConfig } from './crmLogic.js';
 import { todayKey } from '../lib/dates.js';
 
-const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities', goal: 'crmGoals' };
+const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities', goal: 'crmGoals', config: 'crmConfigs' };
 export const nowIso = () => new Date().toISOString();
 
 /** Saves (adds or replaces) one CRM record; sync.js sends it to the server. */
@@ -34,6 +34,7 @@ export function logActivity(act) {
 
 export const useCrm = () => {
   const s = useStore();
+  applyConfig(s.crmConfigs.find((c) => c.id === 'main')); // stage probabilities and risk limits are shared settings
   return { me: s.me, companies: s.crmCompanies, contacts: s.crmContacts, deals: s.crmDeals, activities: s.crmActivities, goals: s.crmGoals, today: todayKey() };
 };
 export const money = (n) => (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });

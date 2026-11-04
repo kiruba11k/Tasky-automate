@@ -18,6 +18,15 @@ test('goals need a month, a known measure, a target and an owner', () => {
   assert.ok(crmProblem('crmGoal', { ...goal, ownerId: '' }));
 });
 
+test('settings keep probabilities between 1% and 99% and limits in days', () => {
+  const cfg = { prob: { qualified: 0.1, meeting: 0.25, proposal: 0.5, negotiation: 0.75 }, stall: { qualified: 21, meeting: 14, proposal: 14, negotiation: 21 }, quietDays: 14 };
+  assert.equal(crmProblem('crmConfig', cfg), null);
+  assert.ok(crmProblem('crmConfig', { ...cfg, prob: { ...cfg.prob, meeting: 1.5 } }));
+  assert.ok(crmProblem('crmConfig', { ...cfg, stall: { ...cfg.stall, proposal: 0 } }));
+  assert.ok(crmProblem('crmConfig', { ...cfg, quietDays: 'x' }));
+  assert.ok(crmProblem('crmConfig', {}));
+});
+
 test('an open deal needs an owner and a next action; closed and nurture deals do not', () => {
   const deal = { name: 'Acme', ownerId: 'u1', stage: 'proposal', amount: 100, nextAction: { title: 'Call', due: '2026-11-05' } };
   assert.equal(crmProblem('crmDeal', deal), null);

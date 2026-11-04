@@ -5,7 +5,7 @@
 
 import { dueAlerts, OPEN, rollProject, wallClock } from './deadlines.js';
 
-export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias', 'crmCompany', 'crmContact', 'crmDeal', 'crmActivity', 'crmGoal'];
+export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias', 'crmCompany', 'crmContact', 'crmDeal', 'crmActivity', 'crmGoal', 'crmConfig'];
 const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
 const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
@@ -194,6 +194,11 @@ export function crmProblem(kind, d) {
     if (!(d.amount === undefined || (Number.isFinite(d.amount) && d.amount >= 0))) return 'bad amount';
     const open = !['won', 'lost'].includes(d.stage) && d.status !== 'nurture';
     if (open && !(typeof d.nextAction?.title === 'string' && d.nextAction.title.trim() && d.nextAction.due)) return 'an open deal needs a next action';
+  }
+  if (kind === 'crmConfig') {
+    const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+    const stages = ['qualified', 'meeting', 'proposal', 'negotiation'];
+    if (!stages.every((s) => inRange(d.prob?.[s], 0.01, 0.99)) || !stages.every((s) => inRange(d.stall?.[s], 1, 365)) || !inRange(d.quietDays, 1, 365)) return 'bad settings';
   }
   if (kind === 'crmGoal') {
     if (!/^\d{4}-\d{2}$/.test(d.period ?? '') || !['won_value', 'won_count', 'new_leads', 'activities'].includes(d.metric) || !(Number.isFinite(d.target) && d.target >= 0) || typeof d.ownerId !== 'string' || !d.ownerId) return 'bad goal';
@@ -411,6 +416,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       case 'daily': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev) : eodDecisionOk(u, data, prev, changed); // a person's own days; another person's day only gets end of day decisions
       case 'weekly': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev, 'eowReviews') : eodDecisionOk(u, data, prev, changed, 'eowReviews'); // a person's own weeks; another person's week only gets end of week decisions
       case 'crmCompany': case 'crmContact': case 'crmDeal': case 'crmActivity': return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId)); // the CRM is shared inside the team; only the owner or a lead deletes a record
+      case 'crmConfig': return key === 'main' && lead(u) && !deleting && !crmProblem(kind, data); // the CRM's shared settings: stage probabilities and risk limits, set by managers and PMs
       case 'crmGoal': return !crmProblem(kind, data) && (lead(u) || (mine(data.ownerId) && (!prev || mine(prev.ownerId)))); // leads set goals for anyone and the team; everyone else only their own
       case 'profile': return mine(key);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
