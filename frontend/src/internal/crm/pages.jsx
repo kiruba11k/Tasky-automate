@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListChecks, ArrowRightLeft, Check } from 'lucide-react';
 import { Qe as PEOPLE, be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
 import { STAGES, OPEN_STAGES, moveStage, DEFAULT_CONFIG, mergePlan, duplicateGroups, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
-import { useCrm, saveRecord, removeRecord, logActivity, money, nowIso } from './crmStore.js';
+import { useCrm, saveRecord, removeRecord, canRemove, REMOVE_DENIED, logActivity, money, nowIso } from './crmStore.js';
 import { stageConversion, closeDateReport, closedByMonth, outcomeReport, goalProgress, GOAL_METRICS } from './reports.js';
 import { IndexTable } from './IndexTable.jsx';
 import { RecordForm, CompleteActionModal, OwnerSelect, FIELD } from './forms.jsx';
@@ -257,7 +257,7 @@ export function RecordPage() {
     logActivity({ type: actType, subject: note.trim().slice(0, 80), notes: note.trim().length > 80 ? note.trim() : '', ownerId: me, dealId: type === 'deal' ? id : undefined, contactId: type === 'contact' ? id : rec.contactIds?.[0], companyId: type === 'company' ? id : rec.companyId });
     setNote('');
   };
-  const remove = () => { if (window.confirm(`Delete ${rec.name}?`)) { removeRecord(type, id); nav(`/crm/${type === 'company' ? 'companies' : type === 'contact' ? 'contacts' : 'deals'}`); } };
+  const remove = () => { if (window.confirm(`Delete ${rec.name}?`) && removeRecord(type, id)) { nav(`/crm/${type === 'company' ? 'companies' : type === 'contact' ? 'contacts' : 'deals'}`); } };
   return (
     <div className="crm-record" data-testid="record-page">
       <Card className="h-fit space-y-3">
@@ -603,6 +603,7 @@ export function SettingsPage() {
 export function DataPage() {
   const { companies, contacts, deals, activities } = useCrm();
   const merge = (type, keep, drop) => {
+    if (!canRemove(type, drop.id)) return toast({ title: REMOVE_DENIED });
     if (!window.confirm(`Merge ${drop.name} into ${keep.name}? Deals, contacts and activity move to ${keep.name}.`)) return;
     const plan = mergePlan(type, keep, drop, { contacts, deals, activities });
     plan.updates.forEach((u) => saveRecord(u.type, u.rec));
