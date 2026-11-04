@@ -8,6 +8,7 @@ import { OTHER_PREFIX, groupBlocks } from './planBlocks';
 import { targetKind } from '../projects/targetKinds';
 import { TargetSheet } from '../projects/TargetSheet';
 import { MyWeekTargets } from './MyWeekTargets';
+import { FixedWeekTargets } from './FixedWeekTargets';
 
 /** The rows of one project's targets for the week holding `date`: [project, target, type, goal], from its saved weekly plan. */
 export function weeklyTargetRows(project, date) {
@@ -93,6 +94,7 @@ export function WeeklyTargets({ personId, date }) {
         testId="weekly-targets-sheet"
       />
       )}
+      <FixedWeekTargets personId={personId} date={date} />
       <MyWeekTargets personId={personId} mon={monday} />
     </Card>
     </div>
