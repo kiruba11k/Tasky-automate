@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListChecks, ArrowRightLeft, Check } from 'lucide-react';
-import { be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
+import { Qe as PEOPLE, be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
 import { STAGES, OPEN_STAGES, moveStage, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
 import { useCrm, saveRecord, removeRecord, logActivity, money, nowIso } from './crmStore.js';
-import { stageConversion, closeDateReport, closedByMonth, outcomeReport } from './reports.js';
+import { stageConversion, closeDateReport, closedByMonth, outcomeReport, goalProgress, GOAL_METRICS } from './reports.js';
 import { IndexTable } from './IndexTable.jsx';
 import { RecordForm, CompleteActionModal, OwnerSelect, FIELD } from './forms.jsx';
+import { isAdminTier } from '../lib/constants.js';
 import { toast } from '../kit/toast.js';
 
 const th = 'px-3 py-2 text-left text-xs font-bold text-muted';
@@ -425,6 +426,66 @@ export function ReportsPage() {
         <section><h2 className="mb-1 text-sm font-bold">Stage-to-stage conversion</h2><ConversionCard /></section>
         <section><h2 className="mb-1 text-sm font-bold">How completed actions ended {out.positiveRate != null && <span className="font-normal text-muted">({out.positiveRate}% moved the deal forward)</span>}</h2>
           <Table testid="report-outcomes" head={['Outcome', 'Actions']} rows={out.counts.map((c) => [c.label, c.count])} /></section>
+      </div>
+    </>
+  );
+}
+
+/** Sales goals for a month: one person's or the team's targets, with progress from the CRM data. */
+export function GoalsPage() {
+  const { me, deals, contacts, activities, goals, today } = useCrm();
+  const [period, setPeriod] = useState(today.slice(0, 7));
+  const [draft, setDraft] = useState({ ownerId: me, metric: 'won_value', target: '' });
+  const admin = isAdminTier(PEOPLE.find((p) => p.id === me)?.role);
+  const list = goals.filter((g) => g.period === period).sort((a, b) => (a.ownerId === 'team' ? -1 : b.ownerId === 'team' ? 1 : firstName(a.ownerId).localeCompare(firstName(b.ownerId))));
+  const add = () => {
+    const target = Number(draft.target);
+    if (!(target > 0)) return toast({ title: 'Type a target above zero.' });
+    if (list.some((g) => g.ownerId === draft.ownerId && g.metric === draft.metric)) return toast({ title: 'That goal already exists this month. Edit its target instead.' });
+    saveRecord('goal', { ownerId: draft.ownerId, metric: draft.metric, target, period });
+    setDraft((d) => ({ ...d, target: '' }));
+  };
+  const field = cx(FIELD, '!w-auto');
+  return (
+    <>
+      <PageHead title="Sales Goals"><input aria-label="Month" type="month" className={field} value={period} onChange={(e) => e.target.value && setPeriod(e.target.value)} /></PageHead>
+      <Card className="mb-3 flex flex-wrap items-end gap-2">
+        <label className="text-xs font-semibold text-muted">For
+          <select aria-label="Goal for" className={cx(field, 'mt-1 block')} value={draft.ownerId} onChange={(e) => setDraft((d) => ({ ...d, ownerId: e.target.value }))} disabled={!admin}>
+            {admin && <option value="team">Whole team</option>}
+            {(admin ? PEOPLE : PEOPLE.filter((p) => p.id === me)).map((p) => <option key={p.id} value={p.id}>{firstName(p.id)}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-muted">Measure
+          <select aria-label="Goal measure" className={cx(field, 'mt-1 block')} value={draft.metric} onChange={(e) => setDraft((d) => ({ ...d, metric: e.target.value }))}>
+            {GOAL_METRICS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-muted">Target
+          <input aria-label="Goal target" type="number" min={0} className={cx(field, 'mt-1 block w-32')} value={draft.target} onChange={(e) => setDraft((d) => ({ ...d, target: e.target.value }))} />
+        </label>
+        <Button onClick={add} data-testid="goal-add"><Plus size={14} /> Add goal</Button>
+      </Card>
+      <div className="space-y-2" data-testid="goals">
+        {list.map((g) => {
+          const pr = goalProgress(g, { deals, contacts, activities });
+          const m = GOAL_METRICS.find((x) => x.id === g.metric);
+          const can = admin || g.ownerId === me;
+          return (
+            <Card key={g.id} className="!p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span><b>{g.ownerId === 'team' ? 'Whole team' : firstName(g.ownerId)}</b> · {m?.label}</span>
+                <span className="flex items-center gap-2">
+                  <b className="tabular-nums">{m?.money ? money(pr.value) : pr.value} / {m?.money ? money(g.target) : g.target} ({pr.pct ?? 0}%)</b>
+                  {can && <button type="button" className="focus-ring text-xs text-muted underline" onClick={() => { const t = Number(window.prompt('New target', String(g.target))); if (t > 0) saveRecord('goal', { ...g, target: t }); }}>Edit</button>}
+                  {can && <button type="button" className="focus-ring text-xs text-muted underline" onClick={() => window.confirm('Delete this goal?') && removeRecord('goal', g.id)}>Delete</button>}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2"><div className={cx('h-full rounded-full', pr.pct >= 100 ? 'bg-mint-ink' : 'bg-accent')} style={{ width: `${Math.min(100, pr.pct ?? 0)}%` }} /></div>
+            </Card>
+          );
+        })}
+        {!list.length && <p className="text-sm text-muted">No goals for this month yet.</p>}
       </div>
     </>
   );

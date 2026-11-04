@@ -42,6 +42,7 @@ export const emptyState = () => ({
   crmContacts: [],
   crmDeals: [],
   crmActivities: [],
+  crmGoals: [],
   aliases: {},
   daily: {},
   weekly: {},

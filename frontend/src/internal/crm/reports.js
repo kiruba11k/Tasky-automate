@@ -55,3 +55,25 @@ export function outcomeReport(activities) {
   const positive = done.filter((a) => ['connected', 'meeting_booked', 'proposal_requested'].includes(a.outcome)).length;
   return { counts, total: done.length, positiveRate: done.length ? Math.round((100 * positive) / done.length) : null };
 }
+
+export const GOAL_METRICS = [
+  { id: 'won_value', label: 'Won revenue', money: true },
+  { id: 'won_count', label: 'Deals won' },
+  { id: 'new_leads', label: 'New leads' },
+  { id: 'activities', label: 'Activities logged' },
+];
+
+/**
+ * How far a goal has got: { value, target, pct }. A goal belongs to one person or to 'team' (everyone); `period` is YYYY-MM.
+ * Revenue and deals won count by the month the deal closed, new leads by the month the contact was created, activities by their date.
+ */
+export function goalProgress(goal, { deals, contacts, activities }) {
+  const mine = (r) => goal.ownerId === 'team' || r.ownerId === goal.ownerId;
+  const inMonth = (iso) => !!iso && iso.startsWith(goal.period);
+  let value = 0;
+  if (goal.metric === 'won_value') value = deals.filter((d) => mine(d) && d.stage === 'won' && inMonth(d.closedAt)).reduce((t, d) => t + (d.amount ?? 0), 0);
+  else if (goal.metric === 'won_count') value = deals.filter((d) => mine(d) && d.stage === 'won' && inMonth(d.closedAt)).length;
+  else if (goal.metric === 'new_leads') value = contacts.filter((c) => mine(c) && inMonth(c.createdAt) && ['prospect', 'lead'].includes(c.lifecycle)).length;
+  else if (goal.metric === 'activities') value = activities.filter((a) => mine(a) && a.type !== 'stage' && inMonth(a.at)).length;
+  return { value, target: goal.target, pct: goal.target > 0 ? Math.round((100 * value) / goal.target) : null };
+}

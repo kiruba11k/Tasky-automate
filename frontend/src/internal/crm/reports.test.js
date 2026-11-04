@@ -32,3 +32,17 @@ test('outcome report shows how follow-ups ended', () => {
   assert.equal(r.positiveRate, 67);
   assert.equal(r.counts.find((c) => c.id === 'no_response').count, 1);
 });
+
+import { goalProgress } from './reports.js';
+test('goal progress counts the month, the owner and the team', () => {
+  const data = {
+    deals: [d('a', 'won', { ownerId: 'u1', amount: 600, closedAt: '2026-11-03T00:00:00Z' }), d('b', 'won', { ownerId: 'u2', amount: 400, closedAt: '2026-11-04T00:00:00Z' }), d('c', 'won', { ownerId: 'u1', amount: 999, closedAt: '2026-10-04T00:00:00Z' })],
+    contacts: [{ ownerId: 'u1', lifecycle: 'lead', createdAt: '2026-11-02T00:00:00Z' }, { ownerId: 'u1', lifecycle: 'customer', createdAt: '2026-11-02T00:00:00Z' }],
+    activities: [{ ownerId: 'u1', type: 'call', at: '2026-11-02T00:00:00Z' }, { ownerId: 'u1', type: 'stage', at: '2026-11-02T00:00:00Z' }],
+  };
+  assert.deepEqual(goalProgress({ ownerId: 'u1', period: '2026-11', metric: 'won_value', target: 1000 }, data), { value: 600, target: 1000, pct: 60 });
+  assert.equal(goalProgress({ ownerId: 'team', period: '2026-11', metric: 'won_value', target: 1000 }, data).pct, 100);
+  assert.equal(goalProgress({ ownerId: 'u1', period: '2026-11', metric: 'new_leads', target: 2 }, data).value, 1);
+  assert.equal(goalProgress({ ownerId: 'u1', period: '2026-11', metric: 'activities', target: 5 }, data).value, 1);
+  assert.equal(goalProgress({ ownerId: 'u1', period: '2026-11', metric: 'won_count', target: 0 }, data).pct, null);
+});

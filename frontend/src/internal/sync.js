@@ -19,6 +19,7 @@ const COLLECTIONS = {
   crmContacts: { kind: "crmContact", shape: "list" },
   crmDeals: { kind: "crmDeal", shape: "list" },
   crmActivities: { kind: "crmActivity", shape: "list" },
+  crmGoals: { kind: "crmGoal", shape: "list" },
   daily: { kind: "daily", shape: "map" },
   weekly: { kind: "weekly", shape: "map" },
   profiles: { kind: "profile", shape: "map" },

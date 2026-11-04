@@ -2,7 +2,7 @@ import { useStore } from '../store.js';
 import { newId } from '../lib/domain.js';
 import { todayKey } from '../lib/dates.js';
 
-const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities' };
+const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities', goal: 'crmGoals' };
 export const nowIso = () => new Date().toISOString();
 
 /** Saves (adds or replaces) one CRM record; sync.js sends it to the server. */
@@ -27,6 +27,6 @@ export function logActivity(act) {
 
 export const useCrm = () => {
   const s = useStore();
-  return { me: s.me, companies: s.crmCompanies, contacts: s.crmContacts, deals: s.crmDeals, activities: s.crmActivities, today: todayKey() };
+  return { me: s.me, companies: s.crmCompanies, contacts: s.crmContacts, deals: s.crmDeals, activities: s.crmActivities, goals: s.crmGoals, today: todayKey() };
 };
 export const money = (n) => (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
