@@ -4,6 +4,7 @@ import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListCh
 import { be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
 import { STAGES, OPEN_STAGES, moveStage, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
 import { useCrm, saveRecord, removeRecord, logActivity, money, nowIso } from './crmStore.js';
+import { stageConversion, closeDateReport, closedByMonth, outcomeReport } from './reports.js';
 import { IndexTable } from './IndexTable.jsx';
 import { RecordForm, CompleteActionModal, OwnerSelect, FIELD } from './forms.jsx';
 import { toast } from '../kit/toast.js';
@@ -102,7 +103,7 @@ export function DealsPage() {
     if (r.error) return toast({ title: r.error });
     if (r.deal === deal) return;
     saveRecord('deal', r.deal);
-    logActivity({ type: 'stage', subject: `Stage: ${stageOf(deal.stage)?.label} to ${stageOf(stage)?.label}`, dealId: deal.id, companyId: deal.companyId, ownerId: me });
+    logActivity({ type: 'stage', subject: `Stage: ${stageOf(deal.stage)?.label} to ${stageOf(stage)?.label}`, fromStage: deal.stage, toStage: stage, dealId: deal.id, companyId: deal.companyId, ownerId: me });
   };
   const [adding, setAdding] = useState(false);
   const cols = [
@@ -375,6 +376,55 @@ export function HomePage() {
             </tbody>
           </table>
         </Card>
+        <ConversionCard />
+      </div>
+    </>
+  );
+}
+
+function ConversionCard() {
+  const { deals, activities } = useCrm();
+  return (
+    <Card className="space-y-2" data-testid="conversion">
+      <p className="text-sm font-bold">Stage-to-stage conversion</p>
+      <table className="w-full text-sm">
+        <thead><tr><th className={th}>From</th><th className={th}>To</th><th className={th}>Reached</th><th className={th}>Went on</th><th className={th}>Rate</th></tr></thead>
+        <tbody>
+          {stageConversion(deals, activities).map((r) => (
+            <tr key={r.stage} className="border-t border-line"><td className={td}>{r.label}</td><td className={td}>{r.next}</td><td className={td}>{r.reached}</td><td className={td}>{r.advanced}</td><td className={td}>{r.rate == null ? 'n/a' : `${r.rate}%`}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+const monthName = (m) => (m === 'none' ? 'No close date' : new Date(`${m}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
+
+/** Reports: close-date forecast by month, closed deals by month, stage conversion and how completed actions ended. */
+export function ReportsPage() {
+  const { deals, activities } = useCrm();
+  const close = closeDateReport(deals);
+  const closed = closedByMonth(deals);
+  const out = outcomeReport(activities);
+  const Table = ({ head, rows, testid }) => (
+    <div className="overflow-x-auto rounded-xl border border-line" data-testid={testid}>
+      <table className="w-full"><thead className="bg-surface-2"><tr>{head.map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className={td}>{c}</td>)}</tr>)}{!rows.length && <tr><td className="px-3 py-4 text-center text-xs text-muted" colSpan={head.length}>Nothing to report yet.</td></tr>}</tbody>
+      </table>
+    </div>
+  );
+  return (
+    <>
+      <PageHead title="Reports & Dashboards" />
+      <div className="space-y-4">
+        <section><h2 className="mb-1 text-sm font-bold">Expected close dates (open deals)</h2>
+          <Table testid="report-close" head={['Month', 'Deals', 'Value', 'Weighted']} rows={close.map((r) => [monthName(r.month), r.count, money(r.value), money(r.weighted)])} /></section>
+        <section><h2 className="mb-1 text-sm font-bold">Closed deals by month</h2>
+          <Table testid="report-closed" head={['Month', 'Won', 'Lost', 'Won value']} rows={closed.map((r) => [monthName(r.month), r.won, r.lost, money(r.wonValue)])} /></section>
+        <section><h2 className="mb-1 text-sm font-bold">Stage-to-stage conversion</h2><ConversionCard /></section>
+        <section><h2 className="mb-1 text-sm font-bold">How completed actions ended {out.positiveRate != null && <span className="font-normal text-muted">({out.positiveRate}% moved the deal forward)</span>}</h2>
+          <Table testid="report-outcomes" head={['Outcome', 'Actions']} rows={out.counts.map((c) => [c.label, c.count])} /></section>
       </div>
     </>
   );

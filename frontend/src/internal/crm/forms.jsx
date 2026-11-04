@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Qe as PEOPLE, Ya as Modal, Te as Button, be as firstName, oe as cx } from '@/internal/min';
 import { toast } from '../kit/toast.js';
-import { OPEN_STAGES, STAGES, LIFECYCLE, OUTCOMES, ACTIVITY_TYPES, dealProblem, completeAction, outcomeOf } from './crmLogic.js';
+import { OPEN_STAGES, STAGES, LIFECYCLE, OUTCOMES, ACTIVITY_TYPES, dealProblem, completeAction, outcomeOf, stageOf } from './crmLogic.js';
 import { saveRecord, logActivity, nowIso, useCrm } from './crmStore.js';
 import { newId } from '../lib/domain.js';
 
@@ -126,7 +126,7 @@ export function CompleteActionModal({ deal, onClose }) {
     const { deal: updated, activity } = r;
     saveRecord('deal', updated);
     logActivity(activity);
-    if (deal.stage !== updated.stage) logActivity({ type: 'stage', subject: `Stage: ${deal.stage} to ${updated.stage}`, dealId: deal.id, companyId: deal.companyId, ownerId: me });
+    if (deal.stage !== updated.stage) logActivity({ type: 'stage', subject: `Stage: ${stageOf(deal.stage)?.label} to ${stageOf(updated.stage)?.label}`, fromStage: deal.stage, toStage: updated.stage, dealId: deal.id, companyId: deal.companyId, ownerId: me });
     onClose();
   };
   return (
