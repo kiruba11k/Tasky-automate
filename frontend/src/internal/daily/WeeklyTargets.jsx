@@ -153,6 +153,23 @@ export function WeeklyTargets({ personId, date }) {
     });
     if (ok) toast({ title: 'Target removed', tone: 'info' });
   };
+  /** Move a target to another project (a project's own text targets only between projects the person manages). */
+  const moveTo = (it, pid) => {
+    const ok = runAction(() => {
+      if (it.src === 'mine') {
+        const projectId = pid === OTHER ? `${OTHER_PREFIX}Other work` : pid;
+        saveMine((record?.entries ?? []).map((x) => (x.id === it.entry.id ? { ...x, projectId } : x)));
+      } else {
+        const to = plannable.find((p) => p.id === pid);
+        if (!to) fail('You can only move it to a project you manage.');
+        const toStart = projectWeekStart(to, date);
+        const rows = textRows(to, toStart);
+        setWeekText(to.id, toStart, [...rows, { ...it.row, id: newTargetId(rows.length) }]); // add first, so nothing is lost if it is refused
+        setWeekText(it.project.id, it.start, textRows(it.project, it.start).filter((r) => r.id !== it.row.id));
+      }
+    });
+    if (ok) toast({ title: 'Target moved', tone: 'success' });
+  };
   const add = () => {
     if (!adding.name.trim()) return toast({ title: 'Type the target', tone: 'info' });
     if (adding.kind === 'number' && !(+adding.goal > 0)) return toast({ title: 'Type the goal number', tone: 'info' });
@@ -188,7 +205,6 @@ export function WeeklyTargets({ personId, date }) {
   const sheetRows = items.map((it) => [it.range, it.projectName, it.label, it.goal || (it.src === 'plan' ? '' : '·'), it.time > 0 ? formatMinutes(it.time) : '']);
   const head = 'border border-white/20 px-3 py-2 text-center text-xs font-bold';
   const cell = 'border border-line px-2 py-1.5 align-middle';
-  const groupKey = (it) => `${it.range}|${it.projectName}`;
 
   return (
     <div data-testid="weekly-targets">
@@ -237,10 +253,7 @@ export function WeeklyTargets({ personId, date }) {
               </thead>
               <tbody>
                 {items.map((it, i) => {
-                  const firstOfGroup = i === 0 || groupKey(items[i - 1]) !== groupKey(it);
                   const firstOfRange = i === 0 || items[i - 1].range !== it.range;
-                  let projSpan = 1;
-                  while (i + projSpan < items.length && groupKey(items[i + projSpan]) === groupKey(it)) projSpan++;
                   let dateSpan = 1;
                   while (i + dateSpan < items.length && items[i + dateSpan].range === it.range) dateSpan++;
                   const number = it.kind === 'number';
@@ -251,11 +264,25 @@ export function WeeklyTargets({ personId, date }) {
                           {it.range}
                         </td>
                       )}
-                      {firstOfGroup && (
-                        <td rowSpan={projSpan} className={`${cell} text-center align-middle font-semibold`}>
-                          {it.projectName}
-                        </td>
-                      )}
+                      <td className={`${cell} text-center align-middle font-semibold`}>
+                        {it.editable && !it.metric ? (
+                          <select
+                            aria-label={`${it.label} project`}
+                            className={cx(FIELD, 'font-semibold')}
+                            value={it.src === 'mine' ? (String(it.entry.projectId).startsWith(OTHER_PREFIX) ? OTHER : it.entry.projectId) : it.project.id}
+                            onChange={(e) => e.target.value !== (it.src === 'mine' ? it.entry.projectId : it.project.id) && moveTo(it, e.target.value)}
+                          >
+                            {(it.src === 'mine' ? mineProjects : plannable).map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                            {it.src === 'mine' && <option value={OTHER}>{String(it.entry.projectId).startsWith(OTHER_PREFIX) ? it.projectName : 'Other work (not a project)'}</option>}
+                          </select>
+                        ) : (
+                          it.projectName
+                        )}
+                      </td>
                       {it.editable ? (
                         <>
                           <td className={cell}>
