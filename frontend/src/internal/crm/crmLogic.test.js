@@ -82,3 +82,10 @@ test('lifecycle: prospects are qualified before a deal; a won deal makes custome
   assert.equal(lifecycleAfterDeal({ lifecycle: 'lead' }, { stage: 'won' }), 'customer');
   assert.equal(lifecycleAfterDeal({ lifecycle: 'lead' }, { stage: 'proposal' }), 'lead');
 });
+
+test('a deal stuck in one stage is flagged with the days it has sat there', () => {
+  const stuck = dealRisk(deal({ stageSince: '2026-10-10T00:00:00Z', lastActivityAt: '2026-11-03T00:00:00Z' }), today);
+  assert.ok(stuck.reasons.some((r) => /Stalled in Proposal sent for 25 days/.test(r)));
+  assert.equal(stuck.level, 'medium');
+  assert.equal(dealRisk(deal({ stageSince: '2026-11-01T00:00:00Z' }), today).level, 'low');
+});

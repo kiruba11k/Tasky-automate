@@ -32,6 +32,9 @@ export const outcomeOf = (id) => OUTCOMES.find((o) => o.id === id);
 export const stageOf = (id) => STAGES.find((s) => s.id === id);
 export const isOpenDeal = (deal) => deal.status !== 'nurture' && !['won', 'lost'].includes(deal.stage);
 
+/** Days a deal can sit in a stage before it counts as stalled. */
+export const STALL_DAYS = { qualified: 21, meeting: 14, proposal: 14, negotiation: 21 };
+
 /** Why a deal cannot be saved as it is, or null. An open deal needs an owner and a meaningful next action with a date. */
 export function dealProblem(deal) {
   if (!deal.name?.trim()) return 'Give the deal a name.';
@@ -61,6 +64,8 @@ export function dealRisk(deal, today, quietDays = 14) {
   if ((deal.closeDateChanges ?? 0) >= 2) { reasons.push(`Close date pushed ${deal.closeDateChanges} times`); score += 2; }
   const last = deal.lastActivityAt?.slice(0, 10) ?? deal.createdAt?.slice(0, 10);
   if (last && daysBetween(last, today) >= quietDays) { reasons.push(`No activity for ${daysBetween(last, today)} days`); score += 2; }
+  const since = deal.stageSince?.slice(0, 10);
+  if (since && STALL_DAYS[deal.stage] && daysBetween(since, today) >= STALL_DAYS[deal.stage]) { reasons.push(`Stalled in ${stageOf(deal.stage).label} for ${daysBetween(since, today)} days`); score += 2; }
   if (reasons.length && (deal.amount ?? 0) >= 50000) score += 1; // a big deal is riskier to lose
   return { level: score >= 4 ? 'high' : score >= 2 ? 'medium' : 'low', reasons, score };
 }

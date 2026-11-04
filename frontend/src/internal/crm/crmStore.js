@@ -10,7 +10,9 @@ export const nowIso = () => new Date().toISOString();
 export function saveRecord(type, rec) {
   const name = NAME[type];
   const me = useStore.getState().me;
+  const before = type === 'deal' ? useStore.getState().crmDeals.find((d) => d.id === rec.id) : null;
   const full = { ownerId: me, createdAt: nowIso(), ...rec, id: rec.id ?? newId() };
+  if (type === 'deal' && (!before || before.stage !== full.stage)) full.stageSince = nowIso(); // how long a deal has sat in its stage
   useStore.setState((s) => ({ [name]: s[name].some((r) => r.id === full.id) ? s[name].map((r) => (r.id === full.id ? full : r)) : [full, ...s[name]] }));
   if (type === 'deal' && full.stage === 'won') {
     // a won deal turns its buying contacts into customers
