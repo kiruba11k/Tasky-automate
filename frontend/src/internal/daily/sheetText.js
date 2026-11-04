@@ -12,6 +12,9 @@ export function sheetTargetText(row, name) {
     : row.targetText || name;
 }
 
+/** Finding work (extraction, enrichment, prospecting, scraping): how many were found can differ from how many were tried, so it reads "found". */
+export const isFindingWork = (name) => /extract|enrich|prospect|scrap|find|lookup|research/i.test(name ?? '');
+
 /** The "Targets achieved" cell: what was typed, the milestone's status (empty while "Not started"), or "<done> of <qty> <name>". `done` is the row's achieved count. */
 export function sheetAchievedText(row, name, done) {
   const found = row.foundQty;
@@ -25,6 +28,6 @@ export function sheetAchievedText(row, name, done) {
       : found != null && done
         ? `${found} found of ${done} tried ${name}` // finding work: found can be fewer than the numbers tried, and the tried total stays
         : done
-        ? `${done}${row.qty ? ` of ${row.qty}` : ''} ${name}`
+        ? `${done}${isFindingWork(name) ? ' found' : ''}${row.qty ? ` of ${row.qty}` : ''} ${name}`
         : '';
 }
