@@ -4,6 +4,7 @@ import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListCh
 import { be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
 import { STAGES, OPEN_STAGES, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
 import { useCrm, removeRecord, logActivity, money } from './crmStore.js';
+import { IndexTable } from './IndexTable.jsx';
 import { RecordForm, CompleteActionModal, OwnerSelect, FIELD } from './forms.jsx';
 import { toast } from '../kit/toast.js';
 
@@ -29,55 +30,6 @@ const Stat = ({ label, value }) => (
   </div>
 );
 
-/** Searchable, sortable table with an owner filter. `columns`: [{ key, label, get(row), render?(row) }]. */
-function IndexTable({ rows, columns, to, search = (r) => r.name, empty }) {
-  const [q, setQ] = useState('');
-  const [owner, setOwner] = useState('');
-  const [sort, setSort] = useState({ key: columns[0].key, dir: 1 });
-  const nav = useNavigate();
-  const shown = useMemo(() => {
-    const col = columns.find((c) => c.key === sort.key) ?? columns[0];
-    return rows
-      .filter((r) => (!owner || r.ownerId === owner) && (!q || `${search(r)} ${columns.map((c) => c.get(r)).join(' ')}`.toLowerCase().includes(q.toLowerCase())))
-      .sort((a, b) => (String(col.get(a) ?? '') > String(col.get(b) ?? '') ? 1 : -1) * sort.dir || 0);
-  }, [rows, q, owner, sort, columns, search]);
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <input aria-label="Search" className={cx(FIELD, 'max-w-xs')} placeholder="Search..." value={q} onChange={(e) => setQ(e.target.value)} />
-        <select aria-label="Filter by owner" className={cx(FIELD, 'max-w-[10rem]')} value={owner} onChange={(e) => setOwner(e.target.value)}>
-          <option value="">All owners</option>
-          {[...new Set(rows.map((r) => r.ownerId))].map((id) => <option key={id} value={id}>{firstName(id)}</option>)}
-        </select>
-        <span className="self-center text-xs text-muted">{shown.length} of {rows.length}</span>
-      </div>
-      <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full">
-          <thead className="bg-surface-2">
-            <tr>
-              {columns.map((c) => (
-                <th key={c.key} className={th}>
-                  <button type="button" className="focus-ring font-bold" onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? -s.dir : 1 }))}>
-                    {c.label}{sort.key === c.key ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((r) => (
-              <tr key={r.id} className="cursor-pointer border-t border-line hover:bg-surface-2" onClick={() => nav(to(r))}>
-                {columns.map((c) => <td key={c.key} className={td}>{c.render ? c.render(r) : c.get(r) ?? '·'}</td>)}
-              </tr>
-            ))}
-            {!shown.length && <tr><td className="px-3 py-6 text-center text-sm text-muted" colSpan={columns.length}>{empty}</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 const useNames = () => {
   const { companies, contacts } = useCrm();
   return { company: (id) => companies.find((c) => c.id === id)?.name, contact: (id) => contacts.find((c) => c.id === id)?.name };
@@ -100,7 +52,7 @@ export function ContactsPage({ lifecycle }) {
   return (
     <>
       <PageHead title={lifecycle ? 'Leads / Prospects' : 'Contacts'}><Button onClick={() => setAdding(true)}><Plus size={14} /> New contact</Button></PageHead>
-      <IndexTable rows={rows} columns={cols} to={(r) => `/crm/contact/${r.id}`} empty="No contacts yet." />
+      <IndexTable type="contact" rows={rows} columns={cols} to={(r) => `/crm/contact/${r.id}`} empty="No contacts yet." filters={[{ key: 'lifecycle', label: 'Lifecycle', kind: 'select', get: (r) => r.lifecycle, show: (v) => LIFECYCLE.find((l) => l.id === v)?.label }, { key: 'company', label: 'Company', kind: 'select', get: (r) => names.company(r.companyId) }]} bulk={[{ key: 'lifecycle', label: 'Lifecycle', options: LIFECYCLE.map((l) => ({ value: l.id, label: l.label })) }]} />
       {adding && <RecordForm type="contact" initial={lifecycle ? { lifecycle: lifecycle[0] } : {}} onClose={() => setAdding(false)} />}
     </>
   );
@@ -121,7 +73,7 @@ export function CompaniesPage() {
   return (
     <>
       <PageHead title="Companies"><Button onClick={() => setAdding(true)}><Plus size={14} /> New company</Button></PageHead>
-      <IndexTable rows={companies} columns={cols} to={(r) => `/crm/company/${r.id}`} empty="No companies yet." />
+      <IndexTable type="company" rows={companies} columns={cols} to={(r) => `/crm/company/${r.id}`} empty="No companies yet." filters={[{ key: 'industry', label: 'Industry', kind: 'select', get: (r) => r.industry }, { key: 'location', label: 'Location', kind: 'select', get: (r) => r.location }]} />
       {adding && <RecordForm type="company" onClose={() => setAdding(false)} />}
     </>
   );
@@ -141,18 +93,18 @@ function DealCard({ deal, today }) {
 }
 
 export function DealsPage() {
-  const { deals, today } = useCrm();
+  const { deals, companies, today } = useCrm();
   const names = useNames();
   const [view, setView] = useState('board');
   const [adding, setAdding] = useState(false);
   const cols = [
     { key: 'name', label: 'Deal', get: (r) => r.name },
     { key: 'company', label: 'Company', get: (r) => names.company(r.companyId) },
-    { key: 'amount', label: 'Amount', get: (r) => String(r.amount ?? 0).padStart(12, '0'), render: (r) => money(r.amount) },
+    { key: 'amount', label: 'Amount', get: (r) => r.amount, render: (r) => money(r.amount) },
     { key: 'stage', label: 'Stage', get: (r) => stageOf(r.stage)?.label },
     { key: 'close', label: 'Close date', get: (r) => r.closeDate },
     { key: 'next', label: 'Next action', get: (r) => r.nextAction?.due, render: (r) => (r.nextAction ? `${r.nextAction.title} (${r.nextAction.due})` : '·') },
-    { key: 'risk', label: 'Health', get: (r) => dealRisk(r, today).score, render: (r) => <RiskBadge risk={dealRisk(r, today)} /> },
+    { key: 'risk', label: 'Health', get: (r) => dealRisk(r, today).score, sort: (r) => -dealRisk(r, today).score, render: (r) => <RiskBadge risk={dealRisk(r, today)} /> },
     { key: 'owner', label: 'Owner', get: (r) => firstName(r.ownerId) },
   ];
   return (
@@ -168,7 +120,7 @@ export function DealsPage() {
         <Button onClick={() => setAdding(true)}><Plus size={14} /> New deal</Button>
       </PageHead>
       {view === 'table' ? (
-        <IndexTable rows={deals} columns={cols} to={(r) => `/crm/deal/${r.id}`} empty="No deals yet." />
+        <IndexTable type="deal" rows={deals} columns={cols} to={(r) => `/crm/deal/${r.id}`} empty="No deals yet." filters={[{ key: 'stage', label: 'Stage', kind: 'select', get: (r) => r.stage, show: (v) => stageOf(v)?.label }, { key: 'source', label: 'Source', kind: 'select', get: (r) => r.source }, { key: 'industry', label: 'Industry', kind: 'select', get: (r) => companies.find((c) => c.id === r.companyId)?.industry }, { key: 'risk', label: 'Health', kind: 'select', get: (r) => dealRisk(r, today).level }, { key: 'amount', label: 'Value', kind: 'number', get: (r) => r.amount }, { key: 'close', label: 'Close', kind: 'date', get: (r) => r.closeDate }]} bulk={[{ key: 'stage', label: 'Stage', options: STAGES.map((st) => ({ value: st.id, label: st.label })) }]} />
       ) : (
         <div className="grid gap-3 overflow-x-auto md:grid-cols-4" data-testid="deal-board">
           {OPEN_STAGES.map((s) => {
