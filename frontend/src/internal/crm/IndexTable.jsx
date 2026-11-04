@@ -4,7 +4,8 @@ import { Download, Save, X } from 'lucide-react';
 import { Te as Button, be as firstName, oe as cx } from '@/internal/min';
 import { FIELD, OwnerSelect } from './forms.jsx';
 import { applyFilters, sortRows, toCsv, loadViews, saveViews, withView, loadHidden, saveHidden, visibleColumns } from './tableLogic.js';
-import { saveRecord } from './crmStore.js';
+import { saveRecord, removeRecord, canRemove, useCrm } from './crmStore.js';
+import { useStore } from '../store.js';
 import { toast } from '../kit/toast.js';
 
 const th = 'px-3 py-2 text-left text-xs font-bold text-muted';
@@ -23,7 +24,10 @@ export function IndexTable({ type, rows, columns: allColumns, filters = [], bulk
   const [state, setState] = useState(BLANK);
   const [sort, setSort] = useState({ key: columns[0].key, dir: 1 });
   const [picked, setPicked] = useState(() => new Set());
-  const [views, setViews] = useState(() => loadViews(type));
+  const { me } = useCrm();
+  const shared = useStore((s) => s.crmViews).filter((v) => v.type === type);
+  const [mine, setViews] = useState(() => loadViews(type));
+  const views = [...mine.map((v) => ({ ...v, shared: false })), ...shared.map((v) => ({ name: v.name, state: v.state, shared: true, id: v.id, ownerId: v.ownerId }))];
   const [bulkValue, setBulkValue] = useState({});
   const nav = useNavigate();
   const text = searchText ?? ((r) => `${r.name ?? ''} ${columns.map((c) => c.get(r)).join(' ')}`);
@@ -54,11 +58,20 @@ export function IndexTable({ type, rows, columns: allColumns, filters = [], bulk
   const saveView = () => {
     const name = window.prompt('Name this view')?.trim();
     if (!name) return;
-    const next = withView(views, name, state);
+    if (window.confirm('Share this view with the whole team?\n\nOK = shared with everyone, Cancel = only on this device.')) {
+      saveRecord('view', { type, name, state, ownerId: me, id: shared.find((v) => v.ownerId === me && v.name === name)?.id });
+      return;
+    }
+    const next = withView(mine, name, state);
     setViews(next);
     saveViews(type, next);
   };
-  const dropView = (name) => { const next = views.filter((v) => v.name !== name); setViews(next); saveViews(type, next); };
+  const dropView = (v) => {
+    if (v.shared) return removeRecord('view', v.id);
+    const next = mine.filter((x) => x.name !== v.name);
+    setViews(next);
+    saveViews(type, next);
+  };
   const small = cx(FIELD, '!w-auto');
   return (
     <div className="space-y-2" data-testid={`index-${type}`}>
@@ -107,9 +120,9 @@ export function IndexTable({ type, rows, columns: allColumns, filters = [], bulk
         <div className="flex flex-wrap items-center gap-1.5" data-testid="saved-views">
           <span className="text-xs font-semibold text-muted">Views</span>
           {views.map((v) => (
-            <span key={v.name} className="flex items-center rounded-full border border-line text-xs font-semibold">
-              <button type="button" className="focus-ring rounded-l-full px-2 py-0.5 hover:bg-surface-2" onClick={() => setState({ ...BLANK, ...v.state })}>{v.name}</button>
-              <button type="button" aria-label={`Delete view ${v.name}`} className="focus-ring rounded-r-full px-1 py-0.5 text-muted hover:bg-surface-2" onClick={() => dropView(v.name)}><X size={11} /></button>
+            <span key={`${v.shared}-${v.id ?? v.name}`} className="flex items-center rounded-full border border-line text-xs font-semibold">
+              <button type="button" className="focus-ring rounded-l-full px-2 py-0.5 hover:bg-surface-2" title={v.shared ? 'Shared with the team' : 'Only on this device'} onClick={() => setState({ ...BLANK, ...v.state })}>{v.shared ? '👥 ' : ''}{v.name}</button>
+              {(!v.shared || canRemove('view', v.id)) && <button type="button" aria-label={`Delete view ${v.name}`} className="focus-ring rounded-r-full px-1 py-0.5 text-muted hover:bg-surface-2" onClick={() => dropView(v)}><X size={11} /></button>}
             </span>
           ))}
         </div>

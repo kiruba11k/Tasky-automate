@@ -5,7 +5,7 @@
 
 import { dueAlerts, OPEN, rollProject, wallClock } from './deadlines.js';
 
-export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias', 'crmCompany', 'crmContact', 'crmDeal', 'crmActivity', 'crmGoal', 'crmConfig'];
+export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias', 'crmCompany', 'crmContact', 'crmDeal', 'crmActivity', 'crmGoal', 'crmConfig', 'crmView'];
 const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
 const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
@@ -194,6 +194,9 @@ export function crmProblem(kind, d) {
     if (!(d.amount === undefined || (Number.isFinite(d.amount) && d.amount >= 0))) return 'bad amount';
     const open = !['won', 'lost'].includes(d.stage) && d.status !== 'nurture';
     if (open && !(typeof d.nextAction?.title === 'string' && d.nextAction.title.trim() && d.nextAction.due)) return 'an open deal needs a next action';
+  }
+  if (kind === 'crmView') {
+    if (!['contact', 'company', 'deal'].includes(d.type) || typeof d.name !== 'string' || !d.name.trim() || d.name.length > 60 || !d.state || typeof d.state !== 'object' || JSON.stringify(d.state).length > 4000 || typeof d.ownerId !== 'string') return 'bad view';
   }
   if (kind === 'crmConfig') {
     const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
@@ -420,6 +423,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
         if (!prev && !deleting) for (const cid of data.contactIds || []) if ((await find('crmContact', cid))?.data?.lifecycle === 'prospect') return false;
         return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId));
       case 'crmCompany': case 'crmContact': case 'crmActivity': return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId)); // the CRM is shared inside the team; only the owner or a lead deletes a record
+      case 'crmView': return !crmProblem(kind, data) && (deleting ? lead(u) || mine(prev?.ownerId) : mine(data.ownerId) && (!prev || mine(prev.ownerId))); // a shared table view: anyone shares their own, only the owner or a lead changes or removes it
       case 'crmConfig': return key === 'main' && lead(u) && !deleting && !crmProblem(kind, data); // the CRM's shared settings: stage probabilities and risk limits, set by managers and PMs
       case 'crmGoal': return !crmProblem(kind, data) && (lead(u) || (mine(data.ownerId) && (!prev || mine(prev.ownerId)))); // leads set goals for anyone and the team; everyone else only their own
       case 'profile': return mine(key);

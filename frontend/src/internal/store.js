@@ -44,6 +44,7 @@ export const emptyState = () => ({
   crmActivities: [],
   crmGoals: [],
   crmConfigs: [],
+  crmViews: [],
   aliases: {},
   daily: {},
   weekly: {},

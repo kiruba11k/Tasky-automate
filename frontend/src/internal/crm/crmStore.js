@@ -6,7 +6,7 @@ import { isAdminTier } from '../lib/constants.js';
 import { toast } from '../kit/toast.js';
 import { todayKey } from '../lib/dates.js';
 
-const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities', goal: 'crmGoals', config: 'crmConfigs' };
+const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities', goal: 'crmGoals', config: 'crmConfigs', view: 'crmViews' };
 export const nowIso = () => new Date().toISOString();
 
 /** Saves (adds or replaces) one CRM record; sync.js sends it to the server. */

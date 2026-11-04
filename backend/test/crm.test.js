@@ -27,6 +27,15 @@ test('settings keep probabilities between 1% and 99% and limits in days', () => 
   assert.ok(crmProblem('crmConfig', {}));
 });
 
+test('a shared view names its table and carries a small state', () => {
+  const v = { type: 'deal', name: 'Big deals', ownerId: 'u1', state: { q: '', active: { stage: 'proposal' } } };
+  assert.equal(crmProblem('crmView', v), null);
+  assert.ok(crmProblem('crmView', { ...v, type: 'goal' }));
+  assert.ok(crmProblem('crmView', { ...v, name: ' ' }));
+  assert.ok(crmProblem('crmView', { ...v, state: 'x' }));
+  assert.ok(crmProblem('crmView', { ...v, state: { big: 'x'.repeat(5000) } }));
+});
+
 test('an open deal needs an owner and a next action; closed and nurture deals do not', () => {
   const deal = { name: 'Acme', ownerId: 'u1', stage: 'proposal', amount: 100, nextAction: { title: 'Call', due: '2026-11-05' } };
   assert.equal(crmProblem('crmDeal', deal), null);
