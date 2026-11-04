@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListChecks, ArrowRightLeft, Check } from 'lucide-react';
 import { be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
-import { STAGES, OPEN_STAGES, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
-import { useCrm, removeRecord, logActivity, money } from './crmStore.js';
+import { STAGES, OPEN_STAGES, moveStage, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
+import { useCrm, saveRecord, removeRecord, logActivity, money, nowIso } from './crmStore.js';
 import { IndexTable } from './IndexTable.jsx';
 import { RecordForm, CompleteActionModal, OwnerSelect, FIELD } from './forms.jsx';
 import { toast } from '../kit/toast.js';
@@ -83,7 +83,7 @@ function DealCard({ deal, today }) {
   const names = useNames();
   const risk = dealRisk(deal, today);
   return (
-    <Link to={`/crm/deal/${deal.id}`} className="focus-ring block rounded-xl border border-line bg-surface p-2.5 text-left shadow-sm hover:-translate-y-0.5 hover:shadow-md">
+    <Link to={`/crm/deal/${deal.id}`} draggable onDragStart={(e) => e.dataTransfer.setData('text/deal', deal.id)} className="focus-ring block rounded-xl border border-line bg-surface p-2.5 text-left shadow-sm hover:-translate-y-0.5 hover:shadow-md">
       <p className="truncate text-sm font-bold">{deal.name}</p>
       <p className="text-xs text-muted">{names.company(deal.companyId) ?? 'No company'} · {firstName(deal.ownerId)}</p>
       <p className="mt-1 flex items-center justify-between text-xs"><b className="tabular-nums">{money(deal.amount)}</b><RiskBadge risk={risk} /></p>
@@ -96,6 +96,14 @@ export function DealsPage() {
   const { deals, companies, today } = useCrm();
   const names = useNames();
   const [view, setView] = useState('board');
+  const { me } = useCrm();
+  const moveDealTo = (deal, stage) => {
+    const r = moveStage(deal, stage, nowIso());
+    if (r.error) return toast({ title: r.error });
+    if (r.deal === deal) return;
+    saveRecord('deal', r.deal);
+    logActivity({ type: 'stage', subject: `Stage: ${stageOf(deal.stage)?.label} to ${stageOf(stage)?.label}`, dealId: deal.id, companyId: deal.companyId, ownerId: me });
+  };
   const [adding, setAdding] = useState(false);
   const cols = [
     { key: 'name', label: 'Deal', get: (r) => r.name },
@@ -122,11 +130,22 @@ export function DealsPage() {
       {view === 'table' ? (
         <IndexTable type="deal" rows={deals} columns={cols} to={(r) => `/crm/deal/${r.id}`} empty="No deals yet." filters={[{ key: 'stage', label: 'Stage', kind: 'select', get: (r) => r.stage, show: (v) => stageOf(v)?.label }, { key: 'source', label: 'Source', kind: 'select', get: (r) => r.source }, { key: 'industry', label: 'Industry', kind: 'select', get: (r) => companies.find((c) => c.id === r.companyId)?.industry }, { key: 'risk', label: 'Health', kind: 'select', get: (r) => dealRisk(r, today).level }, { key: 'amount', label: 'Value', kind: 'number', get: (r) => r.amount }, { key: 'close', label: 'Close', kind: 'date', get: (r) => r.closeDate }]} bulk={[{ key: 'stage', label: 'Stage', options: STAGES.map((st) => ({ value: st.id, label: st.label })) }]} />
       ) : (
-        <div className="grid gap-3 overflow-x-auto md:grid-cols-4" data-testid="deal-board">
-          {OPEN_STAGES.map((s) => {
+        <div className="grid gap-3 overflow-x-auto md:grid-cols-6" data-testid="deal-board">
+          {STAGES.map((s) => {
             const list = deals.filter((d) => d.stage === s.id && d.status !== 'nurture');
             return (
-              <section key={s.id} aria-label={s.label} className="min-w-[14rem] rounded-xl bg-surface-2 p-2">
+              <section
+                key={s.id}
+                aria-label={s.label}
+                data-stage={s.id}
+                className="min-w-[14rem] rounded-xl bg-surface-2 p-2"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const deal = deals.find((d) => d.id === e.dataTransfer.getData('text/deal'));
+                  if (deal) moveDealTo(deal, s.id);
+                }}
+              >
                 <h2 className="mb-2 flex justify-between px-1 text-xs font-bold">{s.label}<span className="font-normal text-muted">{list.length} · {money(list.reduce((t, d) => t + (d.amount ?? 0), 0))} · {Math.round(s.prob * 100)}%</span></h2>
                 <div className="space-y-2">{list.map((d) => <DealCard key={d.id} deal={d} today={today} />)}</div>
               </section>

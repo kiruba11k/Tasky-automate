@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dealProblem, dealRisk, atRiskDeals, pipelineStats, myActions, completeAction } from './crmLogic.js';
+import { moveStage, dealProblem, dealRisk, atRiskDeals, pipelineStats, myActions, completeAction } from './crmLogic.js';
 
 const today = '2026-11-04';
 const deal = (o = {}) => ({ id: 'd1', name: 'Acme', ownerId: 'u1', stage: 'proposal', amount: 10000, closeDate: '2026-11-30', nextAction: { title: 'Call', due: '2026-11-05' }, createdAt: '2026-11-01T00:00:00Z', ...o });
@@ -61,4 +61,16 @@ test('completing an action records the outcome and asks for the next step', () =
   assert.equal(n.deal.status, 'nurture');
   assert.equal(n.deal.nextAction, null);
   assert.equal(completeAction(deal(), { outcomeId: 'connected', next: { title: 'Send deck', due: '2026-11-07' } }, ctx).deal.nextAction.due, '2026-11-07');
+});
+
+test('moving a deal between stages', () => {
+  const m = moveStage(deal(), 'negotiation', '2026-11-04T10:00:00Z');
+  assert.equal(m.deal.stage, 'negotiation');
+  assert.equal(m.deal.lastActivityAt, '2026-11-04T10:00:00Z');
+  const won = moveStage(deal(), 'won', '2026-11-04T10:00:00Z').deal;
+  assert.equal(won.stage, 'won');
+  assert.ok(won.closedAt);
+  assert.match(moveStage({ ...won, nextAction: null }, 'proposal', 'x').error, /next action/);
+  assert.equal(moveStage(won, 'proposal', 'x').deal.closedAt, undefined);
+  assert.ok(moveStage(deal(), 'nope', 'x').error);
 });

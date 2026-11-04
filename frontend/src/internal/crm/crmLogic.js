@@ -142,3 +142,14 @@ export function completeAction(deal, { outcomeId, note, next, revisitOn }, { tod
   };
   return { deal: updated, activity };
 }
+
+/** Moves a deal to another stage (dragging on the board). Closing needs nothing more; reopening a closed deal needs a next action. Returns { deal } or { error }. */
+export function moveStage(deal, stageId, now) {
+  if (!stageOf(stageId)) return { error: 'Unknown stage.' };
+  if (deal.stage === stageId) return { deal };
+  const closing = ['won', 'lost'].includes(stageId);
+  const updated = { ...deal, stage: stageId, lastActivityAt: now };
+  if (closing) { updated.closedAt = now; updated.status = 'open'; } else { delete updated.closedAt; }
+  if (!closing && deal.status !== 'nurture' && !deal.nextAction?.title) return { error: 'Add a next action to the deal before reopening it.' };
+  return { deal: updated };
+}
