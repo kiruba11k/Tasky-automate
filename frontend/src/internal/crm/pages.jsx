@@ -222,6 +222,7 @@ export function RecordPage() {
   const { me, companies, contacts, deals, activities, today } = useCrm();
   const [editing, setEditing] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [note, setNote] = useState('');
   const [actType, setActType] = useState('note');
   const rec = (type === 'company' ? companies : type === 'contact' ? contacts : deals).find((r) => r.id === id);
@@ -253,6 +254,8 @@ export function RecordPage() {
         <dl className="space-y-1.5 text-sm">
           {props.map(([k, v]) => <div key={k}><dt className="text-[11px] font-semibold text-muted">{k}</dt><dd>{v || '·'}</dd></div>)}
         </dl>
+        {type === 'contact' && rec.lifecycle === 'prospect' && <Button onClick={() => { saveRecord('contact', { ...rec, lifecycle: 'lead' }); logActivity({ type: 'note', subject: 'Qualified as a lead', contactId: id, companyId: rec.companyId, ownerId: me }); }} data-testid="qualify">Qualify as lead</Button>}
+        {type === 'contact' && ['lead', 'customer'].includes(rec.lifecycle) && <Button onClick={() => setConverting(true)} data-testid="convert">Create deal</Button>}
         <div className="flex gap-2"><Button tone="ghost" className="border border-line" onClick={() => setEditing(true)}>Edit</Button><Button tone="ghost" className="border border-line" onClick={remove}>Delete</Button></div>
       </Card>
       <div className="space-y-3">
@@ -289,6 +292,7 @@ export function RecordPage() {
         {type === 'deal' && <LinkedList title="Company" items={company ? [{ id: company.id, name: company.name, sub: company.industry, to: `/crm/company/${company.id}` }] : []} />}
         {type === 'deal' && <LinkedList title="Buying contacts" items={(rec.contactIds ?? []).map((cid) => contacts.find((c) => c.id === cid)).filter(Boolean).map((c) => ({ id: c.id, name: c.name, sub: c.title, to: `/crm/contact/${c.id}` }))} />}
       </div>
+      {converting && <RecordForm type="deal" initial={{ name: `${company?.name ?? rec.name} deal`, companyId: rec.companyId, contactIds: [id] }} onClose={() => setConverting(false)} onSaved={(d) => nav(`/crm/deal/${d.id}`)} />}
       {editing && <RecordForm type={type} initial={rec} onClose={() => setEditing(false)} />}
       {completing && <CompleteActionModal deal={rec} onClose={() => setCompleting(false)} />}
     </div>

@@ -153,3 +153,14 @@ export function moveStage(deal, stageId, now) {
   if (!closing && deal.status !== 'nurture' && !deal.nextAction?.title) return { error: 'Add a next action to the deal before reopening it.' };
   return { deal: updated };
 }
+
+/**
+ * The lifecycle rules: a prospect is qualified into a lead, a deal is opened only for qualified leads (or customers), and a won deal turns its buying contacts into customers.
+ * Why a deal cannot be opened for these contacts, or null.
+ */
+export function dealContactProblem(contacts) {
+  const prospect = contacts.find((c) => c && c.lifecycle === 'prospect');
+  return prospect ? `Qualify ${prospect.name} as a lead before opening a deal.` : null;
+}
+/** The lifecycle a contact has after its deal changes: won makes a customer, anything else leaves it. */
+export const lifecycleAfterDeal = (contact, deal) => (deal.stage === 'won' && contact.lifecycle !== 'customer' ? 'customer' : contact.lifecycle);

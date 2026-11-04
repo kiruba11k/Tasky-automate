@@ -1,5 +1,6 @@
 import { useStore } from '../store.js';
 import { newId } from '../lib/domain.js';
+import { lifecycleAfterDeal } from './crmLogic.js';
 import { todayKey } from '../lib/dates.js';
 
 const NAME = { company: 'crmCompanies', contact: 'crmContacts', deal: 'crmDeals', activity: 'crmActivities', goal: 'crmGoals' };
@@ -11,6 +12,10 @@ export function saveRecord(type, rec) {
   const me = useStore.getState().me;
   const full = { ownerId: me, createdAt: nowIso(), ...rec, id: rec.id ?? newId() };
   useStore.setState((s) => ({ [name]: s[name].some((r) => r.id === full.id) ? s[name].map((r) => (r.id === full.id ? full : r)) : [full, ...s[name]] }));
+  if (type === 'deal' && full.stage === 'won') {
+    // a won deal turns its buying contacts into customers
+    useStore.getState().crmContacts.filter((c) => full.contactIds?.includes(c.id) && lifecycleAfterDeal(c, full) !== c.lifecycle).forEach((c) => saveRecord('contact', { ...c, lifecycle: 'customer' }));
+  }
   return full;
 }
 export const removeRecord = (type, id) => useStore.setState((s) => ({ [NAME[type]]: s[NAME[type]].filter((r) => r.id !== id) }));

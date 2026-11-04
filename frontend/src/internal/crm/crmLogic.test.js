@@ -74,3 +74,11 @@ test('moving a deal between stages', () => {
   assert.equal(moveStage(won, 'proposal', 'x').deal.closedAt, undefined);
   assert.ok(moveStage(deal(), 'nope', 'x').error);
 });
+
+import { dealContactProblem, lifecycleAfterDeal } from './crmLogic.js';
+test('lifecycle: prospects are qualified before a deal; a won deal makes customers', () => {
+  assert.match(dealContactProblem([{ name: 'Jane', lifecycle: 'prospect' }]), /Qualify Jane/);
+  assert.equal(dealContactProblem([{ name: 'Jane', lifecycle: 'lead' }, undefined]), null);
+  assert.equal(lifecycleAfterDeal({ lifecycle: 'lead' }, { stage: 'won' }), 'customer');
+  assert.equal(lifecycleAfterDeal({ lifecycle: 'lead' }, { stage: 'proposal' }), 'lead');
+});

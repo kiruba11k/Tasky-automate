@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Qe as PEOPLE, Ya as Modal, Te as Button, be as firstName, oe as cx } from '@/internal/min';
 import { toast } from '../kit/toast.js';
-import { OPEN_STAGES, STAGES, LIFECYCLE, OUTCOMES, ACTIVITY_TYPES, dealProblem, completeAction, outcomeOf, stageOf } from './crmLogic.js';
+import { OPEN_STAGES, STAGES, LIFECYCLE, OUTCOMES, ACTIVITY_TYPES, dealProblem, dealContactProblem, completeAction, outcomeOf, stageOf } from './crmLogic.js';
 import { saveRecord, logActivity, nowIso, useCrm } from './crmStore.js';
 import { newId } from '../lib/domain.js';
 
@@ -33,7 +33,7 @@ export function RecordForm({ type, initial = {}, onClose, onSaved }) {
     if (type === 'deal') {
       const prev = initial.id ? initial : null;
       if (prev && prev.closeDate && rec.closeDate !== prev.closeDate) rec.closeDateChanges = (prev.closeDateChanges ?? 0) + 1;
-      const why = dealProblem(rec);
+      const why = dealProblem(rec) || (!initial.id ? dealContactProblem((rec.contactIds ?? []).map((id) => contacts.find((c) => c.id === id))) : null);
       if (why) return toast({ title: why });
     } else if (!rec.name?.trim()) return toast({ title: 'Give it a name.' });
     const saved = saveRecord(type, rec);
