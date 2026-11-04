@@ -34,3 +34,4 @@ input.crm-num { width: 6.5rem !important; }
 input.crm-date { width: 9.5rem !important; }
 .crm-table td, .crm-table th { white-space: nowrap; }
 .crm-table td { vertical-align: middle; }
+.crm-colhead { display: flex; flex-direction: column; gap: 0.125rem; padding: 0 0.25rem; margin-bottom: 0.5rem; }

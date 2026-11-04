@@ -149,7 +149,7 @@ export function DealsPage() {
                   if (deal) moveDealTo(deal, s.id);
                 }}
               >
-                <h2 className="mb-2 flex justify-between px-1 text-xs font-bold">{s.label}<span className="font-normal text-muted">{list.length} · {money(list.reduce((t, d) => t + (d.amount ?? 0), 0))} · {Math.round(s.prob * 100)}%</span></h2>
+                <h2 className="crm-colhead text-xs font-bold">{s.label}<span className="font-normal text-muted">{list.length} · {money(list.reduce((t, d) => t + (d.amount ?? 0), 0))} · {Math.round(s.prob * 100)}%</span></h2>
                 <div className="space-y-2">{list.map((d) => <DealCard key={d.id} deal={d} today={today} />)}</div>
               </section>
             );
