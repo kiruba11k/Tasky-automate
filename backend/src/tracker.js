@@ -415,7 +415,11 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       }
       case 'daily': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev) : eodDecisionOk(u, data, prev, changed); // a person's own days; another person's day only gets end of day decisions
       case 'weekly': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev, 'eowReviews') : eodDecisionOk(u, data, prev, changed, 'eowReviews'); // a person's own weeks; another person's week only gets end of week decisions
-      case 'crmCompany': case 'crmContact': case 'crmDeal': case 'crmActivity': return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId)); // the CRM is shared inside the team; only the owner or a lead deletes a record
+      case 'crmDeal':
+        // a deal is opened only for contacts that are qualified: a prospect has to become a lead first
+        if (!prev && !deleting) for (const cid of data.contactIds || []) if ((await find('crmContact', cid))?.data?.lifecycle === 'prospect') return false;
+        return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId));
+      case 'crmCompany': case 'crmContact': case 'crmActivity': return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId)); // the CRM is shared inside the team; only the owner or a lead deletes a record
       case 'crmConfig': return key === 'main' && lead(u) && !deleting && !crmProblem(kind, data); // the CRM's shared settings: stage probabilities and risk limits, set by managers and PMs
       case 'crmGoal': return !crmProblem(kind, data) && (lead(u) || (mine(data.ownerId) && (!prev || mine(prev.ownerId)))); // leads set goals for anyone and the team; everyone else only their own
       case 'profile': return mine(key);

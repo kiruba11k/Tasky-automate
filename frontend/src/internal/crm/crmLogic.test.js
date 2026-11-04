@@ -101,3 +101,43 @@ test('shared settings change the forecast and the stall limit, and reset to defa
   assert.equal(stageLookup('proposal').prob, DEFAULT_CONFIG.prob.proposal);
   assert.equal(dealRisk(deal({ lastActivityAt: '2026-10-30T00:00:00Z' }), today).level, 'low');
 });
+
+import { findDuplicate, mergePlan } from './crmLogic.js';
+test('duplicates: same email for contacts, same domain or name for companies', () => {
+  const contacts = [{ id: 'a', name: 'Jane', email: 'Jane@Acme.com' }];
+  assert.equal(findDuplicate('contact', { id: 'new', name: 'J', email: 'jane@acme.com' }, contacts)?.id, 'a');
+  assert.equal(findDuplicate('contact', { id: 'a', name: 'Jane', email: 'jane@acme.com' }, contacts), undefined); // itself
+  assert.equal(findDuplicate('contact', { id: 'n', name: 'Jane', email: '' }, contacts), undefined);
+  const companies = [{ id: 'c', name: 'Acme', domain: 'acme.com' }];
+  assert.equal(findDuplicate('company', { id: 'n', name: 'ACME Inc', domain: 'acme.com' }, companies)?.id, 'c');
+  assert.equal(findDuplicate('company', { id: 'n', name: ' acme ', domain: '' }, companies)?.id, 'c');
+  assert.equal(findDuplicate('company', { id: 'n', name: 'Other', domain: 'other.com' }, companies), undefined);
+});
+
+test('merging a duplicate company re-points contacts, deals and activities and keeps the filled fields', () => {
+  const keep = { id: 'k', name: 'Acme', domain: '', industry: 'Software' };
+  const drop = { id: 'x', name: 'Acme Inc', domain: 'acme.com', industry: 'Other', lists: ['Q4'] };
+  const p = mergePlan('company', keep, drop, { contacts: [{ id: 'c1', companyId: 'x' }, { id: 'c2', companyId: 'z' }], deals: [{ id: 'd1', companyId: 'x' }], activities: [{ id: 'a1', companyId: 'x' }] });
+  assert.equal(p.keep.domain, 'acme.com');
+  assert.equal(p.keep.industry, 'Software');
+  assert.equal(p.keep.name, 'Acme');
+  assert.deepEqual(p.keep.lists, ['Q4']);
+  assert.deepEqual(p.updates.slice(1).map((u) => [u.type, u.rec.id, u.rec.companyId]), [['contact', 'c1', 'k'], ['deal', 'd1', 'k'], ['activity', 'a1', 'k']]);
+  assert.deepEqual(p.remove, { type: 'company', id: 'x' });
+});
+
+test('merging a duplicate contact re-points deal links without doubling', () => {
+  const p = mergePlan('contact', { id: 'k', name: 'Jane' }, { id: 'x', name: 'J', email: 'j@a.com' }, { deals: [{ id: 'd1', contactIds: ['x', 'k'] }], activities: [{ id: 'a1', contactId: 'x' }] });
+  assert.deepEqual(p.updates[1].rec.contactIds, ['k']);
+  assert.equal(p.updates[2].rec.contactId, 'k');
+  assert.equal(p.keep.email, 'j@a.com');
+});
+
+import { duplicateGroups } from './crmLogic.js';
+test('duplicate groups link records through a shared domain or name, even via a third', () => {
+  const list = [{ id: 'a', name: 'Acme' }, { id: 'b', name: 'Acme Inc', domain: 'acme.com' }, { id: 'c', name: 'Acme', domain: 'acme.com' }, { id: 'z', name: 'Other', domain: 'other.com' }];
+  const g = duplicateGroups('company', list);
+  assert.equal(g.length, 1);
+  assert.deepEqual(g[0].map((r) => r.id).sort(), ['a', 'b', 'c']);
+  assert.deepEqual(duplicateGroups('contact', [{ id: '1', email: 'x@a.com' }, { id: '2', email: 'X@a.com' }, { id: '3', email: '' }, { id: '4', email: '' }]).map((x) => x.length), [2]);
+});

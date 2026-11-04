@@ -179,3 +179,44 @@ export function dealContactProblem(contacts) {
 }
 /** The lifecycle a contact has after its deal changes: won makes a customer, anything else leaves it. */
 export const lifecycleAfterDeal = (contact, deal) => (deal.stage === 'won' && contact.lifecycle !== 'customer' ? 'customer' : contact.lifecycle);
+
+const norm = (s) => (s ?? '').trim().toLowerCase();
+/** An existing record that `rec` would duplicate: a contact with the same email, a company with the same domain or name. Returns it, or undefined. */
+const isSame = (type, a, b) => (type === 'contact'
+  ? !!norm(a.email) && norm(a.email) === norm(b.email)
+  : (!!norm(a.domain) && norm(a.domain) === norm(b.domain)) || norm(a.name) === norm(b.name));
+export function findDuplicate(type, rec, existing) {
+  return type === 'contact' || type === 'company' ? existing.find((r) => r.id !== rec.id && isSame(type, rec, r)) : undefined;
+}
+/** Groups of records that are duplicates of each other (two companies that share a domain, or a name, are in one group even through a third). Only groups of 2 or more. */
+export function duplicateGroups(type, list) {
+  const groups = [];
+  list.forEach((r) => {
+    const hits = groups.filter((g) => g.some((m) => isSame(type, m, r)));
+    if (!hits.length) return groups.push([r]);
+    hits[0].push(r);
+    hits.slice(1).forEach((g) => { hits[0].push(...g); groups.splice(groups.indexOf(g), 1); });
+  });
+  return groups.filter((g) => g.length > 1);
+}
+
+/**
+ * Merging a duplicate into the record to keep: blanks on the kept record are filled from the duplicate, every link to the duplicate
+ * (deals, contacts, activities) is re-pointed at the kept record, and the duplicate goes. Returns { keep, updates: [{ type, rec }], remove: { type, id } }.
+ */
+export function mergePlan(type, keep, drop, { contacts = [], deals = [], activities = [] }) {
+  const merged = { ...drop, ...Object.fromEntries(Object.entries(keep).filter(([, v]) => v !== undefined && v !== '' && v !== null)) };
+  merged.id = keep.id;
+  merged.lists = [...new Set([...(keep.lists ?? []), ...(drop.lists ?? [])])];
+  if (!merged.lists.length) delete merged.lists;
+  const updates = [{ type, rec: merged }];
+  if (type === 'company') {
+    contacts.filter((c) => c.companyId === drop.id).forEach((c) => updates.push({ type: 'contact', rec: { ...c, companyId: keep.id } }));
+    deals.filter((d) => d.companyId === drop.id).forEach((d) => updates.push({ type: 'deal', rec: { ...d, companyId: keep.id } }));
+    activities.filter((a) => a.companyId === drop.id).forEach((a) => updates.push({ type: 'activity', rec: { ...a, companyId: keep.id } }));
+  } else {
+    deals.filter((d) => d.contactIds?.includes(drop.id)).forEach((d) => updates.push({ type: 'deal', rec: { ...d, contactIds: [...new Set(d.contactIds.map((id) => (id === drop.id ? keep.id : id)))] } }));
+    activities.filter((a) => a.contactId === drop.id).forEach((a) => updates.push({ type: 'activity', rec: { ...a, contactId: keep.id } }));
+  }
+  return { keep: merged, updates, remove: { type, id: drop.id } };
+}

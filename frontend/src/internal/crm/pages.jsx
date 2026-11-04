@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, LayoutGrid, Table2, Phone, Mail, CalendarDays, StickyNote, ListChecks, ArrowRightLeft, Check } from 'lucide-react';
 import { Qe as PEOPLE, be as firstName, oe as cx, Te as Button, rt as Card } from '@/internal/min';
-import { STAGES, OPEN_STAGES, moveStage, DEFAULT_CONFIG, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
+import { STAGES, OPEN_STAGES, moveStage, DEFAULT_CONFIG, mergePlan, duplicateGroups, LIFECYCLE, isOpenDeal, stageOf, dealRisk, atRiskDeals, pipelineStats, myActions } from './crmLogic.js';
 import { useCrm, saveRecord, removeRecord, logActivity, money, nowIso } from './crmStore.js';
 import { stageConversion, closeDateReport, closedByMonth, outcomeReport, goalProgress, GOAL_METRICS } from './reports.js';
 import { IndexTable } from './IndexTable.jsx';
@@ -601,14 +601,16 @@ export function SettingsPage() {
 
 /** Data management: likely duplicate contacts and companies, so a record keeps one identity. */
 export function DataPage() {
-  const { companies, contacts } = useCrm();
-  const group = (list, key) => {
-    const m = new Map();
-    list.forEach((r) => { const k = key(r); if (k) m.set(k, [...(m.get(k) ?? []), r]); });
-    return [...m.values()].filter((g) => g.length > 1);
+  const { companies, contacts, deals, activities } = useCrm();
+  const merge = (type, keep, drop) => {
+    if (!window.confirm(`Merge ${drop.name} into ${keep.name}? Deals, contacts and activity move to ${keep.name}.`)) return;
+    const plan = mergePlan(type, keep, drop, { contacts, deals, activities });
+    plan.updates.forEach((u) => saveRecord(u.type, u.rec));
+    removeRecord(plan.remove.type, plan.remove.id);
+    toast({ title: `Merged into ${keep.name}.` });
   };
-  const dupContacts = group(contacts, (c) => c.email?.trim().toLowerCase() || '');
-  const dupCompanies = group(companies, (c) => c.domain?.trim().toLowerCase() || c.name.trim().toLowerCase());
+  const dupContacts = duplicateGroups('contact', contacts);
+  const dupCompanies = duplicateGroups('company', companies);
   const Block = ({ title, groups, type }) => (
     <Card className="space-y-2" data-testid={`dups-${type}`}>
       <p className="text-sm font-bold">{title} ({groups.length})</p>
@@ -617,7 +619,12 @@ export function DataPage() {
           {g.map((r, i) => (
             <div key={r.id} className="flex items-center justify-between gap-2">
               <Link to={`/crm/${type}/${r.id}`} className="hover:underline">{r.name} {r.email || r.domain}</Link>
-              {i > 0 && <button type="button" className="focus-ring rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold" onClick={() => window.confirm(`Delete the duplicate ${r.name}?`) && removeRecord(type, r.id)}>Delete duplicate</button>}
+              {i > 0 && (
+                <span className="flex gap-1">
+                  <button type="button" className="focus-ring rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold" onClick={() => merge(type, g[0], r)}>Merge into first</button>
+                  <button type="button" className="focus-ring rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold" onClick={() => window.confirm(`Delete the duplicate ${r.name}?`) && removeRecord(type, r.id)}>Delete</button>
+                </span>
+              )}
             </div>
           ))}
         </div>
