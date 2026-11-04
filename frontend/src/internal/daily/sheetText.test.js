@@ -24,4 +24,5 @@ test("sheetAchievedText", () => {
   assert.equal(sheetAchievedText({ qty: 5 }, "Calls", 3), "3 of 5 Calls");
   assert.equal(sheetAchievedText({}, "Calls", 3), "3 Calls");
   assert.equal(sheetAchievedText({ qty: 5 }, "Calls", 0), "");
+  assert.equal(sheetAchievedText({ qty: 50, foundQty: 40 }, "contacts", 50), "40 found of 50 tried contacts");
 });

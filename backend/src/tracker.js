@@ -70,7 +70,7 @@ export function entriesProblem(doc) {
   const rows = doc.entries;
   if (!Array.isArray(rows) || rows.length > 300) return 'Too many task rows.';
   const ok = rows.every((r) => r && typeof r === 'object' && typeof r.id === 'string' && r.id.length <= 60 && typeof r.projectId === 'string' && r.projectId.length <= 200
-    && typeof r.task === 'string' && r.task.length <= 200 && short(r.custom, 200) && short(r.desc, 500) && short(r.remarks, 1000) && count(r.qty) && count(r.estMin) && count(r.actualMin) && count(r.doneQty)
+    && typeof r.task === 'string' && r.task.length <= 200 && short(r.custom, 200) && short(r.desc, 500) && short(r.remarks, 1000) && count(r.qty) && count(r.estMin) && count(r.actualMin) && count(r.doneQty) && count(r.foundQty)
     && (r.kind === undefined || ENTRY_KINDS.includes(r.kind)) && short(r.targetText, 1000) && short(r.actualText, 1000) && short(r.status, 40) && short(r.achieved, 1000) && (r.estManual === undefined || typeof r.estManual === 'boolean'));
   return ok ? null : 'A task row is not valid.';
 }
@@ -81,7 +81,7 @@ export function asgProblem(doc) {
   const a = doc.asg;
   const ok = a && typeof a === 'object' && !Array.isArray(a) && Object.keys(a).length <= 300
     && Object.entries(a).every(([id, v]) => id.length <= 200 && v && typeof v === 'object' && typeof v.projectId === 'string' && v.projectId.length <= 200
-      && short(v.task, 200) && short(v.custom, 200) && count(v.actualMin) && count(v.doneQty) && short(v.remarks, 1000));
+      && short(v.task, 200) && short(v.custom, 200) && count(v.actualMin) && count(v.doneQty) && count(v.foundQty) && short(v.remarks, 1000));
   return ok ? null : 'A time or note on an assigned task is not valid.';
 }
 

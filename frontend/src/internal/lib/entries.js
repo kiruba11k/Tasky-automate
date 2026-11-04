@@ -283,6 +283,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     if (day && !sum.days.includes(day)) sum.days.push(day); // the days this row adds up
     sum.qty = row.qty != null || sum.qty != null ? (sum.qty ?? 0) + (row.qty ?? 0) : undefined;
     sum.doneQty = row.doneQty != null || sum.doneQty != null ? (sum.doneQty ?? 0) + (row.doneQty ?? 0) : undefined;
+    sum.foundQty = row.foundQty != null || sum.foundQty != null ? (sum.foundQty ?? 0) + (row.foundQty ?? 0) : undefined;
     sum.estMin += row.estMin;
     sum.actualMin = row.actualMin != null || sum.actualMin != null ? (sum.actualMin ?? 0) + (row.actualMin ?? 0) : undefined;
     if (row.targetText) sum.targetText = row.targetText;
@@ -297,6 +298,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
     const typed = overrides[key];
     if (typed?.qty != null) sum.qty = typed.qty;
     if (typed?.doneQty != null) sum.doneQty = typed.doneQty;
+    if (typed?.foundQty != null) sum.foundQty = typed.foundQty;
     if (typed?.status) sum.status = typed.status;
     if (typed?.actualText != null) sum.actualText = typed.actualText;
     if (typed?.targetText != null) sum.targetText = typed.targetText;

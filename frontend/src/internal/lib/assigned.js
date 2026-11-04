@@ -131,6 +131,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         qty: Math.max(0, b.qty - (l?.qty ?? 0)),
         doneQty: Math.max(0, b.done - (l?.done ?? 0), typedDone ?? 0),
         typedDone,
+        foundQty: typed?.foundQty,
         approved: b.approved && !(typedDone > b.done - (l?.done ?? 0)), // false = the number "fills in with the approved number" and is still awaiting approval
         estMin,
         actualMin: totalMin,

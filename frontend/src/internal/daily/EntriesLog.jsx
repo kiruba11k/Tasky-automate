@@ -58,6 +58,25 @@ const STATUS_LABEL = { todo: 'To do', in_progress: 'In progress', in_review: 'In
  * A task assigned to the person, in the project's day table. The row comes from the task itself (never saved with the day's rows);
  * what the person types on it, the time taken and a note, is kept in the day record's `asg`.
  */
+/** Optional "found" count under a number row's Actual: finding work (contacts, phone numbers) may find fewer than the numbers tried. Typing it keeps the tried total: when nothing was typed as done, the whole target counts as tried. */
+function FoundInput({ row, onChange }) {
+  return (
+    <input
+      aria-label="Found"
+      type="number"
+      min={0}
+      className={cx(FIELD, 'mt-1 w-24 tabular-nums text-xs')}
+      placeholder="found (optional)"
+      title="How many were found, if fewer than the numbers tried"
+      value={row.foundQty ?? ''}
+      onChange={(e) => {
+        const v = e.target.value === '' ? undefined : Math.max(0, Math.round(+e.target.value));
+        onChange(v == null ? { foundQty: undefined } : { foundQty: v, doneQty: row.doneQty ?? row.qty ?? v });
+      }}
+    />
+  );
+}
+
 function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, onChange, onRemove, personId, date, canMove, onReschedule }) {
   const [editing, setEditing] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -155,6 +174,11 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
             )}
             <span className="text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
           </span>
+        )}
+        {locked ? (
+          r.foundQty != null && <span className="block text-[10px] text-muted">{r.foundQty} found</span>
+        ) : (
+          <FoundInput row={{ ...r, doneQty: r.typedDone }} onChange={(patch) => onType(patch)} />
         )}
       </td>
       <td className="px-2 py-2">
@@ -836,19 +860,26 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                           </td>
                           <td className="px-2 py-2">
                             {kind === 'number' ? (
-                              tableReadOnly ? (
-                                <span className="tabular-nums">{r.doneQty ?? '·'}</span>
-                              ) : (
-                                <input
-                                  aria-label="Actual"
-                                  type="number"
-                                  min={0}
-                                  className={cx(FIELD, 'tabular-nums')}
-                                  placeholder="0"
-                                  value={r.doneQty ?? ''}
-                                  onChange={(e) => update(r.id, { doneQty: parseQty(e.target.value) })}
-                                />
-                              )
+                              <>
+                                {tableReadOnly ? (
+                                  <span className="tabular-nums">{r.doneQty ?? '·'}</span>
+                                ) : (
+                                  <input
+                                    aria-label="Actual"
+                                    type="number"
+                                    min={0}
+                                    className={cx(FIELD, 'tabular-nums')}
+                                    placeholder="0"
+                                    value={r.doneQty ?? ''}
+                                    onChange={(e) => update(r.id, { doneQty: parseQty(e.target.value) })}
+                                  />
+                                )}
+                                {tableReadOnly ? (
+                                  r.foundQty != null && <span className="block text-[10px] text-muted">{r.foundQty} found</span>
+                                ) : (
+                                  <FoundInput row={r} onChange={(patch) => update(r.id, patch)} />
+                                )}
+                              </>
                             ) : kind === 'milestone' ? (
                               <select
                                 aria-label="Actual"

@@ -14,6 +14,7 @@ export function sheetTargetText(row, name) {
 
 /** The "Targets achieved" cell: what was typed, the milestone's status (empty while "Not started"), or "<done> of <qty> <name>". `done` is the row's achieved count. */
 export function sheetAchievedText(row, name, done) {
+  const found = row.foundQty;
   const kind = row.kind ?? 'number';
   return kind === 'text'
     ? row.actualText
@@ -21,7 +22,9 @@ export function sheetAchievedText(row, name, done) {
       ? row.status && row.status !== 'Not started'
         ? row.status
         : ''
-      : done
+      : found != null && done
+        ? `${found} found of ${done} tried ${name}` // finding work: found can be fewer than the numbers tried, and the tried total stays
+        : done
         ? `${done}${row.qty ? ` of ${row.qty}` : ''} ${name}`
         : '';
 }
