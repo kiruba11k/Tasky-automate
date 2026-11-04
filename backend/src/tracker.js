@@ -5,7 +5,7 @@
 
 import { dueAlerts, OPEN, rollProject, wallClock } from './deadlines.js';
 
-export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias'];
+export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias', 'crmCompany', 'crmContact', 'crmDeal', 'crmActivity'];
 const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
 const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
@@ -184,6 +184,21 @@ export function weeklyProblem(patch) {
   if (!['eowSnapshot', 'targetsSnapshot', 'snapshots', 'overrides'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A week record is not valid.';
   return null;
 }
+/** Why a CRM record is refused, or null: the right kind of value, sensible sizes, and an open deal always has an owner and a next action. */
+export function crmProblem(kind, d) {
+  if (!d || typeof d !== 'object') return 'bad record';
+  const str = (v, n) => v === undefined || v === null || (typeof v === 'string' && v.length <= n);
+  if (!str(d.name, 200) || !str(d.notes, 4000) || !str(d.subject, 300) || !str(d.email, 200) || !str(d.phone, 60)) return 'too long';
+  if (kind === 'crmDeal') {
+    if (typeof d.name !== 'string' || !d.name.trim() || !d.ownerId) return 'a deal needs a name and an owner';
+    if (!(d.amount === undefined || (Number.isFinite(d.amount) && d.amount >= 0))) return 'bad amount';
+    const open = !['won', 'lost'].includes(d.stage) && d.status !== 'nurture';
+    if (open && !(typeof d.nextAction?.title === 'string' && d.nextAction.title.trim() && d.nextAction.due)) return 'an open deal needs a next action';
+  }
+  if (kind === 'crmContact' || kind === 'crmCompany') { if (typeof d.name !== 'string' || !d.name.trim()) return 'a name is needed'; }
+  return null;
+}
+
 /** Why a profile is refused, or null: its own settings must be the kind of value the screens save. Photos are small images. */
 export function profileProblem(patch) {
   const doc = present(patch);
@@ -392,6 +407,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       }
       case 'daily': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev) : eodDecisionOk(u, data, prev, changed); // a person's own days; another person's day only gets end of day decisions
       case 'weekly': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev, 'eowReviews') : eodDecisionOk(u, data, prev, changed, 'eowReviews'); // a person's own weeks; another person's week only gets end of week decisions
+      case 'crmCompany': case 'crmContact': case 'crmDeal': case 'crmActivity': return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId)); // the CRM is shared inside the team; only the owner or a lead deletes a record
       case 'profile': return mine(key);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
       case 'conv': case 'msg': case 'alias':
