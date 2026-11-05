@@ -557,7 +557,11 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
       : 'Fill in the actuals and lock them first'
     : 'Lock your targets first';
 
-  const totals = [...shown, ...assignedNow.rows].reduce((t, r) => ({ est: t.est + (r.assigned ? (r.actualMin ?? r.estMin ?? 0) : rowTime(r)), act: t.act + (r.actualMin ?? 0) }), { est: 0, act: 0 });
+  // One Time column is both the estimate and the time taken, so the day's actual adds up the same times the table shows
+  const totals = [...shown, ...assignedNow.rows].reduce((t, r) => {
+    const time = r.assigned ? (r.actualMin ?? r.estMin ?? 0) : rowTime(r);
+    return { est: t.est + time, act: t.act + time };
+  }, { est: 0, act: 0 });
   const plannedTotal = groups.reduce((sum, g) => sum + g.planned, 0);
 
   return (
