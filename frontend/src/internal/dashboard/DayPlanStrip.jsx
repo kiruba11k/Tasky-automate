@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LUNCH_BLOCK } from '../lib/dates';
+import { planColors } from '../daily/planColors';
 import { Se as useStore, ac as useTheme, Tr as PROJECT_COLORS, We as formatMinutes } from '@/internal/min';
 
 /** Day runs 10:00 to 19:00, expressed in minutes. */
@@ -19,6 +20,7 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
   const projects = useStore((s) => s.projects);
   const lunch = useStore((s) => s.profiles[s.me]?.lunch) ?? LUNCH_BLOCK; // the lunch set on my profile
   const theme = useTheme();
+  const colors = planColors(blocks, (b) => (b.custom || b.projectId.startsWith('other:') ? undefined : projectColor(projects, b.projectId)), PROJECT_COLORS); // neighbouring blocks never share a colour
   const blockStyle = (color) =>
     theme.blocks === 'striped'
       ? {
@@ -72,8 +74,8 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
               style={{
                 left: `${left}%`,
                 width: `${width}%`,
-                background: b.custom ? (b.custom.priority ? '#DC2626' : '#64748B') : projectColor(projects, b.projectId),
-                ...blockStyle(projectColor(projects, b.projectId)),
+                background: b.custom?.priority ? '#DC2626' : colors.get(b.id),
+                ...blockStyle(colors.get(b.id)),
                 ...(b.custom
                   ? {
                       backgroundImage:

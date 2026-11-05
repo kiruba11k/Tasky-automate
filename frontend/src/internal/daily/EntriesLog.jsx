@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { CalendarDays, ClipboardList, Lock, Pencil, Plus, Save, Send, Star, Trash, X, Check } from 'lucide-react';
 import {
   oe as cx,
@@ -120,7 +121,7 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
           {!editing && titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
         </span>
         {editing && (
-          <input aria-label="Task description" className={cx(FIELD, 'mt-1')} placeholder="Description (today only)" value={draft.desc ?? ''} onChange={(e) => setDraft((d) => ({ ...d, desc: e.target.value }))} />
+          <AutoText aria-label="Task description" className={cx(FIELD, 'mt-1')} placeholder="Description (today only)" value={draft.desc ?? ''} onChange={(e) => setDraft((d) => ({ ...d, desc: e.target.value }))} />
         )}
         {r.edited && !editing && (
           <span className="mt-0.5 block text-[10px] text-muted" data-testid="carry-edited" title="Changed for today only. Earlier days keep the original.">
@@ -195,7 +196,7 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
         {locked ? (
           <span>{r.remarks || '·'}</span>
         ) : (
-          <input aria-label="Notes" className={FIELD} placeholder="Add note..." value={r.remarks ?? ''} onChange={(e) => onType({ remarks: e.target.value })} />
+          <AutoText aria-label="Notes" className={FIELD} placeholder="Add note..." value={r.remarks ?? ''} onChange={(e) => onType({ remarks: e.target.value })} />
         )}
       </td>
       {showRemoveCell && (
@@ -653,7 +654,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
               <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-2/60 px-3 py-2">
                 {renaming?.pid === pid ? (
                   <span className="flex items-center gap-1.5">
-                    <input
+                    <AutoText
                       aria-label="New name"
                       autoFocus
                       className="focus-ring w-52 rounded-lg border border-line bg-surface px-2 py-1 text-sm"
@@ -810,7 +811,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                                   <EntryKindSelect compact value={kind} onChange={(k) => update(r.id, { kind: k })} />
                                 </span>
                                 {r.task === CUSTOM_TASK && (
-                                  <input
+                                  <AutoText
                                     aria-label="Custom task name"
                                     autoFocus
                                     className={cx(FIELD, 'mt-1')}
@@ -848,7 +849,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                                 <span className="tabular-nums">{r.qty ?? '·'}</span>
                               )
                             ) : tableEditable ? (
-                              <input
+                              <AutoText
                                 aria-label="Target"
                                 className={FIELD}
                                 placeholder={kind === 'milestone' ? 'e.g. Prepare agenda and notes' : 'e.g. Refresh lookalike model'}
@@ -898,7 +899,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             ) : tableReadOnly ? (
                               <span>{r.actualText || '·'}</span>
                             ) : (
-                              <input
+                              <AutoText
                                 aria-label="Actual"
                                 className={FIELD}
                                 placeholder="What got done"
@@ -924,7 +925,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
                             {tableReadOnly ? (
                               <span>{r.remarks || '·'}</span>
                             ) : (
-                              <input
+                              <AutoText
                                 aria-label="Notes"
                                 className={FIELD}
                                 placeholder="Add note..."
@@ -1061,7 +1062,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
           </select>
           {pick === OTHER && (
             <>
-              <input
+              <AutoText
                 aria-label="Other work name"
                 autoFocus
                 className="focus-ring w-56 rounded-lg border border-line bg-surface px-2 py-1 text-sm"

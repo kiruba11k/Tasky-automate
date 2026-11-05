@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Check, X } from 'lucide-react';
 import { oe as cx, Te as Button, Ye as toast } from '@/internal/min';
 import { CUSTOM_PROJECT, OTHER_PREFIX } from './planBlocks';
@@ -36,7 +37,7 @@ export function ProjectChanger({ current, projects, onSave, onCancel, label = 'P
         <option value={CUSTOM_PROJECT}>Custom (type a name)...</option>
       </select>
       {value === CUSTOM_PROJECT && (
-        <input
+        <AutoText
           aria-label="New custom project name"
           autoFocus
           className={cx(FIELD, 'w-44')}

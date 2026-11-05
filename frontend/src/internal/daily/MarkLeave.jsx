@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { CalendarOff } from 'lucide-react';
 import { Se as useStore, Te as Button, lt as guarded, Ye as toast } from '@/internal/min';
 import { leaveLabel, leaveOn } from '../lib/leave.js';
@@ -95,7 +96,7 @@ export function MarkLeave({ personId, date }) {
             </label>
             <label className="mt-2 block text-xs font-semibold text-muted">
               Note (optional)
-              <input aria-label="Leave note" className={FIELD} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Diwali" />
+              <AutoText aria-label="Leave note" className={FIELD} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Diwali" />
             </label>
             <div className="mt-3 flex items-center justify-between gap-2">
               {leave ? (

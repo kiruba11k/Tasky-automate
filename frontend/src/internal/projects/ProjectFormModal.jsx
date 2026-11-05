@@ -1,4 +1,5 @@
 import { isLeadership, isApprover, approverNames } from '@/internal/lib/constants';
+import { AutoText } from '@/internal/kit/AutoText';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Crown, ArrowRightLeft, Plus, ShieldCheck, Trash, X } from 'lucide-react';
 import {
@@ -440,7 +441,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-semibold">
           Project name
-          <input
+          <AutoText
             className={clsx(INPUT_CLASS, 'mt-1 text-ink')}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -449,7 +450,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
         </label>
         <label className="text-sm font-semibold">
           Client
-          <input
+          <AutoText
             className={clsx(INPUT_CLASS, 'mt-1 text-ink')}
             value={client}
             onChange={(e) => setClient(e.target.value)}
@@ -499,7 +500,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
           >
             {metrics.map((m, index) => (
               <li key={m.id} className="flex items-center gap-2 px-3 py-1.5">
-                <input
+                <AutoText
                   aria-label={`Name of number ${index + 1}`}
                   className={clsx(INPUT_CLASS, 'flex-1 py-1.5 text-ink')}
                   value={m.label}
@@ -521,7 +522,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
           <p className="mb-3 text-xs text-muted">No numbers tracked yet.</p>
         )}
         <div className="flex gap-2">
-          <input
+          <AutoText
             aria-label="New number name"
             className={clsx(INPUT_CLASS, 'flex-1 text-ink')}
             placeholder="New number, e.g. Connections accepted"
@@ -619,13 +620,13 @@ export function ProjectFormModal({ open, onClose, edit }) {
                 key={t.key}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_7rem_15rem_11rem_auto]"
               >
-                <input
+                <AutoText
                   aria-label="Custom task name"
                   className={clsx(INPUT_CLASS, 'py-1.5 font-semibold text-ink')}
                   value={t.name}
                   onChange={(e) => updateCustomTask(index, { name: e.target.value })}
                 />
-                <input
+                <AutoText
                   aria-label={`Unit for ${t.name}`}
                   className={clsx(INPUT_CLASS, 'hidden py-1.5 text-ink sm:block')}
                   value={t.unit}
@@ -675,7 +676,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
           </ul>
         )}
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto]">
-          <input
+          <AutoText
             aria-label="New custom task name"
             className={clsx(INPUT_CLASS, 'text-ink')}
             placeholder="Task name, e.g. LinkedIn connection request"
@@ -683,7 +684,7 @@ export function ProjectFormModal({ open, onClose, edit }) {
             onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
             onKeyDown={onEnterAdd}
           />
-          <input
+          <AutoText
             aria-label="New custom task unit"
             className={clsx(INPUT_CLASS, 'text-ink')}
             placeholder="Unit, e.g. calls"

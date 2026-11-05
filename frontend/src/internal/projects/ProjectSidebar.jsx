@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { Se as useStore, ea as canEditProject, vt as Avatar, nt as fullName, $e as dayKey, lt as attempt, Ye as toast, Ge as INPUT_CLASS } from '@/internal/min';
 import { formatHours } from './projectHelpers';
@@ -63,7 +64,7 @@ export function ProjectSidebar({ p }) {
                       if (attempt(() => editUpdate(p.id, u.id, editing.text))) { setEditing(null); toast({ title: 'Update saved', tone: 'success' }); }
                     }}
                   >
-                    <input aria-label="Update text" className={INPUT_CLASS} value={editing.text} onChange={(e) => setEditing({ id: u.id, text: e.target.value })} />
+                    <AutoText aria-label="Update text" className={INPUT_CLASS} value={editing.text} onChange={(e) => setEditing({ id: u.id, text: e.target.value })} />
                     <button type="submit" aria-label="Save update" className="focus-ring rounded p-1 text-muted hover:text-ink"><Check size={13} /></button>
                     <button type="button" aria-label="Cancel" className="focus-ring rounded p-1 text-muted hover:text-ink" onClick={() => setEditing(null)}><X size={13} /></button>
                   </form>

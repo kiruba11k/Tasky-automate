@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Pencil, Plus, X } from 'lucide-react';
 import {
   Se as useStore,
@@ -52,7 +53,7 @@ export function MetricsEditor({ p }) {
               const periods = m.periods ?? ['week', 'month'];
               return (
                 <li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-                  <input
+                  <AutoText
                     aria-label={`Rename ${m.label}`}
                     className={clsx(INPUT_CLASS, 'max-w-[240px] flex-1 py-1 text-ink')}
                     defaultValue={m.label}
@@ -89,7 +90,7 @@ export function MetricsEditor({ p }) {
                 (setNewLabel(''), toast({ title: 'Now tracking it', tone: 'success' }));
             }}
           >
-            <input
+            <AutoText
               className={clsx(INPUT_CLASS, 'min-w-[220px] flex-1 text-ink')}
               placeholder="New number, e.g. Connections accepted"
               value={newLabel}

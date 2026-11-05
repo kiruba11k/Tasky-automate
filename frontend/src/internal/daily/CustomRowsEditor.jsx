@@ -1,4 +1,5 @@
 import { X, Plus } from 'lucide-react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { oe as cx } from '@/internal/min';
 
 let customRowCounter = 0;
@@ -17,7 +18,7 @@ export function CustomRowsEditor({ rows, onChange, title, hint, suggest }) {
         <div className="mt-2 space-y-2">
           {rows.map((row) => (
             <div key={row.id} className="flex items-center gap-2">
-              <input
+              <AutoText
                 aria-label="Custom item"
                 className={cx(fieldClass, 'min-w-0 flex-1')}
                 placeholder="e.g. Client call notes"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { AnimatePresence, Reorder, motion, useReducedMotion } from 'framer-motion';
 import { CalendarClock, GripVertical, Lock, Pencil, Plus, Trash, WandSparkles } from 'lucide-react';
 import {
@@ -15,6 +16,7 @@ import { formatShortDate } from './dateHelpers';
 import { FillFromPicker } from './FillFromPicker';
 import { DurationInput } from './DurationInput';
 import { LunchRow } from './LunchRow';
+import { Tr as PROJECT_PALETTE } from '@/internal/min';
 import { ReorderRow } from './ReorderRow';
 import { ProjectChanger } from './ProjectChanger';
 import {
@@ -30,6 +32,7 @@ import {
   groupBlocks,
   toClock,
 } from './planBlocks';
+import { planColors } from './planColors';
 
 let idCounter = 0;
 const LANE_ANIM_IN = { opacity: 0, scaleY: 0.3, y: 10 };
@@ -53,6 +56,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
   const lunchEnd = toMinutes(lunch.end);
   const activeProjects = projects.filter((p) => p.status === 'active');
   const groups = useMemo(() => groupBlocks(plan), [plan]);
+  const colorOf = (item) => colors.get(item.id) ?? blockColor(item.projectId, item.custom, projects);
 
   // keep the saved blocks laid out around lunch
   useEffect(() => {
@@ -118,6 +122,11 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
     });
   };
   const extraTotal = extras.reduce((sum, x) => sum + x.minutes, 0);
+  // blocks next to each other never share a colour, and the extra hours carry on from the last planned block
+  const colors = useMemo(
+    () => planColors([...plan, ...layExtras(extras)], (b) => (b.custom || b.projectId.startsWith(OTHER_PREFIX) ? undefined : blockColor(b.projectId, undefined, projects)), PROJECT_PALETTE),
+    [plan, extras, projects, extraStart], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   useEffect(() => {
     const laid = layExtras(extras);
     const key = (list) => list.map((x) => `${x.id}|${x.start}|${x.end}`).join(',');
@@ -311,7 +320,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
               className="overflow-hidden text-xs font-semibold text-muted"
             >
               Name
-              <input
+              <AutoText
                 aria-label="Custom project name"
                 autoFocus
                 className={cx(fieldClass, 'w-48')}
@@ -394,7 +403,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                     lifted && '!bg-transparent border-2 border-dashed border-accent/60',
                   )}
                   style={{
-                    background: lifted ? undefined : blockColor(block.projectId, block.custom, projects),
+                    background: lifted ? undefined : colorOf(block),
                     boxShadow: lifted ? 'none' : '0 1px 2px rgb(0 0 0 / 0.15)',
                   }}
                   title={`${blockLabel(block.projectId, block.custom, projects)} · ${block.start} to ${block.end} · drag to move`}
@@ -423,7 +432,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                 style={{
                   left: pos(g.s),
                   width: `${((g.e - g.s) / span) * 100}%`,
-                  background: blockColor(dragged.projectId, dragged.custom, projects),
+                  background: colorOf(dragged),
                   backgroundImage: drag.lane === 'extra' ? STRIPES : undefined,
                   transform: 'translateY(-3px) scale(1.03)',
                 }}
@@ -463,7 +472,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                     lifted
                       ? undefined
                       : {
-                          background: blockColor(item.projectId, undefined, projects),
+                          background: colorOf(item),
                           backgroundImage: STRIPES,
                           boxShadow: 'inset 0 -4px 0 rgb(124 58 237 / 0.9)',
                         }
@@ -535,7 +544,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                   data={{ 'data-plan-row': group.id }}
                 >
                   <span className="w-5 text-xs font-bold text-muted">{index + 1}</span>
-                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: blockColor(group.projectId, group.custom, projects) }} />
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorOf(group) }} />
                   <span className="min-w-[10rem] flex-1 font-semibold">
                     {editing?.id === group.id && editing.lane === 'plan' ? (
                       <ProjectChanger
@@ -621,7 +630,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                     data={{ 'data-extra-row': item.id }}
                   >
                     <span className="rounded bg-lavender-strong px-1.5 py-0.5 text-[9px] font-bold text-white">EXTRA</span>
-                    <span className="inline-block h-3 w-3 rounded-full" style={{ background: blockColor(item.projectId, undefined, projects) }} />
+                    <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorOf(item) }} />
                     <span className="min-w-[10rem] flex-1 font-semibold">
                       {editing?.id === item.id && editing.lane === 'extra' ? (
                         <ProjectChanger

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { CalendarPlus, Pencil, Trash2, X } from 'lucide-react';
 import { ConfirmModal } from '../kit/ConfirmModal';
 import {
@@ -35,13 +36,13 @@ export function MeetingsPanel({ p, canEdit }) {
               setForm({ ...form, company: '', contact: '' }));
           }}
         >
-          <input
+          <AutoText
             className={clsx(INPUT_CLASS, 'text-ink')}
             placeholder="Company"
             value={form.company}
             onChange={(e) => setForm({ ...form, company: e.target.value })}
           />
-          <input
+          <AutoText
             className={clsx(INPUT_CLASS, 'text-ink')}
             placeholder="Contact (name, role)"
             value={form.contact}

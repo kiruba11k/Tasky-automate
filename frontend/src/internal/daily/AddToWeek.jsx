@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Plus } from 'lucide-react';
 import { oe as cx, Se as useStore, Te as Button, Ye as toast } from '@/internal/min';
 import { rowKey } from '../lib/entries.js';
@@ -107,7 +108,7 @@ export function AddToWeek({ personId, mon }) {
       {task === CUSTOM_TASK && (
         <label className="text-xs font-semibold text-muted">
           Name
-          <input
+          <AutoText
             aria-label="Week custom task"
             autoFocus
             className={cx(FIELD, 'mt-1 block w-40')}
@@ -157,7 +158,7 @@ export function AddToWeek({ personId, mon }) {
         <>
           <label className="text-xs font-semibold text-muted">
             Target
-            <input
+            <AutoText
               aria-label="Week target text"
               className={cx(FIELD, 'mt-1 block w-48')}
               value={targetText}
@@ -177,7 +178,7 @@ export function AddToWeek({ personId, mon }) {
           ) : (
             <label className="text-xs font-semibold text-muted">
               Actual
-              <input
+              <AutoText
                 aria-label="Week actual text"
                 className={cx(FIELD, 'mt-1 block w-48')}
                 value={actualText}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Plus, Settings2, Trash2 } from 'lucide-react';
 import { oe as cx, Se as useStore, Te as Button, Ya as Modal, Ye as toast } from '@/internal/min';
 import { TASK_TYPES } from '../lib/constants.js';
@@ -111,7 +112,7 @@ function TaskMenuModal({ personId, open, onClose }) {
           </div>
         )}
         <div className="mt-3 flex gap-2">
-          <input
+          <AutoText
             aria-label="New task option"
             className="focus-ring flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm"
             placeholder="Add your own, e.g. Client call"

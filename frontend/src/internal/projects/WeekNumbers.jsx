@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Pencil, Lock } from 'lucide-react';
 import {
   Se as useStore,
@@ -245,7 +246,7 @@ function WeekNumbersTable({ p, canEdit }) {
                         <Badge tone={STATUS_TONES[r.status] ?? 'grey'}>{r.status ?? 'Not started'}</Badge>
                       )
                     ) : editable ? (
-                      <input
+                      <AutoText
                         aria-label={`${r.label} achieved`}
                         className={TABLE_INPUT_CLASS}
                         value={r.actual ?? ''}

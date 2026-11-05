@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Pencil, Lock, Copy, Plus, Trash } from 'lucide-react';
 import { oe as clsx, Te as Button, qe as Badge, tc as tracksPeriod, Ye as toast } from '@/internal/min';
 import {
@@ -189,7 +190,7 @@ export function PeriodPlan({ p, api, period, ws, range, title, prevTitle, prev, 
               <tr key={r.id} className="border-t border-line" data-text-target={r.id}>
                 <td className="px-3 py-1.5">
                   {edit ? (
-                    <input
+                    <AutoText
                       aria-label="Target name"
                       className={TABLE_INPUT_CLASS}
                       placeholder="e.g. Case study sign-off"
@@ -237,7 +238,7 @@ export function PeriodPlan({ p, api, period, ws, range, title, prevTitle, prev, 
                       <b className="tabular-nums">{r.targetNum ?? 0}</b>
                     )
                   ) : edit ? (
-                    <input
+                    <AutoText
                       aria-label="Target goal"
                       className={TABLE_INPUT_CLASS}
                       placeholder={kind === 'milestone' ? 'e.g. Client signs off' : 'e.g. Launch v2 to 200 contacts'}

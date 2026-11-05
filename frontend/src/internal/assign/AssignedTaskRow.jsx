@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { BellRing, Pencil, Star, Trash2 } from 'lucide-react';
 import { ConfirmModal } from '../kit/ConfirmModal';
 import { taskBreakdownKey } from '../lib/domain';
@@ -121,7 +122,7 @@ export function AssignedTaskRow({ t: task }) {
           }}
         >
           <div className="grid gap-2 sm:grid-cols-[1fr_100px_120px_auto]">
-            <input
+            <AutoText
               aria-label="Title"
               className={INPUT_CLASS}
               value={title}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { Check, Copy, Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import {
   Se as useStore,
@@ -329,7 +330,7 @@ export function WeeklyTargets({ personId, date }) {
                         ))}
                         <option value={OTHER}>Other work (not a project)</option>
                       </select>
-                      {addProjectId === OTHER && <input aria-label="Target work" className={cx(FIELD, 'w-32')} placeholder="e.g. Hiring" value={adding.work} onChange={(e) => setAdding({ ...adding, work: e.target.value })} />}
+                      {addProjectId === OTHER && <AutoText aria-label="Target work" className={cx(FIELD, 'w-32')} placeholder="e.g. Hiring" value={adding.work} onChange={(e) => setAdding({ ...adding, work: e.target.value })} />}
                       {canFix && (
                         <select aria-label="Target for" className={cx(FIELD, 'w-36')} value={adding.forProject ? 'project' : 'me'} onChange={(e) => setAdding({ ...adding, forProject: e.target.value === 'project' })}>
                           <option value="project">Fix for the project</option>
@@ -341,7 +342,7 @@ export function WeeklyTargets({ personId, date }) {
                   <td className={cell}>
                     <span className="flex items-center gap-1.5">
                       <EntryKindSelect compact value={adding.kind} onChange={(k) => setAdding({ ...adding, kind: k })} />
-                      <input aria-label="Target name" className={FIELD} placeholder="e.g. 200 prospects mapped" value={adding.name} onChange={(e) => setAdding({ ...adding, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+                      <AutoText aria-label="Target name" className={FIELD} placeholder="e.g. 200 prospects mapped" value={adding.name} onChange={(e) => setAdding({ ...adding, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
                     </span>
                   </td>
                   <td className={cell}>

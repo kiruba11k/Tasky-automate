@@ -1,4 +1,5 @@
 import { mineFirst } from '@/internal/lib/mine';
+import { AutoText } from '@/internal/kit/AutoText';
 import { ReadMore } from '@/internal/ui/ReadMore';
 import { isAdminTier } from '@/internal/lib/constants';
 import { isWeekday, nextWeekday, todayKey } from '@/internal/lib/dates';
@@ -435,14 +436,14 @@ export function AssignTasks() {
               )}
               {typeId === 'custom' && (
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <input
+                  <AutoText
                     className={INPUT_CLASS}
                     aria-label="Custom task name"
                     placeholder="Task name, e.g. LinkedIn profile audit"
                     value={customName}
                     onChange={(G) => setCustomName(G.target.value)}
                   />
-                  <input
+                  <AutoText
                     className={INPUT_CLASS}
                     aria-label="Custom task unit"
                     placeholder="Unit, e.g. profiles"
@@ -503,7 +504,7 @@ export function AssignTasks() {
               )}
               <label className="min-w-[200px] flex-1 text-sm font-semibold">
                 Title (optional)
-                <input
+                <AutoText
                   className={cn(INPUT_CLASS, 'mt-1')}
                   placeholder="e.g. Northwind QBR deck"
                   value={title}

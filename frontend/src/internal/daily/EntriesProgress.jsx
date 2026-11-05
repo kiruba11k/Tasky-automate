@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AutoText } from '@/internal/kit/AutoText';
 import { CalendarDays, Image as ImageIcon, Pencil, Trash } from 'lucide-react';
 import { oe as cx, Se as useStore, Rh as ProgressBar, pu as projectColor, qe as Badge, We as formatMinutes, Ye as toast, lt as guarded } from '@/internal/min';
 import { addDays, formatDayMonth, parseDateKey, weekStart, WEEKDAY_SHORT } from '../lib/dates.js';
@@ -54,7 +55,7 @@ function TextBox({ value, onSave, label, placeholder = 'What got done' }) {
     setText(value);
   }, [value]);
   return (
-    <input
+    <AutoText
       aria-label={label}
       value={text}
       onChange={(e) => setText(e.target.value)}
