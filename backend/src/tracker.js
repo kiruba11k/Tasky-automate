@@ -5,7 +5,7 @@
 
 import { dueAlerts, OPEN, rollProject, wallClock } from './deadlines.js';
 
-export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias', 'crmCompany', 'crmContact', 'crmDeal', 'crmActivity', 'crmGoal', 'crmConfig', 'crmView'];
+export const KINDS = ['task', 'project', 'daily', 'weekly', 'notice', 'profile', 'conv', 'msg', 'alias'];
 const MAX_DOC = 1_500_000; // bytes of JSON per document (profile photos are data URLs)
 const ROLES = ['founder', 'manager', 'pm', 'resource'];
 
@@ -184,32 +184,6 @@ export function weeklyProblem(patch) {
   if (!['eowSnapshot', 'targetsSnapshot', 'snapshots', 'overrides'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A week record is not valid.';
   return null;
 }
-/** Why a CRM record is refused, or null: the right kind of value, sensible sizes, and an open deal always has an owner and a next action. */
-export function crmProblem(kind, d) {
-  if (!d || typeof d !== 'object') return 'bad record';
-  const str = (v, n) => v === undefined || v === null || (typeof v === 'string' && v.length <= n);
-  if (!str(d.name, 200) || !str(d.notes, 4000) || !str(d.subject, 300) || !str(d.email, 200) || !str(d.phone, 60)) return 'too long';
-  if (kind === 'crmDeal') {
-    if (typeof d.name !== 'string' || !d.name.trim() || !d.ownerId) return 'a deal needs a name and an owner';
-    if (!(d.amount === undefined || (Number.isFinite(d.amount) && d.amount >= 0))) return 'bad amount';
-    const open = !['won', 'lost'].includes(d.stage) && d.status !== 'nurture';
-    if (open && !(typeof d.nextAction?.title === 'string' && d.nextAction.title.trim() && d.nextAction.due)) return 'an open deal needs a next action';
-  }
-  if (kind === 'crmView') {
-    if (!['contact', 'company', 'deal'].includes(d.type) || typeof d.name !== 'string' || !d.name.trim() || d.name.length > 60 || !d.state || typeof d.state !== 'object' || JSON.stringify(d.state).length > 4000 || typeof d.ownerId !== 'string') return 'bad view';
-  }
-  if (kind === 'crmConfig') {
-    const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
-    const stages = ['qualified', 'meeting', 'proposal', 'negotiation'];
-    if (!stages.every((s) => inRange(d.prob?.[s], 0.01, 0.99)) || !stages.every((s) => inRange(d.stall?.[s], 1, 365)) || !inRange(d.quietDays, 1, 365)) return 'bad settings';
-  }
-  if (kind === 'crmGoal') {
-    if (!/^\d{4}-\d{2}$/.test(d.period ?? '') || !['won_value', 'won_count', 'new_leads', 'activities'].includes(d.metric) || !(Number.isFinite(d.target) && d.target >= 0) || typeof d.ownerId !== 'string' || !d.ownerId) return 'bad goal';
-  }
-  if (kind === 'crmContact' || kind === 'crmCompany') { if (typeof d.name !== 'string' || !d.name.trim()) return 'a name is needed'; }
-  return null;
-}
-
 /** Why a profile is refused, or null: its own settings must be the kind of value the screens save. Photos are small images. */
 export function profileProblem(patch) {
   const doc = present(patch);
@@ -418,14 +392,6 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
       }
       case 'daily': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev) : eodDecisionOk(u, data, prev, changed); // a person's own days; another person's day only gets end of day decisions
       case 'weekly': return key.startsWith(`${u.id}|`) ? eodOwnerOk(u, data, prev, 'eowReviews') : eodDecisionOk(u, data, prev, changed, 'eowReviews'); // a person's own weeks; another person's week only gets end of week decisions
-      case 'crmDeal':
-        // a deal is opened only for contacts that are qualified: a prospect has to become a lead first
-        if (!prev && !deleting) for (const cid of data.contactIds || []) if ((await find('crmContact', cid))?.data?.lifecycle === 'prospect') return false;
-        return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId));
-      case 'crmCompany': case 'crmContact': case 'crmActivity': return !crmProblem(kind, data) && (!deleting || lead(u) || mine(prev?.ownerId)); // the CRM is shared inside the team; only the owner or a lead deletes a record
-      case 'crmView': return !crmProblem(kind, data) && (deleting ? lead(u) || mine(prev?.ownerId) : mine(data.ownerId) && (!prev || mine(prev.ownerId))); // a shared table view: anyone shares their own, only the owner or a lead changes or removes it
-      case 'crmConfig': return key === 'main' && lead(u) && !deleting && !crmProblem(kind, data); // the CRM's shared settings: stage probabilities and risk limits, set by managers and PMs
-      case 'crmGoal': return !crmProblem(kind, data) && (lead(u) || (mine(data.ownerId) && (!prev || mine(prev.ownerId)))); // leads set goals for anyone and the team; everyone else only their own
       case 'profile': return mine(key);
       case 'notice': return !prev || mine(prev.to); // anyone can notify, only the recipient marks it read
       case 'conv': case 'msg': case 'alias':

@@ -32,8 +32,7 @@ import { PersonPage } from '../people/PersonPage';
 import { MobileNav } from './MobileNav';
 import ScrollRocket from './ScrollRocket';
 import { useFunMode } from '../fun/useFunMode';
-import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV, CRM_NAV } from './navItems';
-import { CrmApp } from '@/internal/crm/CrmApp';
+import { DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV, PEOPLE_NAV, DAILY_NAV, TEAM_NAV, TEAM_UPDATES_NAV, HUB_NAV } from './navItems';
 import { FunChip } from '../fun/FunChip';
 import HubPage from '@/hub/HubPage';
 import CastPage from '@/fun/CastPage';
@@ -81,7 +80,6 @@ export function Shell() {
       : isAdmin || isPm
         ? [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]
         : [DASHBOARD_NAV, PROJECTS_NAV, ASSIGN_NAV]), // a resource can hand tasks to anyone too
-    CRM_NAV,
     ...(hasFun ? [HUB_NAV] : []),
   ]; // Profile lives in the top bar (your name), not in the side rail
   // projects waiting for an approver: shown on the page where they are decided
@@ -105,7 +103,7 @@ export function Shell() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.end !== false}
+            end
             className={({ isActive }) =>
               cx(
                 'focus-ring relative flex w-16 flex-col items-center [&>svg]:transition-transform justify-center gap-1 rounded-xl px-1 py-2 text-center text-[11px] font-semibold leading-tight',
@@ -160,7 +158,6 @@ export function Shell() {
         <main className="shell-main mx-auto max-w-6xl p-4 sm:p-6">
           <Routes>
             <Route path="/" element={isManager && !alsoWorks ? <ManagerDashboard /> : <MemberDashboard />} />
-            <Route path="/crm/*" element={<CrmApp />} />
             <Route path="/projects" element={isManager ? <ManagerProjects /> : <MemberProjects />} />
             <Route path="/daily" element={isManager && !alsoWorks ? <ManagerDaily /> : <MemberDaily />} />
             <Route path="/profile" element={<ProfilePage />} />
