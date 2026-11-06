@@ -11,7 +11,7 @@ export const blockPid = (b) => (b.custom ? (b.custom.projectId ?? b.projectId) :
 /** Project id an extra-hours row counts under: its project, or its free-text work as "other:<work>". */
 export const extraPid = (x) => x.projectId ?? (x.work ? `${OTHER}${x.work}` : undefined);
 
-const nameOf = (pid, projects) => (pid.startsWith(OTHER) ? pid.slice(OTHER.length) : (projects.find((p) => p.id === pid)?.name ?? pid));
+const nameOf = (pid, projects) => (!pid ? 'Other work' : pid.startsWith(OTHER) ? pid.slice(OTHER.length) : (projects.find((p) => p.id === pid)?.name ?? pid));
 
 /**
  * Re-point rows at another project. A row whose task is one of the old project's own standards ("std:<id>") that the new project

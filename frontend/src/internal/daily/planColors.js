@@ -3,6 +3,7 @@
 /** The block id a colour belongs to: a block that lunch split in two ("a" and "a~2") is one piece of work and keeps one colour. */
 export const colorKey = (id) => String(id).split('~')[0];
 
+
 /**
  * Map of block id to colour. Blocks are taken in time order; each wants its project's colour (`preferred(block)`, or none for other / custom
  * work) and gets it unless the block before has it, or the block after wants it and another colour is free. Otherwise the next palette colour

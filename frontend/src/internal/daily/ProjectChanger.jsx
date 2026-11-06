@@ -15,7 +15,7 @@ const FIELD = 'focus-ring rounded-xl border border-line bg-surface px-2 py-1.5 t
  */
 export function ProjectChanger({ current, projects, onSave, onCancel, label = 'Project' }) {
   const active = projects.filter((p) => p.status === 'active' || p.id === current);
-  const isOther = current.startsWith(OTHER_PREFIX);
+  const isOther = !current || current.startsWith(OTHER_PREFIX);
   const [value, setValue] = useState(isOther ? CUSTOM_PROJECT : current);
   const [name, setName] = useState(isOther ? current.slice(OTHER_PREFIX.length) : '');
   const submit = () => {

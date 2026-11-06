@@ -115,7 +115,7 @@ export function WeeklyHours({ personId, date }) {
                       <span className="flex min-w-0 items-center gap-1.5 truncate font-medium">
                         <span
                           className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ background: pid.startsWith('other:') ? '#64748B' : projectColor(projects, pid) }}
+                          style={{ background: !pid || pid.startsWith('other:') ? '#64748B' : projectColor(projects, pid) }}
                         />
                         {projectLabel(pid, projects)}
                       </span>

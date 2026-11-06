@@ -399,7 +399,7 @@ export function EntriesLog({ personId, date, plan, extra, readOnly, onChangeProj
         name: projectLabel(pid, projects),
         added: !fromPlan.has(pid) && !assignedPids.has(pid),
       }))
-      .filter((g) => g.project || g.pid.startsWith(OTHER));
+      .filter((g) => g.project || g.pid?.startsWith(OTHER));
   }, [blocks, extras, shown, projects, added, assignedPids]);
 
   const removeGroup = (pid, name) => {

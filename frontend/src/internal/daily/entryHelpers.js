@@ -51,7 +51,7 @@ export const weeklyAchieved = weeklyDone;
 
 /** Name to show for a project id in the tables: free-text "other:" work, or the project's name. */
 export const projectLabel = (projectId, projects) =>
-  projectId.startsWith('other:') ? projectId.slice('other:'.length) : (projects.find((p) => p.id === projectId)?.name ?? projectId);
+  !projectId ? 'Other work' : projectId.startsWith('other:') ? projectId.slice('other:'.length) : (projects.find((p) => p.id === projectId)?.name ?? projectId);
 
 /** The kinds of target a row can have. */
 export const ENTRY_KINDS = ['number', 'milestone', 'text'];

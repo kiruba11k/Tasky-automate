@@ -114,7 +114,7 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
         end: toClock(at + item.minutes),
         minutes: item.minutes,
         work: saved?.work || blockLabel(item.projectId, undefined, projects),
-        projectId: !item.projectId.startsWith(OTHER_PREFIX) ? item.projectId : undefined,
+        projectId: item.projectId && !item.projectId.startsWith(OTHER_PREFIX) ? item.projectId : undefined,
         ...(saved?.auto ? { auto: true } : {}),
       };
       at += item.minutes;
@@ -122,9 +122,10 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
     });
   };
   const extraTotal = extras.reduce((sum, x) => sum + x.minutes, 0);
-  // blocks next to each other never share a colour, and the extra hours carry on from the last planned block
+  // blocks next to each other never share a colour, and the extra hours carry on from the last planned block.
+  // Other / custom work, or an extra saved without a project, has no colour of its own.
   const colors = useMemo(
-    () => planColors([...plan, ...layExtras(extras)], (b) => (b.custom || b.projectId.startsWith(OTHER_PREFIX) ? undefined : blockColor(b.projectId, undefined, projects)), PROJECT_PALETTE),
+    () => planColors([...plan, ...layExtras(extras)], (b) => (b.custom || !b.projectId || b.projectId.startsWith(OTHER_PREFIX) ? undefined : blockColor(b.projectId, undefined, projects)), PROJECT_PALETTE),
     [plan, extras, projects, extraStart], // eslint-disable-line react-hooks/exhaustive-deps
   );
   useEffect(() => {

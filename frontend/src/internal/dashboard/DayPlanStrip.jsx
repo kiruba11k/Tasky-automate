@@ -20,7 +20,7 @@ export function DayPlanStrip({ blocks, loggedMinutes, extra = [] }) {
   const projects = useStore((s) => s.projects);
   const lunch = useStore((s) => s.profiles[s.me]?.lunch) ?? LUNCH_BLOCK; // the lunch set on my profile
   const theme = useTheme();
-  const colors = planColors(blocks, (b) => (b.custom || b.projectId.startsWith('other:') ? undefined : projectColor(projects, b.projectId)), PROJECT_COLORS); // neighbouring blocks never share a colour
+  const colors = planColors(blocks, (b) => (b.custom || !b.projectId || b.projectId.startsWith('other:') ? undefined : projectColor(projects, b.projectId)), PROJECT_COLORS); // neighbouring blocks never share a colour
   const blockStyle = (color) =>
     theme.blocks === 'striped'
       ? {

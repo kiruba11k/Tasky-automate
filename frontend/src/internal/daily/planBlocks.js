@@ -27,13 +27,15 @@ export const profileLunch = (profiles, personId) => profiles[personId]?.lunch ??
 export const blockLabel = (projectId, custom, projects) =>
   custom
     ? custom.title
-    : projectId.startsWith(OTHER_PREFIX)
+    : !projectId
+      ? 'Other work' // a block saved without a project
+      : projectId.startsWith(OTHER_PREFIX)
       ? projectId.slice(OTHER_PREFIX.length)
       : (projects.find((p) => p.id === projectId)?.name ?? 'Project');
 
 /** Timeline colour of a block (grey for other / custom work). */
 export const blockColor = (projectId, custom, projects) =>
-  projectId.startsWith(OTHER_PREFIX) || custom ? '#64748B' : projectColor(projects, projectId);
+  !projectId || projectId.startsWith(OTHER_PREFIX) || custom ? '#64748B' : projectColor(projects, projectId);
 
 /**
  * The plan's blocks as one entry per piece of work: a block that lunch split in two (ids "a" and "a~2") is joined back, with
