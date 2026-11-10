@@ -87,6 +87,7 @@ function collectItems({ personId, date, projects, daily, weekly }) {
   const weekRange = formatOrdinalRange(monday, addDays(monday, 4));
   const mineProjects = projects.filter((p) => p.status === 'active' && (p.pmId === personId || p.teamIds?.includes(personId) || p.admins?.includes(personId)));
   const items = [];
+  const hidden = new Set(weekly[`${personId}|${monday}`]?.hiddenFixed ?? []); // fixed targets this person removed or replaced with their own copy
   mineProjects.forEach((p) => {
     const start = projectWeekStart(p, date);
     const wk = projectWeeks(p).find((w) => w.start === start);
@@ -98,8 +99,9 @@ function collectItems({ personId, date, projects, daily, weekly }) {
     const editable = canPlanFor(p, personId);
     (p.metrics ?? [])
       .filter((m) => tracksPeriod(m, 'week') && !off.includes(m.id) && (goals[m.id] ?? 0) > 0)
+      .filter((m) => !hidden.has(`m:${p.id}:${m.id}`))
       .forEach((m) => items.push({ src: 'project', key: `m:${p.id}:${m.id}`, range, project: p, projectName: p.name, start, goals, off, metric: m.id, label: m.label, kind: 'number', goal: String(goals[m.id]), editable }));
-    custom.forEach((r) => {
+    custom.filter((r) => !hidden.has(`t:${p.id}:${r.id}`)).forEach((r) => {
       const kind = targetKind(r);
       items.push({ src: 'project', key: `t:${p.id}:${r.id}`, range, project: p, projectName: p.name, start, row: r, label: r.label, kind, goal: kind === 'number' ? String(r.targetNum ?? 0) : r.target ?? '', editable });
     });
@@ -166,7 +168,12 @@ export function WeeklyTargets({ personId, date }) {
   const change = (it, patch) =>
     runAction(() => {
       const next = { label: it.label, kind: it.kind, goal: it.goal, time: it.time, ...patch };
-      if (it.src === 'mine') {
+      if (it.src === 'project' && !it.editable) {
+        // a fixed target of a project the person does not manage: changing it makes their own copy, the project's target stays as it is
+        if (!next.label.trim()) fail('Type the target.');
+        const copy = rowFor({ id: newEntryId(), projectId: it.project.id }, { name: next.label, kind: next.kind, goal: next.goal, time: next.time });
+        saveWeekly(personId, monday, { entries: [...(record?.entries ?? []), copy], hiddenFixed: [...new Set([...(record?.hiddenFixed ?? []), it.key])] });
+      } else if (it.src === 'mine') {
         if (!next.label.trim()) fail('Type the target.');
         saveMine((record?.entries ?? []).map((x) => (x.id === it.entry.id ? rowFor(x, { name: next.label, kind: next.kind, goal: next.goal, time: next.time }) : x)));
       } else if (it.metric) {
@@ -181,7 +188,8 @@ export function WeeklyTargets({ personId, date }) {
     });
   const remove = (it) => {
     const ok = runAction(() => {
-      if (it.src === 'mine') saveMine((record?.entries ?? []).filter((x) => x.id !== it.entry.id));
+      if (it.src === 'project' && !it.editable) saveWeekly(personId, monday, { hiddenFixed: [...new Set([...(record?.hiddenFixed ?? []), it.key])] }); // taken off this person's table; the project keeps it
+      else if (it.src === 'mine') saveMine((record?.entries ?? []).filter((x) => x.id !== it.entry.id));
       else if (it.metric) setWeekOff(it.project.id, it.start, [...it.off, it.metric]);
       else setWeekText(it.project.id, it.start, textRows(it.project, it.start).filter((r) => r.id !== it.row.id));
     });
@@ -327,7 +335,7 @@ export function WeeklyTargets({ personId, date }) {
                   while (i + dateSpan < items.length && items[i + dateSpan].range === it.range) dateSpan++;
                   const number = it.kind === 'number';
                   return (
-                    <tr key={it.key} className={i % 2 ? 'bg-surface-2/40' : 'bg-surface'} data-target-row={it.key}>
+                    <tr key={it.key} className={i % 2 ? 'bg-surface-2/40' : 'bg-surface'} data-target-row={it.key} title={it.src === 'project' && !it.editable ? "This target is fixed by the project. Changing it makes your own copy; the project's target stays as it is." : undefined}>
                       {firstOfRange && (
                         <td rowSpan={dateSpan} className={`${cell} text-center align-middle font-semibold`}>
                           {it.range}
@@ -352,10 +360,10 @@ export function WeeklyTargets({ personId, date }) {
                           it.projectName
                         )}
                       </td>
-                      {it.editable ? (
+                      {it.editable || it.src === 'project' ? (
                         <>
                           <td className={cell}>
-                            {it.metric ? (
+                            {it.metric && it.editable ? (
                               <span className="px-1.5 font-medium">{it.label}</span>
                             ) : (
                               <span className="flex items-center gap-1.5">
@@ -368,7 +376,7 @@ export function WeeklyTargets({ personId, date }) {
                             <CellText label={`${it.label} goal`} type={number ? 'number' : 'text'} value={it.goal} onSave={(v) => change(it, { goal: v })} />
                           </td>
                           <td className={`${cell} text-center`}>
-                            {it.src === 'mine' ? <DurationInput label={`${it.label} time`} column="target-time" placeholder="..." value={it.time || undefined} onChange={(m) => change(it, { time: m })} /> : null}
+                            {it.src === 'mine' || (it.src === 'project' && !it.editable) ? <DurationInput label={`${it.label} time`} column="target-time" placeholder="..." value={it.time || undefined} onChange={(m) => change(it, { time: m })} /> : null}
                           </td>
                           <td className={`${cell} text-center`}>
                             <button type="button" aria-label={`Delete ${it.label}`} title="Delete" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink" onClick={() => remove(it)}>

@@ -181,6 +181,7 @@ export function weeklyProblem(patch) {
   if (!doc) return null;
   if (!['targetsAt', 'eowAt', 'entriesAt', 'entriesDoneAt'].every((k) => when(doc[k]))) return 'A time of sending is not valid.';
   if (!['targetsNote', 'eowNote'].every((k) => text(doc[k], 5000))) return 'A note is too long.';
+  if (doc.hiddenFixed !== undefined && !(Array.isArray(doc.hiddenFixed) && doc.hiddenFixed.length <= 300 && doc.hiddenFixed.every((k) => typeof k === 'string' && k.length <= 200))) return 'A week record is not valid.';
   if (!['eowSnapshot', 'targetsSnapshot', 'snapshots', 'overrides'].every((k) => doc[k] === undefined || isMap(doc[k]))) return 'A week record is not valid.';
   return null;
 }
