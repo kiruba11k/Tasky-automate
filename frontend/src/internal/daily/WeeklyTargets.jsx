@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AutoText } from '@/internal/kit/AutoText';
-import { Check, Copy, Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import {
   Se as useStore,
   rt as Card,
@@ -33,18 +33,51 @@ function CellText({ value, onSave, label, placeholder, type = 'text', className 
     setSeen(value);
     setText(value);
   }
+  const common = {
+    'aria-label': label,
+    placeholder,
+    value: text,
+    onChange: (e) => setText(e.target.value),
+    onBlur: () => text !== value && onSave(text),
+    onKeyDown: (e) => e.key === 'Enter' && e.target.blur(),
+  };
+  // text wraps and grows so everything typed stays in view; numbers stay a plain box
+  if (type !== 'number') return <AutoText {...common} className={cx(FIELD, className)} />;
+  return <input {...common} type="number" min={0} className={cx(FIELD, 'text-right tabular-nums', className)} />;
+}
+
+/** "Fill from previous week" menu: the earlier weeks that have targets of their own, to copy into this week (what is already here is kept). */
+function WeekFillPicker({ weeks, onPick }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (e.type === 'keydown' ? e.key === 'Escape' : !root.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', close); };
+  }, [open]);
   return (
-    <input
-      aria-label={label}
-      type={type}
-      min={type === 'number' ? 0 : undefined}
-      className={cx(FIELD, type === 'number' && 'text-right tabular-nums', className)}
-      placeholder={placeholder}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => text !== value && onSave(text)}
-      onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-    />
+    <span ref={root} className="relative inline-block">
+      <Button tone="ghost" className="border border-line" data-testid="fill-weekly-targets" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} title="Copy targets from an earlier week into this week">
+        <Copy size={13} /> Fill from previous week <ChevronDown size={11} />
+      </Button>
+      {open && (
+        <div role="menu" aria-label="Earlier weeks" className="absolute right-0 z-30 mt-1 max-h-72 w-72 overflow-y-auto rounded-xl border border-line bg-surface p-1 text-left shadow-pop">
+          <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted">Copy from</p>
+          {weeks.length === 0 ? (
+            <p className="px-2 py-2 text-xs text-muted">No targets saved in earlier weeks yet.</p>
+          ) : (
+            weeks.map((w) => (
+              <button key={w.monday} type="button" role="menuitem" data-source-week={w.monday} className="focus-ring flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-2" onClick={() => { setOpen(false); onPick(w.monday); }}>
+                <b className="font-semibold">{formatOrdinalRange(w.monday, addDays(w.monday, 4))}</b>
+                <span className="text-xs text-muted">{w.count} target{w.count === 1 ? '' : 's'}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -191,14 +224,19 @@ export function WeeklyTargets({ personId, date }) {
       toast({ title: 'Target added', tone: 'success' });
     }
   };
-  const fillFromPrevious = () => {
-    const prev = (weekly[`${personId}|${addDays(monday, -7)}`]?.entries ?? []).filter((e) => e.task);
-    if (!prev.length) return toast({ title: 'No targets last week to copy', tone: 'info' });
+  /** Earlier weeks (newest first, up to 8) that have targets of their own to copy. */
+  const earlierWeeks = [1, 2, 3, 4, 5, 6, 7, 8]
+    .map((k) => addDays(monday, -7 * k))
+    .map((mon) => ({ monday: mon, count: (weekly[`${personId}|${mon}`]?.entries ?? []).filter((e) => e.task).length }))
+    .filter((w) => w.count > 0);
+  const fillFromWeek = (from) => {
+    const prev = (weekly[`${personId}|${from}`]?.entries ?? []).filter((e) => e.task);
+    if (!prev.length) return toast({ title: 'No targets that week to copy', tone: 'info' });
     const same = (a, b) => a.projectId === b.projectId && (a.custom ?? a.task).trim().toLowerCase() === (b.custom ?? b.task).trim().toLowerCase() && (a.kind ?? 'number') === (b.kind ?? 'number');
     const fresh = prev.filter((e) => !(record?.entries ?? []).some((x) => same(x, e)));
-    if (!fresh.length) return toast({ title: "Last week's targets are already here", tone: 'info' });
+    if (!fresh.length) return toast({ title: 'That week\'s targets are already here', tone: 'info' });
     saveMine([...(record?.entries ?? []), ...fresh.map((e) => ({ ...e, id: newEntryId(), doneQty: undefined, actualText: undefined, status: e.kind === 'milestone' ? 'Not started' : undefined }))]);
-    toast({ title: `${fresh.length} target${fresh.length === 1 ? '' : 's'} copied from last week`, tone: 'success' });
+    toast({ title: `${fresh.length} target${fresh.length === 1 ? '' : 's'} copied from ${formatOrdinalRange(from, addDays(from, 4))}`, tone: 'success' });
   };
 
   if (!items.length && !editing && !mineProjects.length) return null;
@@ -218,11 +256,7 @@ export function WeeklyTargets({ personId, date }) {
             <p className="text-xs text-muted">The targets fixed for your projects this week, plus the ones you set yourself, all in one table.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {editing && (
-              <Button tone="ghost" className="border border-line" onClick={fillFromPrevious} title="Copy last week's own targets into this week (what is already here is kept)">
-                <Copy size={13} /> Fill from last week
-              </Button>
-            )}
+            <WeekFillPicker weeks={earlierWeeks} onPick={(from) => { fillFromWeek(from); setEditing(true); }} />
             <Button tone="ghost" className="border border-line" data-testid="edit-weekly-targets" onClick={() => setEditing((v) => !v)}>
               {editing ? (
                 <>
