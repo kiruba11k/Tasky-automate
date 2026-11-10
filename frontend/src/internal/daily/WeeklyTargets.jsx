@@ -224,19 +224,53 @@ export function WeeklyTargets({ personId, date }) {
       toast({ title: 'Target added', tone: 'success' });
     }
   };
-  /** Earlier weeks (newest first, up to 8) that have targets of their own to copy. */
+  /** The fixed targets (numbers and text) of the projects the person manages, in the project week that holds `from`. */
+  const fixedOf = (from) =>
+    plannable.flatMap((p) => {
+      const start = projectWeekStart(p, from);
+      const goals = weekTargetFor(p, from) ?? {};
+      // only numbers somebody actually set for that week (not the project's default), like the table above
+      const metrics = savedWeekPlan(p, from) ? (p.metrics ?? []).filter((m) => tracksPeriod(m, 'week') && (goals[m.id] ?? 0) > 0) : [];
+      const texts = (p.weekText?.[start] ?? []).filter((r) => r.label?.trim());
+      return metrics.length || texts.length ? [{ p, start, goals, metrics, texts }] : [];
+    });
+  /** Earlier weeks (newest first, up to 8) that have targets to copy: the person's own, and the fixed targets of projects they manage. */
   const earlierWeeks = [1, 2, 3, 4, 5, 6, 7, 8]
     .map((k) => addDays(monday, -7 * k))
-    .map((mon) => ({ monday: mon, count: (weekly[`${personId}|${mon}`]?.entries ?? []).filter((e) => e.task).length }))
+    .map((mon) => ({
+      monday: mon,
+      count: (weekly[`${personId}|${mon}`]?.entries ?? []).filter((e) => e.task).length + fixedOf(mon).reduce((n, g) => n + g.metrics.length + g.texts.length, 0),
+    }))
     .filter((w) => w.count > 0);
   const fillFromWeek = (from) => {
     const prev = (weekly[`${personId}|${from}`]?.entries ?? []).filter((e) => e.task);
-    if (!prev.length) return toast({ title: 'No targets that week to copy', tone: 'info' });
     const same = (a, b) => a.projectId === b.projectId && (a.custom ?? a.task).trim().toLowerCase() === (b.custom ?? b.task).trim().toLowerCase() && (a.kind ?? 'number') === (b.kind ?? 'number');
     const fresh = prev.filter((e) => !(record?.entries ?? []).some((x) => same(x, e)));
-    if (!fresh.length) return toast({ title: 'That week\'s targets are already here', tone: 'info' });
-    saveMine([...(record?.entries ?? []), ...fresh.map((e) => ({ ...e, id: newEntryId(), doneQty: undefined, actualText: undefined, status: e.kind === 'milestone' ? 'Not started' : undefined }))]);
-    toast({ title: `${fresh.length} target${fresh.length === 1 ? '' : 's'} copied from ${formatOrdinalRange(from, addDays(from, 4))}`, tone: 'success' });
+    let copied = fresh.length;
+    const ok = runAction(() => {
+      if (fresh.length) saveMine([...(record?.entries ?? []), ...fresh.map((e) => ({ ...e, id: newEntryId(), doneQty: undefined, actualText: undefined, status: e.kind === 'milestone' ? 'Not started' : undefined }))]);
+      // the projects' fixed targets: numbers are filled where this week has none, text targets are added when they are not there yet
+      fixedOf(from).forEach(({ p, start, goals, metrics, texts }) => {
+        const toStart = projectWeekStart(p, date);
+        if (toStart === start) return;
+        const current = weekTargetFor(p, date) ?? {};
+        const missing = metrics.filter((m) => !((current[m.id] ?? 0) > 0));
+        if (missing.length) {
+          const numbers = Object.fromEntries((p.metrics ?? []).map((m) => [m.id, current[m.id] ?? 0]));
+          saveWeekPlan(p.id, toStart, { ...numbers, ...Object.fromEntries(missing.map((m) => [m.id, goals[m.id]])) });
+          copied += missing.length;
+        }
+        const rows = textRows(p, toStart);
+        const label = (r) => `${targetKind(r)}|${r.label.trim().toLowerCase()}`;
+        const add = texts.filter((r) => !rows.some((x) => label(x) === label(r)));
+        if (add.length) {
+          setWeekText(p.id, toStart, [...rows, ...add.map((r, i) => ({ ...r, id: newTargetId(rows.length + i) }))]);
+          copied += add.length;
+        }
+      });
+      if (!copied) fail("That week's targets are already here.");
+    });
+    if (ok) toast({ title: `${copied} target${copied === 1 ? '' : 's'} copied from ${formatOrdinalRange(from, addDays(from, 4))}`, tone: 'success' });
   };
 
   if (!items.length && !editing && !mineProjects.length) return null;
