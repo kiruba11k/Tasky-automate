@@ -157,7 +157,7 @@ export function WeeklyTargets({ personId, date }) {
   const saveMine = (entries) => saveWeekly(personId, monday, { entries });
   const rowFor = (base, { name, kind, goal, time }) => {
     const number = kind === 'number';
-    return { ...base, task: CUSTOM_TASK, custom: name.trim(), kind, qty: number ? Math.max(0, Math.round(+goal || 0)) : undefined, doneQty: number ? base.doneQty : undefined, targetText: number ? undefined : (goal ?? '').trim(), desc: base.desc ?? '', estMin: time ?? 0, actualMin: time, remarks: base.remarks ?? '', achieved: base.achieved ?? '' };
+    return { ...base, target: true, task: CUSTOM_TASK, custom: name.trim(), kind, qty: number ? Math.max(0, Math.round(+goal || 0)) : undefined, doneQty: number ? base.doneQty : undefined, targetText: number ? undefined : (goal ?? '').trim(), desc: base.desc ?? '', estMin: time ?? 0, actualMin: time, remarks: base.remarks ?? '', achieved: base.achieved ?? '' };
   };
   const textRows = (p, start) => (p.weekText?.[start] ?? []).map((r) => ({ ...r }));
   const fail = (m) => {

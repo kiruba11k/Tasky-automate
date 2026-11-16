@@ -255,7 +255,19 @@ export function plannedWeekTargets(project, weekly, projectWeekStartKey) {
 const timeOf = (row) => (row?.actualMin > 0 ? row.actualMin : (row?.estMin ?? 0));
 
 /** Identity of a row across days: the same project, task, custom name and kind of target add up in the week's table. */
-export const rowKey = (row) => `${row.projectId}|${row.task}|${(row.custom ?? "").trim().toLowerCase()}|${row.kind ?? "number"}`;
+export const rowKey = (row) => {
+  const kind = row.kind ?? "number";
+  // a milestone or text row is identified by what it says too: two different things done under one task type are two rows
+  const said = kind === "number" ? "" : `|${(row.targetText ?? "").trim().toLowerCase()}`;
+  return `${row.projectId}|${row.task}|${(row.custom ?? "").trim().toLowerCase()}|${kind}${said}`;
+};
+
+/**
+ * A row of the week record that is a weekly target (planned, set in "Weekly targets"), not work done: it has the target mark, or it carries
+ * a time (rows added to the week as done work never do; their time comes from the day tables). Weekly targets are not part of the Weekly
+ * update's rows or hours.
+ */
+export const isWeekTarget = (e) => e?.target === true || e?.estMin > 0 || e?.actualMin > 0;
 
 /**
  * The rows of a person's "Weekly update": every row of the week's Monday to Friday day tables plus the rows added to the week
@@ -268,7 +280,7 @@ export function weekRows(personId, monday, daily, weekEntries = [], overrides = 
   const all = [
     ...[0, 1, 2, 3, 4].flatMap((i) => dayEntries(daily, personId, addDays(monday, i)).map((r) => ({ ...r, __day: addDays(monday, i) }))),
     ...assignedRows,
-    ...weekEntries,
+    ...weekEntries.filter((e) => !isWeekTarget(e)),
   ];
   const merged = new Map();
   all.forEach((row) => {
