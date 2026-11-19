@@ -60,7 +60,8 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
 
   // keep the saved blocks laid out around lunch
   useEffect(() => {
-    const flowed = flowBlocks(groups, lunch);
+    // a block has one Time, so a block with no actual time of its own (older plans) takes its Time as the actual
+    const flowed = flowBlocks(groups.map((g) => ({ ...g, actual: g.actual ?? g.minutes })), lunch);
     if (blocksKey(flowed) !== blocksKey([...plan].sort((a, b) => a.start.localeCompare(b.start)))) setPlan(flowed);
   }, [lunch, groups]); // eslint-disable-line react-hooks/exhaustive-deps
 
