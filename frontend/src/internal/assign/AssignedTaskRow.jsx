@@ -128,14 +128,18 @@ export function AssignedTaskRow({ t: task }) {
               value={title}
               onChange={(k) => setTitle(k.target.value)}
             />
-            <input
-              aria-label="Quantity"
-              type="number"
-              min={1}
-              className={INPUT_CLASS}
-              value={qty}
-              onChange={(k) => setQty(+k.target.value)}
-            />
+            {task.textTask ? (
+              <span className="flex items-center text-xs font-semibold text-muted">Text task</span>
+            ) : (
+              <input
+                aria-label="Quantity"
+                type="number"
+                min={1}
+                className={INPUT_CLASS}
+                value={qty}
+                onChange={(k) => setQty(+k.target.value)}
+              />
+            )}
             <input
               aria-label="Target minutes"
               type="number"

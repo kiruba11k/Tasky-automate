@@ -117,7 +117,7 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
           {r.priority && <Star size={11} className="self-center fill-butter-ink text-butter-ink" aria-label="Priority" />}
         </span>
         <span className="font-medium">
-          {entryName(r, project)}
+          {r.targetText ? 'Assigned task' : entryName(r, project)}
           {!editing && titles.length > 0 && <span className="block text-xs font-normal text-muted">{titles.join('; ')}</span>}
         </span>
         {editing && (
@@ -141,14 +141,38 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
         )}
       </td>
       <td className="px-2 py-2">
-        {editing ? (
+        {r.targetText ? (
+          <span className="block whitespace-normal" data-testid="assigned-text">{r.targetText}</span>
+        ) : editing ? (
           <input aria-label="Target" type="number" min={0} className={cx(FIELD, 'w-24')} value={draft.qty} onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))} />
         ) : (
           <span className="tabular-nums">{r.qty || '·'}</span>
         )}
       </td>
       <td className="px-2 py-2">
-        {locked ? (
+        {r.targetText ? (
+          locked ? (
+            <span>
+              {r.doneQty > 0 ? 'Completed' : 'Not done'}
+              <span className="ml-1 text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'marked by you' : 'awaiting approval'}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={r.typedDone > 0}
+                aria-label="Mark done"
+                data-testid="mark-done"
+                className={cx('focus-ring rounded-full border px-3 py-1 text-xs font-semibold', r.typedDone > 0 ? 'border-mint-strong bg-mint text-mint-ink' : 'border-line hover:bg-surface-2')}
+                onClick={() => onType({ doneQty: r.typedDone > 0 ? undefined : Math.max(1, r.qty) })}
+              >
+                {r.typedDone > 0 ? 'Done ✓' : 'Mark done'}
+              </button>
+              <span className="text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'marked by you' : 'awaiting approval'}</span>
+            </span>
+          )
+        ) : locked ? (
           <span className="tabular-nums" title="Fills in with the approved number, or the number you typed">
             {r.doneQty ?? 0}
             <span className="ml-1 text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
@@ -177,7 +201,7 @@ function AssignedRow({ r, project, showRemoveCell, locked, onType, canChange, on
             <span className="text-[10px] text-muted">{r.approved ? 'approved' : r.typedDone ? 'typed by you' : 'awaiting approval'}</span>
           </span>
         )}
-        {!isFindingWork(entryName(r, project)) ? null : locked ? (
+        {r.targetText || !isFindingWork(entryName(r, project)) ? null : locked ? (
           r.foundQty != null && <span className="block text-[10px] text-muted">{r.foundQty} found</span>
         ) : (
           <FoundInput row={{ ...r, doneQty: r.typedDone }} onChange={(patch) => onType(patch)} />

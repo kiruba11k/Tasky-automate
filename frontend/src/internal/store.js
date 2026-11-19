@@ -144,7 +144,9 @@ export const useStore = create()(
         const me = get().me;
         if (!draft.assigneeId) throw new Error("Pick who the task is for.");
         if (!draft.projectId) throw new Error("Pick a project for the task.");
-        if (!(draft.qty > 0)) throw new Error("Quantity must be at least 1.");
+        const textTask = draft.textTask === true; // a task given as a sentence to do (one deliverable) instead of a quantity
+        if (!textTask && !(draft.qty > 0)) throw new Error("Quantity must be at least 1.");
+        if (textTask && !draft.targetText?.trim()) throw new Error("Type what should be done.");
         if (!(draft.targetMinutes > 0)) throw new Error("Target time must be at least 1 minute.");
         const project = requireProject(draft.projectId);
         // the owner, an admin or anyone on the project's team assigns its tasks
@@ -152,9 +154,9 @@ export const useStore = create()(
           throw new Error(`Only people on ${project.name} can assign its tasks.`);
         if (project.status !== "active")
           throw new Error(`${project.name} is still waiting for approval.`);
-        let typeId = draft.typeId;
+        let typeId = textTask ? "custom" : draft.typeId;
         let custom =
-          typeId === "custom"
+          typeId === "custom" && !textTask
             ? (findCustomStandard(project, draft.customStandardId) ??
               findCustomStandard(project, draft.customName))
             : undefined;
@@ -164,15 +166,17 @@ export const useStore = create()(
           typeId = "custom";
         }
         const isCustom = typeId === "custom";
-        const customName = isCustom ? custom?.name || draft.customName?.trim() || "" : undefined;
+        const customName = textTask ? draft.targetText.trim() : isCustom ? custom?.name || draft.customName?.trim() || "" : undefined;
         if (isCustom && !customName) throw new Error("Name the custom task.");
         const type = TASK_TYPES.find((t) => t.id === typeId);
-        const unit = isCustom
+        const unit = textTask
+          ? "task"
+          : isCustom
           ? custom?.unit || draft.customUnit?.trim() || "items"
           : (type?.unit ?? "items");
         const title =
           draft.title?.trim() ||
-          (isCustom ? `${draft.qty} ${customName}` : defaultTaskTitle(typeId, draft.qty, draft.variant));
+          (textTask ? customName : isCustom ? `${draft.qty} ${customName}` : defaultTaskTitle(typeId, draft.qty, draft.variant));
         const targetMinutes = Math.round(draft.targetMinutes);
         const at = nowIso();
         return {
@@ -182,10 +186,10 @@ export const useStore = create()(
           customName,
           customStandardId: custom?.id,
           unit,
-          qty: draft.qty,
+          qty: textTask ? 1 : draft.qty,
+          ...(textTask ? { textTask: true } : {}),
           targetMinutes,
-          standardMinutes:
-            computeStandardMinutes(project, typeId, draft.qty, draft.variant, custom?.id) ?? targetMinutes,
+          standardMinutes: textTask ? targetMinutes : computeStandardMinutes(project, typeId, draft.qty, draft.variant, custom?.id) ?? targetMinutes,
           projectId: draft.projectId,
           assigneeId: draft.assigneeId,
           assignedById: me,
@@ -522,6 +526,7 @@ export const useStore = create()(
             qty: edit.qty,
             targetMinutes,
             title: edit.title.trim(),
+            ...(task.textTask ? { customName: edit.title.trim() } : {}), // a text task is its text: editing the title changes what is to be done
             standardMinutes,
             history: changes.length
               ? withHistory(task, "edited", { note: changes.join(", ") })

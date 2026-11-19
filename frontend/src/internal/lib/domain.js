@@ -447,6 +447,8 @@ export function taskBreakdownKey(task) {
   if (!type) {
     const name =
       task.customName?.trim() || task.title.replace(/^\d+\s*/, "").trim() || "Custom task";
+    // a task given as text is its own kind of work: it never adds up with a counted task of the same name
+    if (task.textTask) return { key: `text:${name.toLowerCase()}`, label: name, unit: "task", order: 1e3 };
     return {
       key: `custom:${name.toLowerCase()}`,
       label: name.charAt(0).toUpperCase() + name.slice(1),

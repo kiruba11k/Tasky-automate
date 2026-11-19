@@ -63,7 +63,9 @@ export function ReviewRow({ task, projectName }) {
           <p className="text-xs text-muted">
             {task.adhoc
               ? `${firstName(task.assigneeId)} · ${projectName} · sent for approval without an assigned task`
-              : `${firstName(task.assigneeId)} · ${projectName} · ${task.doneQty} out of ${task.qty}${unitText(task.unit)} in ${formatMinutes(task.minutes ?? 0)} (target ${formatMinutes(task.targetMinutes)})`}
+              : task.textTask
+                ? `${firstName(task.assigneeId)} · ${projectName} · marked done in ${formatMinutes(task.minutes ?? 0)} (target ${formatMinutes(task.targetMinutes)})`
+                : `${firstName(task.assigneeId)} · ${projectName} · ${task.doneQty} out of ${task.qty}${unitText(task.unit)} in ${formatMinutes(task.minutes ?? 0)} (target ${formatMinutes(task.targetMinutes)})`}
           </p>
           {task.adhoc && task.feedback[0] && <p className="text-xs">Note: {task.feedback[0].text}</p>}
           <LinkChips links={task.links} className="mt-1" />

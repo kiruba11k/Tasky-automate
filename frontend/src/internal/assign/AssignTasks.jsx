@@ -64,6 +64,8 @@ export function AssignTasks() {
   const [customName, setCustomName] = useState('');
   const [customUnit, setCustomUnit] = useState('');
   const [qty, setQty] = useState(30);
+  const [byText, setByText] = useState(false); // give the task as a sentence to do instead of a quantity
+  const [targetText, setTargetText] = useState('');
   const [targetMinutes, setTargetMinutes] = useState(60);
   const [manualTarget, setManualTarget] = useState(false);
   const [title, setTitle] = useState('');
@@ -75,7 +77,7 @@ export function AssignTasks() {
     const seen = new Set(customStandards.map((c) => c.name.trim().toLowerCase()));
     const list = [];
     [...tasks]
-      .filter((t) => t.projectId === project?.id && t.typeId === 'custom' && (t.customName ?? '').trim() && !t.customStandardId)
+      .filter((t) => t.projectId === project?.id && t.typeId === 'custom' && !t.textTask && (t.customName ?? '').trim() && !t.customStandardId)
       .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
       .forEach((t) => {
         const key = t.customName.trim().toLowerCase();
@@ -109,8 +111,8 @@ export function AssignTasks() {
     variant: stdType?.variants ? variant : undefined,
     customName: typeId === 'custom' ? customName : undefined,
   };
-  const draftStandard = project ? standardFor(projects, draft) : null;
-  const customMatch = typeId === 'custom' ? matchCustomStandard(project, draft) : undefined;
+  const draftStandard = project && !byText ? standardFor(projects, draft) : null;
+  const customMatch = typeId === 'custom' && !byText ? matchCustomStandard(project, draft) : undefined;
   useEffect(() => {
     if (!manualTarget && draftStandard != null) setTargetMinutes(draftStandard);
   }, [draftStandard, manualTarget]);
@@ -143,6 +145,7 @@ export function AssignTasks() {
   const findProject = (id) => projects.find((p) => p.id === id);
   const itemTitle = (item) => {
     if (item.title?.trim()) return item.title.trim();
+    if (item.textTask) return item.customName?.trim() || 'task';
     const custom = matchCustomStandard(findProject(item.projectId), item);
     return custom
       ? `${item.qty} ${custom.name}`
@@ -157,16 +160,27 @@ export function AssignTasks() {
         tone: 'info',
         emoji: '⚠️',
       });
-    if (!(qty > 0) || !(targetMinutes > 0))
+    if (byText && !targetText.trim())
+      return toast({ title: 'Type what should be done', tone: 'info', emoji: '⚠️' });
+    if ((!byText && !(qty > 0)) || !(targetMinutes > 0))
       return toast({
-        title: 'Quantity and target time must be above zero',
+        title: byText ? 'Target time must be above zero' : 'Quantity and target time must be above zero',
         tone: 'info',
         emoji: '⚠️',
       });
-    if (typeId === 'custom' && !customName.trim())
+    if (!byText && typeId === 'custom' && !customName.trim())
       return toast({ title: 'Name the custom task', tone: 'info', emoji: '⚠️' });
     if (!forDate || !isWeekday(forDate))
       return toast({ title: 'Pick a working day (Monday to Friday)', tone: 'info', emoji: '⚠️' });
+    if (byText) {
+      setCart((G) => [
+        ...G,
+        { key: nextCartKey(), typeId: 'custom', textTask: true, targetText: targetText.trim(), customName: targetText.trim(), qty: 1, targetMinutes, pace: targetMinutes, projectId: project.id, assigneeId, title, date: forDate },
+      ]);
+      setTitle('');
+      setTargetText('');
+      return;
+    }
     setCart((G) => [
       ...G,
       {
@@ -203,7 +217,7 @@ export function AssignTasks() {
       ...fresh.map((t) => {
         const isCustom = t.typeId === 'custom';
         const name = isCustom ? t.customName || t.title.replace(/^\d+\s*/, '') : undefined;
-        const defaultTitle = isCustom ? `${t.qty} ${name}` : defaultTaskTitle(t.typeId, t.qty, t.variant);
+        const defaultTitle = t.textTask ? name : isCustom ? `${t.qty} ${name}` : defaultTaskTitle(t.typeId, t.qty, t.variant);
         return {
           key: nextCartKey(),
           from: t.id,
@@ -212,6 +226,7 @@ export function AssignTasks() {
           customName: name,
           customUnit: isCustom ? t.unit : undefined,
           customStandardId: t.customStandardId,
+          ...(t.textTask ? { textTask: true, targetText: t.customName } : {}),
           qty: t.qty,
           targetMinutes: t.targetMinutes,
           pace: t.targetMinutes / t.qty,
@@ -338,6 +353,32 @@ export function AssignTasks() {
               </div>
             </div>
             <div>
+              <p className="mb-1.5 text-xs font-bold uppercase text-muted">Give the task as</p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Give the task as">
+                <Button tone={!byText ? 'primary' : 'ghost'} className="border border-line" aria-pressed={!byText} onClick={() => setByText(false)}>
+                  A quantity
+                </Button>
+                <Button tone={byText ? 'primary' : 'ghost'} className="border border-line" aria-pressed={byText} data-testid="by-text" onClick={() => { setByText(true); setManualTarget(true); }}>
+                  Text (no quantity)
+                </Button>
+              </div>
+            </div>
+            {byText && (
+              <div>
+                <p className="mb-1.5 text-xs font-bold uppercase text-muted">What should be done</p>
+                <AutoText
+                  className={INPUT_CLASS}
+                  aria-label="Task text"
+                  data-testid="task-text"
+                  placeholder="e.g. Prepare a structured goal for the GTM flow along with Komala"
+                  value={targetText}
+                  onChange={(G) => setTargetText(G.target.value)}
+                />
+                <p className="mt-1 text-xs text-muted">The person marks it done when it is finished; there is no number to count.</p>
+              </div>
+            )}
+            {!byText && (
+            <div>
               <p className="mb-1.5 text-xs font-bold uppercase text-muted">Task</p>
               <div className="flex flex-wrap gap-2">
                 {projectTaskTypes(project).map((G) => (
@@ -454,6 +495,7 @@ export function AssignTasks() {
                 </div>
               )}
             </div>
+            )}
             <div className="flex flex-wrap items-end gap-4">
               <label className="w-40 text-sm font-semibold">
                 For day
@@ -465,17 +507,19 @@ export function AssignTasks() {
                   onChange={(G) => setForDate(G.target.value)}
                 />
               </label>
-              <label className="w-28 text-sm font-semibold">
-                Quantity
-                <input
-                  type="number"
-                  min={1}
-                  aria-label="Quantity"
-                  className={cn(INPUT_CLASS, 'mt-1')}
-                  value={qty}
-                  onChange={(G) => setQty(+G.target.value)}
-                />
-              </label>
+              {!byText && (
+                <label className="w-28 text-sm font-semibold">
+                  Quantity
+                  <input
+                    type="number"
+                    min={1}
+                    aria-label="Quantity"
+                    className={cn(INPUT_CLASS, 'mt-1')}
+                    value={qty}
+                    onChange={(G) => setQty(+G.target.value)}
+                  />
+                </label>
+              )}
               <label className="w-36 text-sm font-semibold">
                 Target time (min)
                 <input
@@ -542,7 +586,7 @@ export function AssignTasks() {
                     {customMatch.unit.replace(/s$/, '')})
                   </p>
                 )}
-                {typeId === 'custom' && !customMatch && (
+                {typeId === 'custom' && !customMatch && !byText && (
                   <p className="text-xs text-muted">
                     Add it as a custom task under <b>Edit project details</b> on the Projects page to track
                     difficulty.
@@ -623,16 +667,20 @@ export function AssignTasks() {
                             </button>
                           </div>
                           <div className="mt-2 flex gap-2">
-                            <label className="flex items-center gap-1 text-xs text-muted">
-                              Qty
-                              <input
-                                type="number"
-                                min={1}
-                                className={cn(INPUT_CLASS, 'w-20 py-1')}
-                                value={item.qty}
-                                onChange={(e) => changeItemQty(item, +e.target.value)}
-                              />
-                            </label>
+                            {item.textTask ? (
+                              <span className="flex items-center text-xs font-semibold text-muted">Text task · mark done</span>
+                            ) : (
+                              <label className="flex items-center gap-1 text-xs text-muted">
+                                Qty
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className={cn(INPUT_CLASS, 'w-20 py-1')}
+                                  value={item.qty}
+                                  onChange={(e) => changeItemQty(item, +e.target.value)}
+                                />
+                              </label>
+                            )}
                             <label className="flex items-center gap-1 text-xs text-muted">
                               Min
                               <input

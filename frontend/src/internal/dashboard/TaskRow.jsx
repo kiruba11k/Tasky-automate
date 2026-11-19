@@ -163,16 +163,20 @@ export function TaskRow({ task }) {
           </select>
         </label>
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <label className="text-sm font-semibold">
-            {task.unit[0].toUpperCase() + task.unit.slice(1)} done
-            <input
-              type="number"
-              min={1}
-              className={cx(inputClass, 'mt-1')}
-              value={doneQty}
-              onChange={(e) => setDoneQty(+e.target.value)}
-            />
-          </label>
+          {task.textTask ? (
+            <p className="self-end pb-2 text-sm font-semibold">Done: the whole task</p>
+          ) : (
+            <label className="text-sm font-semibold">
+              {task.unit[0].toUpperCase() + task.unit.slice(1)} done
+              <input
+                type="number"
+                min={1}
+                className={cx(inputClass, 'mt-1')}
+                value={doneQty}
+                onChange={(e) => setDoneQty(+e.target.value)}
+              />
+            </label>
+          )}
           <label className="text-sm font-semibold">
             Minutes taken
             <input
@@ -198,7 +202,7 @@ export function TaskRow({ task }) {
           ))}
         </div>
         <p className="mt-3 text-sm text-muted">
-          Target: {formatMinutes(task.targetMinutes)} for {task.qty}{task.unit && !/^\d+$/.test(String(task.unit).trim()) ? ` ${task.unit}` : ''}
+          Target: {formatMinutes(task.targetMinutes)}{task.textTask ? '' : ` for ${task.qty}${task.unit && !/^\d+$/.test(String(task.unit).trim()) ? ` ${task.unit}` : ''}`}
         </p>
         <div className="mt-4 text-sm font-semibold">
           Links <span className="font-normal text-muted">(optional: the sheet or doc to check)</span>

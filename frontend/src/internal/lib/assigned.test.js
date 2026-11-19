@@ -53,3 +53,19 @@ test('a time typed on an assigned row stays as typed, whatever time the submitte
   const typed = assignedDay([sent], ME, D, { projects: [], today: D, asg: { [rowId]: { projectId: 'p', actualMin: 60 } } }).rows[0];
   assert.deepEqual([typed.actualMin, typed.typedMin], [60, 60]);
 });
+
+test('a task given as text is a row with a text target that is done or not, never a quantity', () => {
+  const text = task({ typeId: 'custom', customName: 'Prepare the GTM goal with Komala', textTask: true, qty: 1, unit: 'task', title: 'Prepare the GTM goal with Komala' });
+  const opts = { projects: [], today: D };
+  const open = assignedDay([text], ME, D, opts).rows[0];
+  assert.deepEqual([open.kind, open.targetText, open.status, open.doneQty], ['milestone', 'Prepare the GTM goal with Komala', 'Not started', 0]);
+  // the person marks it done: the row reads Completed and counts as 1 of 1
+  const asg = { [`asg|${ME}|${D}|${open.id.split('|').slice(3).join('|')}`]: { projectId: 'p', doneQty: 1 } };
+  const marked = assignedDay([text], ME, D, { ...opts, asg }).rows[0];
+  assert.deepEqual([marked.status, marked.typedDone, marked.doneQty], ['Completed', 1, 1]);
+  // two different texts stay two rows; a text task and a quantity task never merge
+  const other = task({ id: 't2', typeId: 'custom', customName: 'Discuss the pipeline', textTask: true, qty: 1, unit: 'task', title: 'Discuss the pipeline' });
+  const counted = task({ id: 't3', typeId: 'custom', customName: 'Discuss the pipeline', qty: 5, unit: 'items', title: '5 Discuss the pipeline' });
+  assert.equal(assignedDay([text, other], ME, D, opts).rows.length, 2);
+  assert.deepEqual(assignedDay([other, counted], ME, D, opts).rows.map((r) => r.kind).sort(), ['milestone', 'number']);
+});

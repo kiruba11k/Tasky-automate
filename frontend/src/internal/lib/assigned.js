@@ -120,6 +120,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
       const loggedTotal = typedMin || actualMin ? (typedMin ?? 0) + (actualMin ?? 0) : undefined;
       const defaulted = !loggedTotal && defaultTaken && estMin > 0;
       const totalMin = defaulted ? estMin : loggedTotal;
+      const text = b.tasks.every((x) => x.t.textTask); // tasks given as a sentence to do: a row with a text target and a done / not done state, not a quantity
       const row = {
         id: rowId,
         assigned: true,
@@ -127,7 +128,8 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         task: TASK_TYPES.some((x) => x.id === b.tasks[0].t.typeId) ? b.tasks[0].t.typeId : CUSTOM_TASK,
         custom: TASK_TYPES.some((x) => x.id === b.tasks[0].t.typeId) ? undefined : b.k.label,
         label: b.k.label,
-        kind: "number",
+        kind: text ? "milestone" : "number",
+        ...(text ? { targetText: b.tasks[0].t.customName ?? b.k.label } : {}),
         qty: Math.max(0, b.qty - (l?.qty ?? 0)),
         doneQty: Math.max(0, b.done - (l?.done ?? 0), typedDone ?? 0),
         typedDone,
@@ -148,6 +150,7 @@ export function assignedDay(tasks, personId, date, { projects, logged = [], toda
         sentFrom: b.tasks.every((x) => x.late) ? b.tasks.map((x) => x.t.date).sort()[0] : undefined,
         covering: !!l,
       };
+      if (text) row.status = row.doneQty > 0 ? "Completed" : "Not started";
       if (l && !row.qty && !row.doneQty && !row.estMin && !row.actualMin) {
         covers.set(l.rows[0].id, row); // the logged rows already cover the whole assignment
         return;
