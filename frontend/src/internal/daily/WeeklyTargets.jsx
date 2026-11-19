@@ -47,6 +47,33 @@ function CellText({ value, onSave, label, placeholder, type = 'text', className 
   return <input {...common} type="number" min={0} className={cx(FIELD, 'text-right tabular-nums', className)} />;
 }
 
+/** The project of a row: type or pick a name. A name of one of the person's projects is that project; any other name is work that is no project. */
+function ProjectCell({ value, onSave, label, options }) {
+  const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setText(value);
+  }
+  const listId = `projects-${label.replace(/\W+/g, '-')}`;
+  return (
+    <>
+      <input
+        aria-label={label}
+        list={listId}
+        className={cx(FIELD, 'text-center font-semibold')}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => (text.trim() && text !== value ? onSave(text) : setText(value))}
+        onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+      />
+      <datalist id={listId}>
+        {options.map((o) => <option key={o} value={o} />)}
+      </datalist>
+    </>
+  );
+}
+
 /** "Fill from previous week" menu: the earlier weeks that have targets of their own, to copy into this week (what is already here is kept). */
 function WeekFillPicker({ weeks, onPick }) {
   const [open, setOpen] = useState(false);
@@ -160,6 +187,15 @@ export function WeeklyTargets({ personId, date }) {
   const saveMine = (entries) => saveWeekly(personId, monday, { entries });
   /** Rows built from somewhere else: a project's fixed target the person cannot change, work from the day tables, planned time. */
   const derived = (it) => (it.src === 'project' && !it.editable) || it.src === 'day' || it.src === 'plan';
+  /** The project a typed name stands for: one of the person's projects (by name), else free-text work that is no project. */
+  const projectIdFor = (text) => {
+    const name = (text ?? '').trim();
+    if (!name) fail('Type the project.');
+    return mineProjects.find((p) => p.name.trim().toLowerCase() === name.toLowerCase())?.id ?? `${OTHER_PREFIX}${name}`;
+  };
+  const changeProject = (it, text) => change(it, { projectId: projectIdFor(text) });
+  /** Names to suggest for a row's project: the person's projects and the other work already in the table. */
+  const projectNames = [...new Set([...mineProjects.map((p) => p.name), ...items.filter((x) => x.src !== 'project' || !x.project).map((x) => x.projectName)])];
   const move = (it, dir) => {
     const keys = items.map((x) => x.key);
     const next = moveKey(keys, it.key, dir);
@@ -182,11 +218,11 @@ export function WeeklyTargets({ personId, date }) {
         // a row that is not the person's own (a fixed target of a project they do not manage, work from the day tables, planned time):
         // changing it makes their own copy and takes the original off their table; the original is not touched
         if (!next.label.trim()) fail('Type the target.');
-        const copy = rowFor({ id: newEntryId(), projectId: it.src === 'project' ? it.project.id : it.projectId }, { name: next.label, kind: next.kind, goal: next.goal, time: next.time });
+        const copy = rowFor({ id: newEntryId(), projectId: patch.projectId ?? (it.src === 'project' ? it.project.id : it.projectId) }, { name: next.label, kind: next.kind, goal: next.goal, time: next.time });
         saveWeekly(personId, monday, { entries: [...(record?.entries ?? []), copy], hiddenFixed: [...new Set([...(record?.hiddenFixed ?? []), it.key])] });
       } else if (it.src === 'mine') {
         if (!next.label.trim()) fail('Type the target.');
-        saveMine((record?.entries ?? []).map((x) => (x.id === it.entry.id ? rowFor(x, { name: next.label, kind: next.kind, goal: next.goal, time: next.time }) : x)));
+        saveMine((record?.entries ?? []).map((x) => (x.id === it.entry.id ? rowFor(patch.projectId ? { ...x, projectId: patch.projectId } : x, { name: next.label, kind: next.kind, goal: next.goal, time: next.time }) : x)));
       } else if (it.metric) {
         if (!(+next.goal >= 0)) fail('The goal must be a number.');
         const numbers = Object.fromEntries((it.project.metrics ?? []).map((m) => [m.id, it.goals[m.id] ?? 0]));
@@ -353,7 +389,9 @@ export function WeeklyTargets({ personId, date }) {
                         </td>
                       )}
                       <td className={`${cell} text-center align-middle font-semibold`}>
-                        {it.editable && !it.metric ? (
+                        {it.src === 'mine' || derived(it) ? (
+                          <ProjectCell label={`${it.label} project`} value={it.projectName} options={projectNames} onSave={(v) => changeProject(it, v)} />
+                        ) : it.editable && !it.metric ? (
                           <select
                             aria-label={`${it.label} project`}
                             className={cx(FIELD, 'font-semibold')}
