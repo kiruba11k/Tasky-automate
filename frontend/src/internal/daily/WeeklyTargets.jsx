@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AutoText } from '@/internal/kit/AutoText';
-import { Check, ChevronDown, Copy, Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import {
   Se as useStore,
   rt as Card,
@@ -18,6 +18,7 @@ import { weekRows } from '../lib/entries.js';
 import { CUSTOM_TASK, entryName, newEntryId, projectLabel, rowTime } from './entryHelpers';
 import { OTHER_PREFIX, groupBlocks } from './planBlocks';
 import { newTargetId, targetKind } from '../projects/targetKinds';
+import { orderItems, moveKey } from '../lib/weekTargetOrder.js';
 import { TargetSheet } from '../projects/TargetSheet';
 import { sheetColorOf } from './sheetText';
 import { DurationInput } from './DurationInput';
@@ -116,10 +117,10 @@ function collectItems({ personId, date, projects, daily, weekly }) {
     });
   // company work typed into the day tables, and time planned for work that is no project (read only here)
   weekRows(personId, monday, daily, [], {}, [])
-    .filter((r) => String(r.projectId).startsWith(OTHER_PREFIX) && (r.qty > 0 || r.targetText?.trim()))
+    .filter((r) => String(r.projectId).startsWith(OTHER_PREFIX) && (r.qty > 0 || r.targetText?.trim()) && !hidden.has(`d:${r.id}`))
     .forEach((r) => {
       const kind = r.kind ?? 'number';
-      items.push({ src: 'day', key: `d:${r.id}`, range: weekRange, projectName: projectLabel(r.projectId, []), label: entryName(r), kind, goal: kind === 'number' ? String(r.qty) : (r.targetText ?? '').trim(), time: rowTime(r), editable: false });
+      items.push({ src: 'day', key: `d:${r.id}`, projectId: r.projectId, range: weekRange, projectName: projectLabel(r.projectId, []), label: entryName(r), kind, goal: kind === 'number' ? String(r.qty) : (r.targetText ?? '').trim(), time: rowTime(r), editable: false });
     });
   const planned = new Map();
   const add = (name, minutes) => minutes > 0 && planned.set(name, (planned.get(name) ?? 0) + minutes);
@@ -133,7 +134,7 @@ function collectItems({ personId, date, projects, daily, weekly }) {
     });
     (day.extra ?? []).forEach((x) => !projects.some((p) => p.id === x.projectId) && add(x.work || 'Other work', x.minutes));
   }
-  planned.forEach((minutes, name) => items.push({ src: 'plan', key: `p:${name}`, range: weekRange, projectName: name, label: name, kind: 'number', goal: '', time: minutes, editable: false }));
+  planned.forEach((minutes, name) => !hidden.has(`p:${name}`) && items.push({ src: 'plan', key: `p:${name}`, projectId: `${OTHER_PREFIX}${name}`, range: weekRange, projectName: name, label: name, kind: 'number', goal: '', time: minutes, editable: false }));
   return { items, mineProjects, monday };
 }
 
@@ -145,7 +146,9 @@ function collectItems({ personId, date, projects, daily, weekly }) {
 export function WeeklyTargets({ personId, date }) {
   const { projects, daily, weekly, profiles, saveWeekly, saveWeekPlan, setWeekOff, setWeekText } = useStore();
   const [editing, setEditing] = useState(false);
-  const { items, mineProjects, monday } = useMemo(() => collectItems({ personId, date, projects, daily, weekly }), [personId, date, projects, daily, weekly]);
+  const collected = useMemo(() => collectItems({ personId, date, projects, daily, weekly }), [personId, date, projects, daily, weekly]);
+  const { mineProjects, monday } = collected;
+  const items = useMemo(() => orderItems(collected.items, weekly[`${personId}|${collected.monday}`]?.order), [collected, weekly, personId]);
   const plannable = mineProjects.filter((p) => canPlanFor(p, personId));
   const OTHER = 'other';
   const [adding, setAdding] = useState({ projectId: '', work: '', name: '', kind: 'number', goal: '', time: undefined, forProject: true });
@@ -155,6 +158,13 @@ export function WeeklyTargets({ personId, date }) {
   const color = sheetColorOf(profiles[personId], 'week');
 
   const saveMine = (entries) => saveWeekly(personId, monday, { entries });
+  /** Rows built from somewhere else: a project's fixed target the person cannot change, work from the day tables, planned time. */
+  const derived = (it) => (it.src === 'project' && !it.editable) || it.src === 'day' || it.src === 'plan';
+  const move = (it, dir) => {
+    const keys = items.map((x) => x.key);
+    const next = moveKey(keys, it.key, dir);
+    if (next !== keys) saveWeekly(personId, monday, { order: next });
+  };
   const rowFor = (base, { name, kind, goal, time }) => {
     const number = kind === 'number';
     return { ...base, target: true, task: CUSTOM_TASK, custom: name.trim(), kind, qty: number ? Math.max(0, Math.round(+goal || 0)) : undefined, doneQty: number ? base.doneQty : undefined, targetText: number ? undefined : (goal ?? '').trim(), desc: base.desc ?? '', estMin: time ?? 0, actualMin: time, remarks: base.remarks ?? '', achieved: base.achieved ?? '' };
@@ -168,10 +178,11 @@ export function WeeklyTargets({ personId, date }) {
   const change = (it, patch) =>
     runAction(() => {
       const next = { label: it.label, kind: it.kind, goal: it.goal, time: it.time, ...patch };
-      if (it.src === 'project' && !it.editable) {
-        // a fixed target of a project the person does not manage: changing it makes their own copy, the project's target stays as it is
+      if (derived(it)) {
+        // a row that is not the person's own (a fixed target of a project they do not manage, work from the day tables, planned time):
+        // changing it makes their own copy and takes the original off their table; the original is not touched
         if (!next.label.trim()) fail('Type the target.');
-        const copy = rowFor({ id: newEntryId(), projectId: it.project.id }, { name: next.label, kind: next.kind, goal: next.goal, time: next.time });
+        const copy = rowFor({ id: newEntryId(), projectId: it.src === 'project' ? it.project.id : it.projectId }, { name: next.label, kind: next.kind, goal: next.goal, time: next.time });
         saveWeekly(personId, monday, { entries: [...(record?.entries ?? []), copy], hiddenFixed: [...new Set([...(record?.hiddenFixed ?? []), it.key])] });
       } else if (it.src === 'mine') {
         if (!next.label.trim()) fail('Type the target.');
@@ -188,7 +199,7 @@ export function WeeklyTargets({ personId, date }) {
     });
   const remove = (it) => {
     const ok = runAction(() => {
-      if (it.src === 'project' && !it.editable) saveWeekly(personId, monday, { hiddenFixed: [...new Set([...(record?.hiddenFixed ?? []), it.key])] }); // taken off this person's table; the project keeps it
+      if (derived(it)) saveWeekly(personId, monday, { hiddenFixed: [...new Set([...(record?.hiddenFixed ?? []), it.key])] }); // taken off this person's table; the project keeps it
       else if (it.src === 'mine') saveMine((record?.entries ?? []).filter((x) => x.id !== it.entry.id));
       else if (it.metric) setWeekOff(it.project.id, it.start, [...it.off, it.metric]);
       else setWeekText(it.project.id, it.start, textRows(it.project, it.start).filter((r) => r.id !== it.row.id));
@@ -322,7 +333,7 @@ export function WeeklyTargets({ personId, date }) {
               <thead>
                 <tr className="text-white" style={{ background: color }}>
                   {['Date', 'Project', 'Target', 'Goal', 'Time', ''].map((h, i) => (
-                    <th key={i} className={cx(head, i === 5 && 'w-10')}>
+                    <th key={i} className={cx(head, i === 5 && 'w-28')}>
                       {h}
                     </th>
                   ))}
@@ -360,7 +371,7 @@ export function WeeklyTargets({ personId, date }) {
                           it.projectName
                         )}
                       </td>
-                      {it.editable || it.src === 'project' ? (
+                      {it.editable || derived(it) || it.src === 'project' ? (
                         <>
                           <td className={cell}>
                             {it.metric && it.editable ? (
@@ -376,9 +387,15 @@ export function WeeklyTargets({ personId, date }) {
                             <CellText label={`${it.label} goal`} type={number ? 'number' : 'text'} value={it.goal} onSave={(v) => change(it, { goal: v })} />
                           </td>
                           <td className={`${cell} text-center`}>
-                            {it.src === 'mine' || (it.src === 'project' && !it.editable) ? <DurationInput label={`${it.label} time`} column="target-time" placeholder="..." value={it.time || undefined} onChange={(m) => change(it, { time: m })} /> : null}
+                            {!(it.src === 'project' && it.editable) ? <DurationInput label={`${it.label} time`} column="target-time" placeholder="..." value={it.time || undefined} onChange={(m) => change(it, { time: m })} /> : null}
                           </td>
-                          <td className={`${cell} text-center`}>
+                          <td className={`${cell} whitespace-nowrap text-center`}>
+                            <button type="button" aria-label={`Move ${it.label} up`} title="Move up" disabled={i === 0} className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(it, -1)}>
+                              <ArrowUp size={14} />
+                            </button>
+                            <button type="button" aria-label={`Move ${it.label} down`} title="Move down" disabled={i === items.length - 1} className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(it, 1)}>
+                              <ArrowDown size={14} />
+                            </button>
                             <button type="button" aria-label={`Delete ${it.label}`} title="Delete" className="focus-ring rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-coral-ink" onClick={() => remove(it)}>
                               <Trash2 size={14} />
                             </button>
