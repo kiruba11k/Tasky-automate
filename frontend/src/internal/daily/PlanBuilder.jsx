@@ -136,7 +136,8 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
 
   const span = Math.max(WORK_END, extraStart + extraTotal) - WORK_START;
   const pos = (m) => `${((m - WORK_START) / span) * 100}%`;
-  const commitPlan = (list) => setPlan(flowBlocks(list, lunch));
+  // a block has one Time: its actual time is that time, so there is no separate Actual to fill in
+  const commitPlan = (list) => setPlan(flowBlocks(list.map((g) => ({ ...g, actual: g.minutes })), lunch));
   const commitExtra = (list) => setExtra(layExtras(list));
   const laneItems = (name) => (name === 'plan' ? groups : extras);
   const dragged = drag ? laneItems(drag.lane).find((item) => item.id === drag.id) : undefined;
@@ -577,16 +578,6 @@ export function PlanBuilder({ plan, setPlan, extra, setExtra, personId, date, on
                       className="w-20"
                       value={group.minutes}
                       onChange={(m) => m && m >= 5 && commitPlan(groups.map((g) => (g.id === group.id ? { ...g, minutes: m } : g)))}
-                    />
-                  </label>
-                  <label className="flex items-center gap-1 text-xs text-muted">
-                    Actual
-                    <DurationInput
-                      label="Actual time"
-                      className="w-20"
-                      placeholder="..."
-                      value={group.actual}
-                      onChange={(m) => commitPlan(groups.map((g) => (g.id === group.id ? { ...g, actual: m ?? undefined } : g)))}
                     />
                   </label>
                   {onChangeProject && (
