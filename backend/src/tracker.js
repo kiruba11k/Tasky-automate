@@ -299,12 +299,12 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
     return !!orig && orig.reviewerId === u.id && orig.assigneeId === data.assigneeId && orig.projectId === data.projectId;
   }
 
-  /** A team member's own assignment: a new to-do from them, for anyone, on an active project they are on. */
+  /** Anyone's own assignment: a new to-do from them, for anyone, on any active project (they need not be on it). */
   async function assignOk(u, data) {
     if (!data || data.assignedById !== u.id || data.status !== 'todo' || data.reviewerId || data.adhoc || data.approvedAt || (data.reviews || []).length) return false;
     if (!(await live()).some((x) => x.id === data.assigneeId)) return false;
     const project = (await find('project', data.projectId))?.data;
-    return !!project && project.status === 'active' && (project.pmId === u.id || (project.teamIds || []).includes(u.id) || (project.admins || []).includes(u.id));
+    return !!project && project.status === 'active';
   }
 
   const eodChanged = (data, prev, field = 'eodReviews') => {
@@ -354,7 +354,7 @@ export function registerTracker(app, { store, wrap, isOwner = () => false, clock
           if (lead(u) && (mine(data.assignedById) || leadership(u))) return true; // managers and PMs give out tasks
           if (await reworkOk(u, data)) return true; // the reviewer sends the rest of a part-approved task back
           if (await adhocApprovalOk(u, data)) return true; // anyone may send their own unassigned work for approval
-          return assignOk(u, data); // and a resource may hand a task to anyone, on a project they are on
+          return assignOk(u, data); // and anyone may hand a task to anyone, on any active project
         }
         if (deleting) return lead(u) || mine(prev.assignedById); // the assignee cannot delete their own task
         // Review rules. A task is approved (done) or sent back (changes) only by its reviewer. Work by a resource is always

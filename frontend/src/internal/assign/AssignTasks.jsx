@@ -1,7 +1,6 @@
 import { mineFirst } from '@/internal/lib/mine';
 import { AutoText } from '@/internal/kit/AutoText';
 import { ReadMore } from '@/internal/ui/ReadMore';
-import { isAdminTier } from '@/internal/lib/constants';
 import { isWeekday, nextWeekday, todayKey } from '@/internal/lib/dates';
 import React, { useState, useEffect } from 'react';
 import { RotateCcwClock, Plus, Gauge, ShoppingBasket, Trash, Send, Star } from 'lucide-react';
@@ -44,19 +43,15 @@ import {
 /** Route "/assign": build a list of tasks and assign them to teammates. */
 export function AssignTasks() {
   const { me, tasks, projects, assignMany } = useStore();
-  const myRole = PEOPLE.find((G) => G.id === me)?.role;
-  const isManager = isAdminTier(myRole);
-  const myProjects = mineFirst(projects, me).filter(
-    (G) => G.status === 'active' && (canAssignOnProject(G, me) || G.teamIds.includes(me)),
-  );
+  // anyone can assign on any active project (their own first), to anyone
+  const myProjects = mineFirst(projects, me).filter((G) => G.status === 'active');
   const [projectId, setProjectId] = useState(myProjects[0]?.id ?? '');
   const project = myProjects.find((G) => G.id === projectId) ?? myProjects[0];
   const canManage = !!project && canAssignOnProject(project, me); // owner, admin or leadership of the selected project
   const teammates = PEOPLE.filter(
     (G) =>
       (G.id !== me || !canManage) &&
-      (G.role !== 'founder' || G.tracked) &&
-      (isManager || project?.teamIds.includes(G.id) || (!canManage && G.id === me)),
+      (G.role !== 'founder' || G.tracked),
   );
   const [pickedAssignee, setPickedAssignee] = useState('');
   const [typeIdState, setTypeId] = useState('l1');
@@ -137,7 +132,7 @@ export function AssignTasks() {
     return (
       <Card>
         <p className="py-8 text-center text-muted">
-          You'll be able to assign tasks once you own or help run (as a project admin) an approved project.
+          There is no approved project to assign tasks on yet.
         </p>
       </Card>
     );
@@ -335,7 +330,7 @@ export function AssignTasks() {
               <p className="mb-1.5 text-xs font-bold uppercase text-muted">Assign to</p>
               <div className="flex flex-wrap gap-2">
                 {teammates.length === 0 && (
-                  <p className="text-sm text-muted">No teammates on this project yet.</p>
+                  <p className="text-sm text-muted">No one to assign to.</p>
                 )}
                 {teammates.map((G) => (
                   <button
