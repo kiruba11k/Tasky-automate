@@ -24,12 +24,9 @@ const lead = (u) => leadership(u) || trackerRole(u) === 'pm';
 const COLORS = { founder: 'lavender', manager: 'peach', pm: 'sky', resource: 'mint' };
 const TITLES = { founder: 'Founder', manager: 'Manager', pm: 'Project Manager', resource: 'Resource' };
 
-// Who approves project proposals: people flagged `approver` and the emails in PROJECT_APPROVERS (comma separated). Nobody else.
-// If nobody qualifies yet, every manager can, so approvals never get stuck.
-export const approvers = (users) => {
-  const named = users.filter(isNamedApprover);
-  return named.length ? named : users.filter(leadership);
-};
+// Who approves project proposals: the main admins (managers and founders) and anyone flagged `approver` or listed in PROJECT_APPROVERS
+// (comma separated, for a project manager or resource who should approve too). Project managers who are not named only propose.
+export const approvers = (users) => users.filter((u) => isNamedApprover(u) || leadership(u));
 
 export const publicPerson = (u) => ({
   id: u.id,

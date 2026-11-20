@@ -1055,16 +1055,17 @@ describe('tracker documents', () => {
     assert.deepEqual((await call('GET', '/api/tracker/docs', bo)).body.docs.find((d) => d.key === 'p2').data.week, { a: 5 });
   });
 
-  test('project approvals go only to the approvers; project managers propose, they do not approve', async () => {
+  test('project approvals go to the main admins and the named approvers; project managers propose, they do not approve', async () => {
     const people = (await call('GET', '/api/tracker/people', pm)).body;
-    assert.deepEqual(people.filter((p) => p.approver).map((p) => p.name), ['fay'], 'only the flagged person is an approver, even though other founders and managers exist');
+    const approverNames = people.filter((p) => p.approver).map((p) => p.name);
+    assert.ok(approverNames.includes('fay') && approverNames.includes('Admin'), 'the flagged founder and the main admin are approvers');
+    assert.ok(!approverNames.includes('pm') && !approverNames.includes('ann'), 'project managers and resources are not');
     const patch = (token, p) => call('POST', '/api/tracker/docs/batch', token, { patches: [{ kind: 'project', key: 'p3', patch: p }] }).then((r) => r.body.results[0]);
     assert.equal((await patch(pm, { id: 'p3', name: 'P3', pmId: ids.pm, admins: [], status: 'active', teamIds: [] })).ok, false, 'a project manager cannot create a live project');
     assert.equal((await patch(pm, { id: 'p3', name: 'P3', pmId: ids.pm, admins: [], status: 'pending', teamIds: [] })).ok, true, 'but can propose one');
     assert.equal((await patch(pm, { status: 'active' })).ok, false, 'and cannot approve it');
-    assert.equal((await patch(admin, { status: 'active' })).ok, false, 'a manager who is not an approver cannot either');
     assert.equal((await patch(ann, { status: 'active' })).ok, false);
-    assert.equal((await patch(fay, { status: 'active' })).ok, true);
+    assert.equal((await patch(admin, { status: 'active' })).ok, true, 'a main admin approves a proposed project');
     assert.equal((await call('POST', '/api/entities/User', pm, { full_name: 'New Res', email: 'newres@x.com', role: 'team_member' })).status, 403, 'project managers do not add people');
   });
 
@@ -1076,7 +1077,7 @@ describe('tracker documents', () => {
       const people = (await call('GET', '/api/tracker/people', pm)).body;
       const named = people.filter((p) => p.approver).map((p) => p.name);
       assert.ok(named.includes('Komala') && named.includes('fay'));
-      assert.ok(!named.includes('pm') && !named.includes('Admin'), 'project managers and other managers are not approvers once approvers are named');
+      assert.ok(!named.includes('pm') && named.includes('Admin'), 'project managers are not approvers; the main admin is');
       await call('POST', '/api/tracker/docs/batch', pm, { patches: [{ kind: 'project', key: 'p4', patch: { id: 'p4', name: 'P4', pmId: ids.pm, admins: [], status: 'pending', teamIds: [] } }] });
       const del = (token) => call('POST', '/api/tracker/docs/batch', token, { deletes: [{ kind: 'project', key: 'p4' }] }).then((r) => r.body.results[0]);
       assert.equal((await del(ann)).ok, false);
